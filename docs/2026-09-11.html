@@ -133,7 +133,8 @@
     line-height:1.62; font-weight:400; color:var(--ink); white-space:normal;
     text-align:left; cursor:default; letter-spacing:-.01em;
   }
-  .term.open .tip{display:block}
+  /* 열릴 때 스크립트가 body 로 옮기고 display 를 직접 켠다 */
+  body > .tip{display:block}
   .hint{margin:-4px 0 9px; font-size:12px; color:var(--dim)}
   .hint::before{content:"☞ "; }
   .tip-head{display:block; font-size:12.5px; color:var(--accent);
@@ -599,7 +600,7 @@
 
 <footer>
   데이터 출처: 한국거래소·yfinance(시세), 미 연준 FRED(거시지표), 한국은행 ECOS(국내금리)<br>
-  생성 <code>2026-09-11 22:59</code> · 기준일 <code>2026-09-11</code>
+  생성 <code>2026-09-11 23:01</code> · 기준일 <code>2026-09-11</code>
   <div class="disclaimer">
     이 문서는 공개 데이터를 기계적으로 집계·계산한 개인용 기록이며, 투자 권유가 아닙니다.
     확률은 과거 빈도일 뿐 미래를 보장하지 않습니다. 투자 판단과 그 결과는 본인 책임입니다.
@@ -617,14 +618,19 @@
    마우스에서도 표를 훑다 보면 말풍선이 계속 튀어나와 성가시기 때문이다. */
 (function () {
   var open = null;
+  var openTip = null;
   var MARGIN = 8;
 
   function close() {
-    if (open) { open.classList.remove('open'); open = null; }
+    if (!open) return;
+    open.classList.remove('open');
+    if (openTip) { openTip.style.display = ''; open.appendChild(openTip); }
+    open = null;
+    openTip = null;
   }
 
   function place(term) {
-    var tip = term.querySelector('.tip');
+    var tip = openTip;
     if (!tip) return;
 
     tip.style.left = '0px';
@@ -658,8 +664,19 @@
     e.preventDefault();
     if (term === open) { close(); return; }
     close();
+
+    var tip = term.querySelector('.tip');
+    if (!tip) return;
+
+    /* 말풍선을 body 로 옮긴다.
+       표 첫 열은 position:sticky 에 배경색이 있어서, 그 자리에 둔 채로는
+       z-index 를 아무리 올려도 옆 칸 배경에 왼쪽이 잘려 보인다.
+       body 직속이면 어떤 쌓임 맥락에도 갇히지 않는다. */
     term.classList.add('open');
     open = term;
+    openTip = tip;
+    document.body.appendChild(tip);
+    tip.style.display = 'block';
     place(term);
   });
 
