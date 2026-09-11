@@ -1,0 +1,91 @@
+name: 매일 경제 브리핑
+
+on:
+  schedule:
+    # UTC 21:45 = 한국시간 06:45.
+    # GitHub Actions의 cron은 정시를 보장하지 않고 5~30분 늦는 일이 흔하다.
+    # 07:00 정각을 쓰면 전 세계 작업이 몰려 더 밀리므로,
+    # 조금 이르게 잡고 지연을 흡수한다. 미국장 마감(KST 05~06시)은 이미 지났다.
+    - cron: '45 21 * * *'
+  workflow_dispatch:        # 저장소 Actions 탭에서 수동 실행 가능
+
+permissions:
+  contents: write           # 리포트와 예측 기록을 커밋하기 위해 필요
+
+concurrency:
+  group: daily-brief
+  cancel-in-progress: false
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: 자격증명 파일 생성
+        env:
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+          REPORT_BASE_URL: ${{ secrets.REPORT_BASE_URL }}
+        run: |
+          mkdir -p config data
+          # 값은 GitHub Secrets 에만 있고 저장소에는 남지 않는다.
+          cat > config/.env <<EOF
+          KAKAO_REST_API_KEY=$KAKAO_REST_API_KEY
+          FRED_API_KEY=$FRED_API_KEY
+          ECOS_API_KEY=$ECOS_API_KEY
+          DART_API_KEY=$DART_API_KEY
+          FINNHUB_API_KEY=$FINNHUB_API_KEY
+          KRX_ID=$KRX_ID
+          KRX_PW=$KRX_PW
+          REPORT_BASE_URL=$REPORT_BASE_URL
+          EOF
+          python - <<'PY'
+          import json, os, pathlib
+          pathlib.Path("config/.kakao_token.json").write_text(json.dumps({
+              "rest_api_key":  os.environ["KAKAO_REST_API_KEY"],
+              "client_secret": os.environ.get("KAKAO_CLIENT_SECRET", ""),
+              "access_token":  "",          # 실행할 때마다 새로 발급받는다
+              "refresh_token": os.environ["KAKAO_REFRESH_TOKEN"],
+              "scope": "talk_message",
+          }, ensure_ascii=False, indent=2), encoding="utf-8")
+          PY
+
+      - name: 브리핑 생성 및 발송
+        env:
+          PYTHONUTF8: '1'
+          TZ: Asia/Seoul
+        run: python run.py --no-publish
+
+      - name: 리포트와 예측 기록 커밋
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs data/predictions.csv
+          if git diff --cached --quiet; then
+            echo "변경 없음 — 커밋 생략"
+          else
+            git commit -m "브리핑 $(date +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: 실행 로그 남기기
+        if: always()
+        run: tail -40 data/run.log || echo "로그 없음"

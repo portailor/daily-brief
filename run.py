@@ -56,7 +56,7 @@ def publish(trade_date: str) -> bool:
         log("△ git 저장소가 아닙니다. 리포트 발행을 건너뜁니다.")
         return False
 
-    git("add", "docs")
+    git("add", "docs", "data/predictions.csv")
     if not git("diff", "--cached", "--quiet").returncode:
         log("  리포트 변경 없음 — 발행 생략")
         return True
@@ -98,6 +98,12 @@ def main() -> int:
     failures: list[str] = []
 
     db.init()
+
+    # 클라우드에서는 매 실행이 빈 DB로 시작한다. 예측 기록만 되살린다.
+    with db.session() as conn:
+        restored = db.import_predictions(conn)
+    if restored:
+        log(f"✓ 예측 기록 {restored}건 복원")
 
     if not args.no_fetch:
         r, err = step("시세 수집", market.collect)
@@ -144,6 +150,11 @@ def main() -> int:
     if card.hit + card.miss:
         log(f"✓ 채점: {card.hit}/{card.hit + card.miss} 적중")
     log(f"  결론: {payload['verdict']['headline']}")
+
+    # 채점 결과까지 반영한 뒤 내보내야 한다 — 발행보다 먼저.
+    with db.session() as conn:
+        saved = db.export_predictions(conn)
+    log(f"✓ 예측 기록 {saved}건 저장")
 
     if not args.no_publish:
         step("리포트 발행", publish, payload["trade_date"])

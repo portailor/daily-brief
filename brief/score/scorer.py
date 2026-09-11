@@ -59,7 +59,10 @@ def _field_value(conn, instrument: str, trade_date: str, field: str) -> float | 
     return row["v"] if row and row["v"] is not None else None
 
 
-ALLOWED_FIELDS = {"close", "chg_pct", "chg_bp", "sigma", "pct_52w",
+# rules.py 가 실제로 만들어내는 field 를 전부 담아야 한다.
+# 'chg' 가 빠져 있어서 σ·연속일 트리거가 통째로 void 처리되고 있었다.
+ALLOWED_FIELDS = {"close", "chg", "chg_pct", "chg_bp", "sigma", "pct_52w",
+                  "high_52w", "low_52w", "ma20", "ma60", "ma200",
                   "vs_ma20", "vs_ma200", "streak"}
 
 

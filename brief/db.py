@@ -139,6 +139,58 @@ def latest_snapshot(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(LATEST_SNAPSHOT_SQL).fetchall()
 
 
+# ── 예측 기록 보존 ───────────────────────────────────────────
+# 클라우드(GitHub Actions)에서는 매 실행이 빈 서버에서 시작하므로
+# DB가 남지 않는다. 시세·지표는 매번 API에서 다시 받으면 그만이지만,
+# 예측 기록만은 잃으면 적중률이 매일 0에서 다시 시작한다.
+# 그래서 이것만 CSV로 떠서 저장소에 커밋한다 (수백 줄이라 가볍다).
+
+PREDICTIONS_CSV = Path(__file__).resolve().parent.parent / "data" / "predictions.csv"
+
+_PRED_COLS = ["made_on", "claim", "instrument", "field", "op", "threshold",
+              "horizon_days", "probability", "due_on", "resolved_on",
+              "actual", "result"]
+
+
+def export_predictions(conn: sqlite3.Connection,
+                       path: Path | str = PREDICTIONS_CSV) -> int:
+    import csv
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = conn.execute(
+        f"SELECT {','.join(_PRED_COLS)} FROM predictions ORDER BY made_on, id"
+    ).fetchall()
+
+    with path.open("w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(_PRED_COLS)
+        w.writerows([tuple(r[c] for c in _PRED_COLS) for r in rows])
+    return len(rows)
+
+
+def import_predictions(conn: sqlite3.Connection,
+                       path: Path | str = PREDICTIONS_CSV) -> int:
+    """CSV의 기록을 DB로 되살린다. 이미 있는 예측은 건드리지 않는다."""
+    import csv
+
+    path = Path(path)
+    if not path.exists():
+        return 0
+
+    with path.open(encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+
+    n = 0
+    for r in rows:
+        vals = [r.get(c) or None for c in _PRED_COLS]
+        cur = conn.execute(
+            f"""INSERT OR IGNORE INTO predictions ({','.join(_PRED_COLS)})
+                VALUES ({','.join('?' * len(_PRED_COLS))})""", vals)
+        n += cur.rowcount
+    return n
+
+
 def last_trade_date(conn: sqlite3.Connection, instrument: str) -> str | None:
     row = conn.execute(
         "SELECT MAX(trade_date) AS d FROM observations WHERE instrument = ?",
