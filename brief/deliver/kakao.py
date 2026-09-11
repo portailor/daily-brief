@@ -65,8 +65,22 @@ def refresh_access_token() -> str:
 
     tok = res.json()
     cfg["access_token"] = tok["access_token"]
-    if "refresh_token" in tok:                 # 잔여 1개월 미만일 때만 내려옴
+
+    # 카카오는 refresh_token 잔여 기간이 1개월 미만일 때만 새 것을 내려준다.
+    # 즉 이 값이 왔다는 건 "곧 만료된다"는 신호다.
+    # GitHub Actions 는 자기 Secret 을 고칠 수 없으므로 자동 저장이 불가능하다.
+    # 조용히 끊기면 어느 날 갑자기 브리핑이 안 오므로, 크게 알린다.
+    if "refresh_token" in tok:
         cfg["refresh_token"] = tok["refresh_token"]
+        cfg["refresh_rotated_at"] = time.strftime("%Y-%m-%d %H:%M")
+        print("\n" + "!" * 58)
+        print("  카카오 refresh_token 이 갱신됐습니다 (만료 임박 신호).")
+        print("  클라우드에서 돌고 있다면 GitHub Secrets 의")
+        print("  KAKAO_REFRESH_TOKEN 을 아래 값으로 바꿔야 합니다:")
+        print(f"\n  {tok['refresh_token']}\n")
+        print("  바꾸지 않으면 한 달 안에 발송이 멈춥니다.")
+        print("!" * 58 + "\n")
+
     _save(cfg)
     return cfg["access_token"]
 
