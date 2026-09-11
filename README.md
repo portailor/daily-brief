@@ -1,0 +1,153 @@
+# 매일 경제 브리핑
+
+매일 아침 경제 데이터를 모아 계산하고, 카카오톡으로 요약을 보낸 뒤
+전체 리포트를 웹에 올린다.
+
+**리포트** → https://portailor.github.io/daily-brief/
+
+---
+
+## 이 시스템이 다른 브리핑과 다른 점
+
+### 1. 숫자에 LLM을 쓰지 않는다
+
+```
+수집 → 계산 → 채점          전부 코드. 결정론적이다.
+   ↓
+문장 만들기                  (선택) 여기만 LLM 자리
+```
+
+시중 브리핑들이 틀리는 지점이 여기다. 참고로 삼았던 브리핑은
+같은 문서 안에서 지표마다 기준일이 9/7, 9/9, 9/10으로 뒤섞여 있었고
+그게 전부 "오늘"로 서술돼 있었다. 숫자 하나하나는 실존했기 때문에
+개별 검증으로는 걸리지 않는다.
+
+그래서 이 시스템은 **지표마다 기준일을 표에 표시**한다 (`9/10` 배지).
+미국장은 한국보다 하루 늦게 마감하므로 실제로 날짜가 어긋난다.
+
+### 2. 말한 것을 다음날 채점한다
+
+모든 예측은 문장이 아니라 구조로 저장된다.
+
+```
+claim       "코스피가 6,900 아래로 마감"
+instrument  KOSPI      field  close
+op          <          threshold  6900.0
+horizon     1일
+```
+
+다음날 자동으로 대조되어 O/X가 찍히고 누적 적중률에 반영된다.
+사람이 채점하지 않으므로 좋게 봐줄 여지가 없다.
+
+### 3. 확률은 과거 빈도에서 센다
+
+"코스피가 6,900 아래로 마감 = 35%"는 전망이 아니라
+**지난 2년 484거래일 중 하루 만에 0.14% 이상 하락한 날이 170번**이라는
+계산이다. 표본이 적으면 Wilson 신뢰구간으로 폭을 밝힌다 — `0~19%`처럼
+넓게 나오면 그만큼 모른다는 뜻이고, 점 하나로 단정하지 않는다.
+
+### 4. "오늘은 특별한 게 없다"고 말할 수 있다
+
+σ(평소 변동폭 대비 배수)가 임계치를 넘는 지표가 없으면 그렇게 쓴다.
+코스피 -1.76%도 σ가 -0.38이면 평범한 날이다. 매일 무언가 대단한 일이
+있었던 것처럼 쓰지 않는다.
+
+### 5. 용어 설명이 매일 똑같다
+
+`config/terms.json`에서만 나온다. LLM이 그때그때 만들지 않으므로
+설명이 흔들리거나 틀리지 않는다. 표의 밑줄 그어진 단어를 누르면 뜬다.
+
+---
+
+## 구조
+
+```
+run.py                  진입점
+brief/
+  db.py                 SQLite + 예측 기록 CSV 입출력
+  retry.py              일시적 네트워크 오류 재시도
+  collect/
+    market.py           yfinance — 지수·환율·원자재·미국 금리
+    macro.py            FRED(연준) + ECOS(한국은행) — 공식 확정치
+    flows.py            KRX — 외국인·기관·개인 수급
+  analyze/metrics.py    σ · 52주 밴드 · 이동평균 · 연속일
+  score/scorer.py       예측 자동 채점, 누적 적중률
+  interpret/rules.py    트리거 생성, 경험적 확률, 지갑 단위 환산
+  render/
+    report.py           HTML 리포트
+    terms.py            용어 말풍선
+    kakao_text.py       카톡 200자 요약
+  deliver/
+    kakao_auth.py       최초 인증 (한 번만)
+    kakao.py            발송 + 토큰 자동 갱신
+config/
+  settings.yaml         추적 지표, 분석 파라미터, 관심 종목
+  terms.json            용어 사전
+  .env                  API 키 (git 제외)
+docs/index.html         발행되는 리포트
+data/predictions.csv    예측 기록 (유일하게 커밋되는 데이터)
+```
+
+---
+
+## 실행
+
+```bash
+python run.py                  # 전체
+python run.py --no-send        # 카톡 없이 리포트만
+python run.py --no-fetch       # 수집 없이 기존 데이터로
+python run.py --no-publish     # 웹 발행 없이
+```
+
+평소에는 **GitHub Actions가 매일 06:45(UTC 21:45)에 자동 실행**한다.
+PC는 꺼져 있어도 된다. cron은 정시를 보장하지 않아 06:45~07:20 사이에 온다.
+
+수동 실행: 저장소 Actions 탭 → 매일 경제 브리핑 → Run workflow
+
+---
+
+## 손이 가는 일
+
+**카카오 토큰은 2개월마다 갱신해야 한다.** GitHub Actions는 자기 Secret을
+고칠 수 없어서 자동화가 불가능하다. 만료가 가까워지면 실행 로그에 새 토큰이
+크게 출력되므로, 그것을 Secrets의 `KAKAO_REFRESH_TOKEN`에 넣으면 된다.
+
+완전히 만료됐다면 PC에서 다시 인증한다.
+
+```bash
+python brief/deliver/kakao_auth.py <REST_API_KEY> <CLIENT_SECRET>
+```
+
+---
+
+## 바꾸고 싶을 때
+
+| 하고 싶은 것 | 고칠 곳 |
+|---|---|
+| 지표 추가·제거 | `config/settings.yaml` 의 `instruments` |
+| 관심 종목 등록 | `config/settings.yaml` 의 `watchlist` |
+| 용어 추가 | `config/terms.json` |
+| "오늘 볼 것" 민감도 | `settings.yaml` 의 `sigma_notable` (기본 1.5) |
+| 발송 시각 | `.github/workflows/daily-brief.yml` 의 cron (UTC 기준) |
+| 카톡 문구·순서 | `brief/render/kakao_text.py` |
+
+---
+
+## 데이터 출처
+
+| 영역 | 출처 | 비고 |
+|---|---|---|
+| 지수·환율·원자재 | yfinance | 당일 속보치 |
+| 미국 금리·거시 | FRED (연준) | 확정치, 1~2일 지연 |
+| 국내 금리 | ECOS (한국은행) | 공식 고시 |
+| 투자자 수급 | KRX | 로그인 필요 |
+
+같은 지표를 두 곳에서 받는 경우(미 10년물) 과거는 FRED 확정치로 덮고
+최근 이틀은 yfinance 속보치를 쓴다.
+
+---
+
+## 면책
+
+공개 데이터를 기계적으로 집계·계산한 개인용 기록이며 투자 권유가 아니다.
+확률은 과거 빈도일 뿐 미래를 보장하지 않는다.
