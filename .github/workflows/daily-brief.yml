@@ -46,6 +46,32 @@ jobs:
           REPORT_BASE_URL: ${{ secrets.REPORT_BASE_URL }}
         run: |
           mkdir -p config data
+
+          # 어떤 Secret 이 등록됐는지 먼저 보여준다.
+          # 값은 절대 찍지 않고 등록 여부만 표시한다.
+          echo "── Secrets 등록 상태 ──"
+          for name in KAKAO_REST_API_KEY KAKAO_CLIENT_SECRET KAKAO_REFRESH_TOKEN \
+                      FRED_API_KEY ECOS_API_KEY DART_API_KEY FINNHUB_API_KEY \
+                      KRX_ID KRX_PW REPORT_BASE_URL; do
+            if [ -n "${!name}" ]; then
+              echo "  OK      $name (${#name} chars name, value set)"
+            else
+              echo "  MISSING $name"
+            fi
+          done
+          echo ""
+
+          # 이 셋이 없으면 브리핑 자체가 의미 없으므로 여기서 멈춘다.
+          missing=""
+          [ -z "$KAKAO_REST_API_KEY" ] && missing="$missing KAKAO_REST_API_KEY"
+          [ -z "$KAKAO_REFRESH_TOKEN" ] && missing="$missing KAKAO_REFRESH_TOKEN"
+          [ -z "$FRED_API_KEY" ] && missing="$missing FRED_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::필수 Secret 이 없습니다:$missing"
+            echo "저장소 Settings > Secrets and variables > Actions 에서 등록하세요."
+            exit 1
+          fi
+
           # 값은 GitHub Secrets 에만 있고 저장소에는 남지 않는다.
           cat > config/.env <<EOF
           KAKAO_REST_API_KEY=$KAKAO_REST_API_KEY
@@ -57,15 +83,17 @@ jobs:
           KRX_PW=$KRX_PW
           REPORT_BASE_URL=$REPORT_BASE_URL
           EOF
+
           python - <<'PY'
           import json, os, pathlib
           pathlib.Path("config/.kakao_token.json").write_text(json.dumps({
-              "rest_api_key":  os.environ["KAKAO_REST_API_KEY"],
+              "rest_api_key":  os.environ.get("KAKAO_REST_API_KEY", ""),
               "client_secret": os.environ.get("KAKAO_CLIENT_SECRET", ""),
               "access_token":  "",          # 실행할 때마다 새로 발급받는다
-              "refresh_token": os.environ["KAKAO_REFRESH_TOKEN"],
+              "refresh_token": os.environ.get("KAKAO_REFRESH_TOKEN", ""),
               "scope": "talk_message",
           }, ensure_ascii=False, indent=2), encoding="utf-8")
+          print("자격증명 파일 생성 완료")
           PY
 
       - name: 브리핑 생성 및 발송
