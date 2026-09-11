@@ -204,7 +204,8 @@ def render(trade_date: str | None = None,
         newest = max(r["trade_date"] for r in snapshot)
         trade_date = trade_date or newest
 
-        dashboard = build_dashboard(snapshot, newest, insts, acfg, gloss, seen)
+        seen_table: set[str] = set()
+        dashboard = build_dashboard(snapshot, newest, insts, acfg, gloss, seen_table)
         verdict = build_verdict(snapshot, insts, acfg)
         notable = build_notable_lines(snapshot, insts, acfg, gloss, seen)
         trigs = rules.build_triggers(conn, snapshot, insts, acfg)[:6]
@@ -261,7 +262,6 @@ def render(trade_date: str | None = None,
         flow_lines=flow_lines,
         pockets=pockets,
         triggers=trig_view,
-        glossary=gloss.used_terms(seen),
         sources="한국거래소·yfinance(시세), 미 연준 FRED(거시지표), 한국은행 ECOS(국내금리)",
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
         stale="",

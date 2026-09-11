@@ -8,10 +8,16 @@
 """
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import re
 from pathlib import Path
+
+
+def term_id(canon: str) -> str:
+    """용어별 고정 앵커 id. 한글을 그대로 id에 쓰지 않으려고 해시를 쓴다."""
+    return "t" + hashlib.md5(canon.encode("utf-8")).hexdigest()[:8]
 
 TERMS_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "terms.json"
 
@@ -32,8 +38,15 @@ class Glossary:
         surfaces = sorted(self.lookup, key=len, reverse=True)
         self.pattern = re.compile("|".join(re.escape(s) for s in surfaces))
 
-    def annotate(self, text: str, seen: set[str] | None = None) -> str:
-        """텍스트를 HTML로 이스케이프하면서 용어에 툴팁을 입힌다."""
+    def annotate(self, text: str, seen: set[str] | None = None,
+                 mode: str = "tip") -> str:
+        """텍스트를 HTML로 이스케이프하면서 용어를 표시한다.
+
+        mode="tip"  : 그 자리에 말풍선을 띄운다. 공간이 넉넉한 본문용.
+        mode="link" : 하단 용어집으로 가는 링크만 건다. 표 안처럼 좁고
+                      가로 스크롤이 걸린 곳에서는 말풍선이 잘리거나
+                      다음 행에 가려지므로 이쪽을 쓴다.
+        """
         seen = seen if seen is not None else set()
         out: list[str] = []
         pos = 0
@@ -41,9 +54,13 @@ class Glossary:
         for m in self.pattern.finditer(text):
             canon = self.lookup[m.group(0)]
             out.append(html.escape(text[pos:m.start()]))
+            surface = html.escape(m.group(0))
 
-            if canon in seen:
-                out.append(html.escape(m.group(0)))       # 두 번째부터는 그냥 둔다
+            if mode == "link":
+                seen.add(canon)                           # 용어집에는 실어야 한다
+                out.append(f'<a class="term-link" href="#{term_id(canon)}">{surface}</a>')
+            elif canon in seen:
+                out.append(surface)                       # 두 번째부터는 그냥 둔다
             else:
                 seen.add(canon)
                 out.append(self._markup(m.group(0), canon))
@@ -70,7 +87,8 @@ class Glossary:
 
     def used_terms(self, seen: set[str]) -> list[dict]:
         """문서 하단 '오늘 나온 용어' 목록용. 난이도 순으로 정렬."""
-        items = [{"name": k, **self.terms[k]} for k in seen if k in self.terms]
+        items = [{"name": k, "id": term_id(k), **self.terms[k]}
+                 for k in seen if k in self.terms]
         return sorted(items, key=lambda x: (x["level"], x["name"]))
 
 

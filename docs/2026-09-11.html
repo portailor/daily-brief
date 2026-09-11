@@ -116,18 +116,26 @@
 
   /* ── 용어 툴팁 ─────────────────────────── */
   .term{
-    border-bottom:1px dashed var(--accent); cursor:help; position:relative;
-    outline:none;
+    border-bottom:1px dashed var(--accent); cursor:help;
+    outline:none; scroll-margin-top:20px;
   }
+  .term.open{background:var(--hl); border-radius:3px}
+
+  /* 말풍선은 position:fixed 다.
+     표는 가로 스크롤 컨테이너(overflow:auto)여서 absolute 말풍선이 잘리고,
+     첫 열의 position:sticky 가 쌓임 맥락을 만들어 아래 행이 위 행의 말풍선을
+     덮어버린다. fixed 는 두 제약을 모두 벗어난다 — 좌표는 JS가 잡는다. */
   .term .tip{
-    display:none; position:absolute; left:0; top:calc(100% + 7px); z-index:40;
-    width:min(310px,78vw); padding:12px 13px; background:var(--card);
+    display:none; position:fixed; z-index:9999;
+    width:min(310px,86vw); padding:12px 13px; background:var(--card);
     border:1px solid var(--line); border-radius:10px;
-    box-shadow:0 10px 30px rgba(0,0,0,.16); font-size:13.5px;
+    box-shadow:0 12px 34px rgba(0,0,0,.22); font-size:13.5px;
     line-height:1.62; font-weight:400; color:var(--ink); white-space:normal;
-    text-align:left; cursor:default;
+    text-align:left; cursor:default; letter-spacing:-.01em;
   }
-  .term:hover .tip, .term:focus .tip, .term:focus-within .tip{display:block}
+  .term.open .tip{display:block}
+  .hint{margin:-4px 0 9px; font-size:12px; color:var(--dim)}
+  .hint::before{content:"☞ "; }
   .tip-head{display:block; font-size:12.5px; color:var(--accent);
             margin-bottom:6px; font-weight:750}
   .tip-body{display:block}
@@ -172,6 +180,7 @@
 
 <section>
   <h2>오늘의 시장</h2>
+  <p class="hint">밑줄 그어진 단어를 누르면 설명이 나옵니다</p>
   <div class="scroll">
     <table>
       <thead>
@@ -412,11 +421,11 @@
 <section>
   <h2>오늘 볼 것</h2>
   <div class="card">
-    <div class="pocket">국고채 3년물 +8<span class="term" tabindex="0">bp<span class="tip"><strong class="tip-head">bp · 금리 단위, 100bp = 1%</strong><span class="tip-body">basis point. 금리를 말할 때 0.01%를 1bp라고 부릅니다. 금리 변화를 %로 말하면 4.83%가 2.3% 올랐다처럼 헷갈리기 때문에, 시장은 항상 11bp 올랐다로 말합니다.</span><em class="tip-pocket">기준금리 인하 한 번이 보통 25bp(0.25%p)입니다.</em></span></span> — 평소 하루 변동폭의 2.2배입니다. <span class="term" tabindex="0">σ<span class="tip"><strong class="tip-head">시그마 · 평소 변동폭의 몇 배인가</strong><span class="tip-body">이 브리핑에서는 오늘 움직임을 최근 60거래일의 평소 변동폭으로 나눠 계산합니다. 1σ 안쪽이면 평범한 날, 2σ를 넘으면 통계적으로 20거래일에 한 번꼴로 드문 움직임입니다. %만 보면 놓치는 이게 큰 일인가를 판별하려고 씁니다.</span><em class="tip-pocket">코스피가 1.8% 빠져도 σ가 0.4면 평소 변동폭 안입니다. 뉴스 제목이 급락이라도 통계적으론 평범한 날입니다.</em></span></span> 기준 눈여겨볼 움직임입니다.</div>
+    <div class="pocket"><span class="term" tabindex="0">국고채 3년물<span class="tip"><strong class="tip-head">국고채 · 한국 정부가 빌리는 이자율</strong><span class="tip-body">정부가 돈을 빌리려고 발행한 채권이 시장에서 거래되는 수익률입니다. 나라가 망하지 않는 한 떼일 일이 없어 가장 안전한 금리로 취급되고, 은행 대출금리·회사채 금리가 전부 이 위에 얹혀서 결정됩니다.</span><em class="tip-pocket">국고채 금리가 1%p 오르면 주택담보대출 금리도 시차를 두고 비슷하게 따라 오릅니다. 3억 대출이면 연 300만원이 더 나갑니다.</em></span></span> +8<span class="term" tabindex="0">bp<span class="tip"><strong class="tip-head">bp · 금리 단위, 100bp = 1%</strong><span class="tip-body">basis point. 금리를 말할 때 0.01%를 1bp라고 부릅니다. 금리 변화를 %로 말하면 4.83%가 2.3% 올랐다처럼 헷갈리기 때문에, 시장은 항상 11bp 올랐다로 말합니다.</span><em class="tip-pocket">기준금리 인하 한 번이 보통 25bp(0.25%p)입니다.</em></span></span> — 평소 하루 변동폭의 2.2배입니다. <span class="term" tabindex="0">σ<span class="tip"><strong class="tip-head">시그마 · 평소 변동폭의 몇 배인가</strong><span class="tip-body">이 브리핑에서는 오늘 움직임을 최근 60거래일의 평소 변동폭으로 나눠 계산합니다. 1σ 안쪽이면 평범한 날, 2σ를 넘으면 통계적으로 20거래일에 한 번꼴로 드문 움직임입니다. %만 보면 놓치는 이게 큰 일인가를 판별하려고 씁니다.</span><em class="tip-pocket">코스피가 1.8% 빠져도 σ가 0.4면 평소 변동폭 안입니다. 뉴스 제목이 급락이라도 통계적으론 평범한 날입니다.</em></span></span> 기준 눈여겨볼 움직임입니다.</div>
     <div class="pocket">국고채 3년물이 <span class="term" tabindex="0">52주 최고<span class="tip"><strong class="tip-head">52주 위치 · 최근 1년 범위 중 어디쯤인가</strong><span class="tip-body">최근 1년간의 최고가와 최저가 사이에서 현재 값의 상대 위치를 0~100%로 나타낸 것입니다. 절대 수치만으로는 감이 안 오는 지금이 비싼 구간인가 싼 구간인가를 한눈에 보여줍니다.</span><em class="tip-pocket">환율의 52주 위치가 1%면 지난 1년 중 거의 가장 낮다는 뜻입니다. 달러를 사기엔 1년 내 가장 좋은 자리입니다.</em></span></span> 부근입니다 (밴드 100%, 1년 최고 4.014). 지난 1년 중 가장 비싼 구간에 있다는 뜻입니다.</div>
     <div class="pocket">국고채 10년물 +9bp — 평소 하루 변동폭의 2.0배입니다. σ 기준 눈여겨볼 움직임입니다.</div>
     <div class="pocket">국고채 10년물이 52주 최고 부근입니다 (밴드 100%, 1년 최고 4.540). 지난 1년 중 가장 비싼 구간에 있다는 뜻입니다.</div>
-    <div class="pocket">VIX 공포지수 -10.20% — 평소 하루 변동폭의 1.6배입니다. σ 기준 눈여겨볼 움직임입니다.</div>
+    <div class="pocket"><span class="term" tabindex="0">VIX 공포지수<span class="tip"><strong class="tip-head">VIX · 시장의 불안 온도계</strong><span class="tip-body">S&amp;P500 옵션 가격에서 역산한 앞으로 30일간 예상 변동폭입니다. 투자자가 불안할수록 보험(옵션)을 비싸게 사므로 값이 올라갑니다. 통상 20 아래면 평온, 30 넘으면 공포, 40 이상은 패닉으로 봅니다.</span><em class="tip-pocket">VIX 17은 한 달 뒤 S&amp;P500이 지금 대비 ±4.9% 안에 있을 확률이 68%라는 뜻입니다.</em></span></span> -10.20% — 평소 하루 변동폭의 1.6배입니다. σ 기준 눈여겨볼 움직임입니다.</div>
     <div class="pocket">미 국채 30년물이 52주 최고 부근입니다 (밴드 95%, 1년 최고 5.361). 지난 1년 중 가장 비싼 구간에 있다는 뜻입니다.</div>
   </div>
 </section>
@@ -496,9 +505,9 @@
 <section>
   <h2>내 지갑 기준으로는</h2>
   <div class="card">
-    <div class="pocket">브렌트유: 휘발유값에는 보통 이 변동의 3분의 1 정도가 시차를 두고 반영됩니다. 지금 흐름이면 리터당 약 1.1% 인하 압력입니다.</div>
+    <div class="pocket"><span class="term" tabindex="0">브렌트유<span class="tip"><strong class="tip-head">브렌트유 · 유럽 기준 원유 가격</strong><span class="tip-body">북해에서 나는 원유로 유럽·아프리카 지역의 가격 기준입니다. WTI보다 보통 2~5달러 비싼데, 이 격차가 갑자기 벌어지면 미국 내 공급 과잉이나 운송 병목을 의심합니다.</span><em class="tip-pocket">WTI와 브렌트의 가격차를 보면 미국만의 문제인지, 전 세계 문제인지가 갈립니다.</em></span></span>: 휘발유값에는 보통 이 변동의 3분의 1 정도가 시차를 두고 반영됩니다. 지금 흐름이면 리터당 약 1.1% 인하 압력입니다.</div>
     <div class="pocket">VIX 공포지수: 지금 VIX 16은 &#x27;한 달 뒤 S&amp;P500이 ±4.6% 안에 있을 확률이 약 68%&#x27;라는 시장의 예상입니다.</div>
-    <div class="pocket">WTI 원유: 휘발유값에는 보통 이 변동의 3분의 1 정도가 시차를 두고 반영됩니다. 지금 흐름이면 리터당 약 1.2% 인하 압력입니다.</div>
+    <div class="pocket"><span class="term" tabindex="0">WTI 원유<span class="tip"><strong class="tip-head">WTI · 미국산 원유 가격 기준</strong><span class="tip-body">West Texas Intermediate. 미국 텍사스에서 나는 원유로, 세계 3대 유종(WTI·브렌트·두바이) 중 하나입니다. 한국은 실제로는 중동산 두바이유를 주로 수입하지만, 뉴스에서 국제유가라고 하면 보통 이 WTI를 가리킵니다.</span><em class="tip-pocket">유가가 10% 오르면 주유소 휘발유값은 보통 3~4% 오릅니다. 세금과 유통비가 절반 이상이라 충격이 희석되기 때문입니다.</em></span></span>: 휘발유값에는 보통 이 변동의 3분의 1 정도가 시차를 두고 반영됩니다. 지금 흐름이면 리터당 약 1.2% 인하 압력입니다.</div>
   </div>
 </section>
 
@@ -588,65 +597,9 @@
   </details>
 </section>
 
-<section>
-  <h2>오늘 나온 용어</h2>
-  <div class="card">
-    <dl class="gloss">
-      <dt>52주 위치<span class="lv">기본</span></dt>
-      <dd>최근 1년간의 최고가와 최저가 사이에서 현재 값의 상대 위치를 0~100%로 나타낸 것입니다. 절대 수치만으로는 감이 안 오는 지금이 비싼 구간인가 싼 구간인가를 한눈에 보여줍니다.
-<span class="pk">→ 환율의 52주 위치가 1%면 지난 1년 중 거의 가장 낮다는 뜻입니다. 달러를 사기엔 1년 내 가장 좋은 자리입니다.</span>      </dd>
-    </dl>
-    <dl class="gloss">
-      <dt>VIX<span class="lv">기본</span></dt>
-      <dd>S&P500 옵션 가격에서 역산한 앞으로 30일간 예상 변동폭입니다. 투자자가 불안할수록 보험(옵션)을 비싸게 사므로 값이 올라갑니다. 통상 20 아래면 평온, 30 넘으면 공포, 40 이상은 패닉으로 봅니다.
-<span class="pk">→ VIX 17은 한 달 뒤 S&P500이 지금 대비 ±4.9% 안에 있을 확률이 68%라는 뜻입니다.</span>      </dd>
-    </dl>
-    <dl class="gloss">
-      <dt>WTI<span class="lv">기본</span></dt>
-      <dd>West Texas Intermediate. 미국 텍사스에서 나는 원유로, 세계 3대 유종(WTI·브렌트·두바이) 중 하나입니다. 한국은 실제로는 중동산 두바이유를 주로 수입하지만, 뉴스에서 국제유가라고 하면 보통 이 WTI를 가리킵니다.
-<span class="pk">→ 유가가 10% 오르면 주유소 휘발유값은 보통 3~4% 오릅니다. 세금과 유통비가 절반 이상이라 충격이 희석되기 때문입니다.</span>      </dd>
-    </dl>
-    <dl class="gloss">
-      <dt>bp<span class="lv">기본</span></dt>
-      <dd>basis point. 금리를 말할 때 0.01%를 1bp라고 부릅니다. 금리 변화를 %로 말하면 4.83%가 2.3% 올랐다처럼 헷갈리기 때문에, 시장은 항상 11bp 올랐다로 말합니다.
-<span class="pk">→ 기준금리 인하 한 번이 보통 25bp(0.25%p)입니다.</span>      </dd>
-    </dl>
-    <dl class="gloss">
-      <dt>국고채<span class="lv">기본</span></dt>
-      <dd>정부가 돈을 빌리려고 발행한 채권이 시장에서 거래되는 수익률입니다. 나라가 망하지 않는 한 떼일 일이 없어 가장 안전한 금리로 취급되고, 은행 대출금리·회사채 금리가 전부 이 위에 얹혀서 결정됩니다.
-<span class="pk">→ 국고채 금리가 1%p 오르면 주택담보대출 금리도 시차를 두고 비슷하게 따라 오릅니다. 3억 대출이면 연 300만원이 더 나갑니다.</span>      </dd>
-    </dl>
-    <dl class="gloss">
-      <dt>기준금리<span class="lv">기본</span></dt>
-      <dd>한국은행·연준 같은 중앙은행이 물가와 경기를 조절하려고 직접 정하는 금리입니다. 모든 시중 금리의 출발점이라, 여기가 움직이면 예금·대출·채권 금리가 순차로 따라 움직입니다.
-<span class="pk">→ 기준금리를 올리면 대출이자가 늘어 소비가 줄고, 그 결과 물가가 잡힙니다. 물가를 잡는 대가로 경기를 희생시키는 거래입니다.</span>      </dd>
-    </dl>
-    <dl class="gloss">
-      <dt>미 국채 10년물<span class="lv">기본</span></dt>
-      <dd>미국 정부에 10년간 돈을 빌려주고 받는 이자율로, 전 세계 자산 가격의 기준점입니다. 이게 오르면 안전하게 이만큼 받을 수 있는데 굳이 위험한 주식을 살 이유가 줄어 주가가 눌립니다. 특히 먼 미래 이익을 당겨서 평가받는 성장주가 크게 흔들립니다.
-<span class="pk">→ 10년물 4.9%는 미국 정부에 돈을 맡기면 떼일 걱정 없이 연 4.9%라는 뜻입니다. 주식이 이걸 못 이기면 위험을 감수할 이유가 없어집니다.</span>      </dd>
-    </dl>
-    <dl class="gloss">
-      <dt>달러인덱스<span class="lv">중급</span></dt>
-      <dd>유로·엔·파운드 등 주요 6개 통화 대비 달러 가치를 지수화한 것입니다. 원/달러 환율만 보면 원화가 약한 건지 달러가 강한 건지 구분이 안 되는데, 달러인덱스를 같이 보면 그게 갈립니다.
-<span class="pk">→ 환율과 달러인덱스가 같이 오르면 달러가 강한 것이고, 환율만 오르고 달러인덱스가 내리면 원화만 약한 것입니다. 후자가 더 나쁜 신호입니다.</span>      </dd>
-    </dl>
-    <dl class="gloss">
-      <dt>브렌트유<span class="lv">중급</span></dt>
-      <dd>북해에서 나는 원유로 유럽·아프리카 지역의 가격 기준입니다. WTI보다 보통 2~5달러 비싼데, 이 격차가 갑자기 벌어지면 미국 내 공급 과잉이나 운송 병목을 의심합니다.
-<span class="pk">→ WTI와 브렌트의 가격차를 보면 미국만의 문제인지, 전 세계 문제인지가 갈립니다.</span>      </dd>
-    </dl>
-    <dl class="gloss">
-      <dt>시그마<span class="lv">중급</span></dt>
-      <dd>이 브리핑에서는 오늘 움직임을 최근 60거래일의 평소 변동폭으로 나눠 계산합니다. 1σ 안쪽이면 평범한 날, 2σ를 넘으면 통계적으로 20거래일에 한 번꼴로 드문 움직임입니다. %만 보면 놓치는 이게 큰 일인가를 판별하려고 씁니다.
-<span class="pk">→ 코스피가 1.8% 빠져도 σ가 0.4면 평소 변동폭 안입니다. 뉴스 제목이 급락이라도 통계적으론 평범한 날입니다.</span>      </dd>
-    </dl>
-  </div>
-</section>
-
 <footer>
   데이터 출처: 한국거래소·yfinance(시세), 미 연준 FRED(거시지표), 한국은행 ECOS(국내금리)<br>
-  생성 <code>2026-09-11 22:51</code> · 기준일 <code>2026-09-11</code>
+  생성 <code>2026-09-11 22:59</code> · 기준일 <code>2026-09-11</code>
   <div class="disclaimer">
     이 문서는 공개 데이터를 기계적으로 집계·계산한 개인용 기록이며, 투자 권유가 아닙니다.
     확률은 과거 빈도일 뿐 미래를 보장하지 않습니다. 투자 판단과 그 결과는 본인 책임입니다.
@@ -654,5 +607,71 @@
 </footer>
 
 </div>
+
+<script>
+/* 용어 말풍선.
+   말풍선이 position:fixed 이므로 좌표를 직접 잡아준다. 이렇게 해야
+   가로 스크롤되는 표 안에서도 잘리지 않고, sticky 셀에 가려지지도 않는다.
+
+   클릭으로 열고 닫는다 — 터치 기기에는 hover 가 없고,
+   마우스에서도 표를 훑다 보면 말풍선이 계속 튀어나와 성가시기 때문이다. */
+(function () {
+  var open = null;
+  var MARGIN = 8;
+
+  function close() {
+    if (open) { open.classList.remove('open'); open = null; }
+  }
+
+  function place(term) {
+    var tip = term.querySelector('.tip');
+    if (!tip) return;
+
+    tip.style.left = '0px';
+    tip.style.top = '0px';
+
+    var r = term.getBoundingClientRect();
+    var t = tip.getBoundingClientRect();
+    var vw = document.documentElement.clientWidth;
+    var vh = document.documentElement.clientHeight;
+
+    // 가로: 단어 왼쪽에 맞추되 화면 밖으로 나가지 않게 민다
+    var left = Math.min(Math.max(MARGIN, r.left), vw - t.width - MARGIN);
+
+    // 세로: 아래가 좁으면 단어 위로 띄운다
+    var below = vh - r.bottom;
+    var top = (below < t.height + 16 && r.top > t.height + 16)
+      ? r.top - t.height - 7
+      : r.bottom + 7;
+    top = Math.min(Math.max(MARGIN, top), vh - t.height - MARGIN);
+
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('.tip')) return;          // 말풍선 안 클릭은 무시
+
+    var term = e.target.closest('.term');
+    if (!term) { close(); return; }
+
+    e.preventDefault();
+    if (term === open) { close(); return; }
+    close();
+    term.classList.add('open');
+    open = term;
+    place(term);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') close();
+  });
+
+  // 스크롤하거나 창 크기가 바뀌면 좌표가 어긋나므로 따라가게 한다
+  ['scroll', 'resize'].forEach(function (ev) {
+    window.addEventListener(ev, function () { if (open) place(open); }, true);
+  });
+})();
+</script>
 </body>
 </html>
