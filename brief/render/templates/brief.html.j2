@@ -125,7 +125,9 @@
      표는 가로 스크롤 컨테이너(overflow:auto)여서 absolute 말풍선이 잘리고,
      첫 열의 position:sticky 가 쌓임 맥락을 만들어 아래 행이 위 행의 말풍선을
      덮어버린다. fixed 는 두 제약을 모두 벗어난다 — 좌표는 JS가 잡는다. */
-  .term .tip{
+  /* 선택자를 .tip 으로 둔다 — body 로 옮겨져도 스타일이 유지되어야 한다.
+     .term .tip 으로 쓰면 옮기는 순간 position:fixed 까지 통째로 풀려버린다. */
+  .tip{
     display:none; position:fixed; z-index:9999;
     width:min(310px,86vw); padding:12px 13px; background:var(--card);
     border:1px solid var(--line); border-radius:10px;
@@ -133,7 +135,8 @@
     line-height:1.62; font-weight:400; color:var(--ink); white-space:normal;
     text-align:left; cursor:default; letter-spacing:-.01em;
   }
-  .term.open .tip{display:block}
+  /* 열릴 때 스크립트가 body 로 옮기고 display 를 직접 켠다 */
+  body > .tip{display:block}
   .hint{margin:-4px 0 9px; font-size:12px; color:var(--dim)}
   .hint::before{content:"☞ "; }
   .tip-head{display:block; font-size:12.5px; color:var(--accent);
@@ -369,14 +372,19 @@
    마우스에서도 표를 훑다 보면 말풍선이 계속 튀어나와 성가시기 때문이다. */
 (function () {
   var open = null;
+  var openTip = null;
   var MARGIN = 8;
 
   function close() {
-    if (open) { open.classList.remove('open'); open = null; }
+    if (!open) return;
+    open.classList.remove('open');
+    if (openTip) { openTip.style.display = ''; open.appendChild(openTip); }
+    open = null;
+    openTip = null;
   }
 
   function place(term) {
-    var tip = term.querySelector('.tip');
+    var tip = openTip;
     if (!tip) return;
 
     tip.style.left = '0px';
@@ -410,8 +418,19 @@
     e.preventDefault();
     if (term === open) { close(); return; }
     close();
+
+    var tip = term.querySelector('.tip');
+    if (!tip) return;
+
+    /* 말풍선을 body 로 옮긴다.
+       표 첫 열은 position:sticky 에 배경색이 있어서, 그 자리에 둔 채로는
+       z-index 를 아무리 올려도 옆 칸 배경에 왼쪽이 잘려 보인다.
+       body 직속이면 어떤 쌓임 맥락에도 갇히지 않는다. */
     term.classList.add('open');
     open = term;
+    openTip = tip;
+    document.body.appendChild(tip);
+    tip.style.display = 'block';
     place(term);
   });
 

@@ -19,6 +19,9 @@ import requests
 ROOT = Path(__file__).resolve().parent.parent.parent
 TOKEN_PATH = ROOT / "config" / ".kakao_token.json"
 
+sys.path.insert(0, str(ROOT))
+from brief.retry import with_retry  # noqa: E402
+
 SEND_URL = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
 TOKEN_URL = "https://kauth.kakao.com/oauth/token"
 TEXT_LIMIT = 200
@@ -87,11 +90,13 @@ def send_text(text: str,
     else:
         template["link"] = {}
 
-    res = requests.post(
-        SEND_URL,
-        headers={"Authorization": f"Bearer {token}"},
-        data={"template_object": json.dumps(template, ensure_ascii=False)},
-        timeout=15)
+    res = with_retry(
+        lambda: requests.post(
+            SEND_URL,
+            headers={"Authorization": f"Bearer {token}"},
+            data={"template_object": json.dumps(template, ensure_ascii=False)},
+            timeout=20),
+        label="카카오 발송")
 
     if res.status_code != 200:
         raise KakaoError(f"발송 실패 [{res.status_code}] {res.text}")

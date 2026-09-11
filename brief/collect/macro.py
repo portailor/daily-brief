@@ -22,6 +22,7 @@ import requests
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 from brief import db  # noqa: E402
+from brief.retry import with_retry  # noqa: E402
 
 FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 ECOS_URL = "https://ecos.bok.or.kr/api/StatisticSearch"
@@ -83,12 +84,12 @@ class MacroReport:
 
 
 def fetch_fred(series_id: str, api_key: str, start: str) -> list[tuple[str, float]]:
-    res = requests.get(FRED_URL, params={
+    res = with_retry(lambda: requests.get(FRED_URL, params={
         "series_id": series_id,
         "api_key": api_key,
         "file_type": "json",
         "observation_start": start,
-    }, timeout=25)
+    }, timeout=25), attempts=2, label=f"FRED {series_id}")
     res.raise_for_status()
 
     out = []
@@ -106,7 +107,8 @@ def fetch_ecos(stat_code: str, cycle: str, item: str,
                api_key: str, start: str, end: str) -> list[tuple[str, float]]:
     url = (f"{ECOS_URL}/{api_key}/json/kr/1/10000/"
            f"{stat_code}/{cycle}/{start}/{end}/{item}")
-    res = requests.get(url, timeout=25)
+    res = with_retry(lambda: requests.get(url, timeout=25),
+                     attempts=2, label=f"ECOS {stat_code}")
     res.raise_for_status()
     body = res.json()
 
