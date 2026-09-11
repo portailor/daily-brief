@@ -1,0 +1,363 @@
+"""규칙 기반 해석기 — LLM 없이 돌아가는 브리핑의 본체.
+
+여기서 만드는 예측은 전부 두 가지를 갖춰야 한다.
+  1) 숫자 트리거   : "10Y가 4.95 위로 마감하면" — 다음날 자동 채점 가능
+  2) 경험적 확률   : 과거 2년 데이터에서 같은 조건을 찾아 실제 빈도를 센 값
+
+2번이 핵심이다. LLM에게 확률을 물으면 근거 없는 '느낌'이 나오지만,
+여기서는 "과거 이 조건이 37번 있었고 그중 23번 그렇게 됐다 = 62%"라고
+셀 수 있다. 틀려도 근거가 남는다.
+"""
+from __future__ import annotations
+
+import math
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+from brief import db  # noqa: E402
+from brief.collect.market import Instrument, load_instruments  # noqa: E402
+
+MIN_SAMPLES = 12          # 이보다 사례가 적으면 확률을 말하지 않는다
+
+
+# ─────────────────────────────────────────────────────────────
+#  경험적 확률
+# ─────────────────────────────────────────────────────────────
+
+def base_rate(conn, instrument: str, where_sql: str, params: tuple,
+              target_field: str, op: str, threshold: float,
+              horizon: int = 1) -> tuple[float, int] | None:
+    """과거에 같은 조건이 있었던 날들을 찾아, horizon일 뒤 결과의 빈도를 센다.
+
+    반환: (확률, 표본수) — 표본이 MIN_SAMPLES 미만이면 None.
+    """
+    rows = conn.execute(
+        f"SELECT trade_date FROM metrics WHERE instrument = ? AND {where_sql} "
+        f"ORDER BY trade_date", (instrument, *params)).fetchall()
+    if len(rows) < MIN_SAMPLES:
+        return None
+
+    dates = [r["trade_date"] for r in rows]
+    hits = total = 0
+
+    for d in dates:
+        fut = conn.execute(
+            "SELECT trade_date FROM observations WHERE instrument=? AND trade_date > ? "
+            "ORDER BY trade_date LIMIT ?", (instrument, d, horizon)).fetchall()
+        if len(fut) < horizon:
+            continue
+        target_date = fut[horizon - 1]["trade_date"]
+
+        if target_field == "close":
+            row = conn.execute(
+                "SELECT close AS v FROM observations WHERE instrument=? AND trade_date=?",
+                (instrument, target_date)).fetchone()
+        else:
+            row = conn.execute(
+                f"SELECT {target_field} AS v FROM metrics WHERE instrument=? AND trade_date=?",
+                (instrument, target_date)).fetchone()
+        if not row or row["v"] is None:
+            continue
+
+        total += 1
+        v = row["v"]
+        if (op == ">" and v > threshold) or (op == "<" and v < threshold):
+            hits += 1
+
+    if total < MIN_SAMPLES:
+        return None
+    return hits / total, total
+
+
+def move_probability(conn, instrument: str, required_pct: float,
+                     direction: str, horizon: int = 1) -> tuple[float, int] | None:
+    """'하루 만에 required_pct 만큼 움직일 확률'을 과거 수익률 분포에서 센다.
+
+    라운드 레벨 돌파에는 이쪽을 쓴다. 절대 가격으로 세면
+    "지난 2년간 코스피가 6,900 아래였던 비율" 같은 무의미한 값이 나오는데,
+    지수는 추세가 있어서 과거 절대 수준은 내일과 아무 상관이 없기 때문이다.
+    필요 변동률로 정규화해야 "내일 그만큼 움직일 수 있는가"라는 질문이 된다.
+    """
+    closes = [r["close"] for r in conn.execute(
+        "SELECT close FROM observations WHERE instrument = ? ORDER BY trade_date",
+        (instrument,)).fetchall()]
+    if len(closes) < 60 + horizon:
+        return None
+
+    rets = [(closes[i + horizon] / closes[i] - 1) * 100
+            for i in range(len(closes) - horizon)
+            if closes[i]]
+    if len(rets) < MIN_SAMPLES:
+        return None
+
+    if direction == "up":
+        hits = sum(1 for r in rets if r >= required_pct)
+    else:
+        hits = sum(1 for r in rets if r <= required_pct)
+    return hits / len(rets), len(rets)
+
+
+def wilson(hits: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """Wilson 95% 신뢰구간.
+
+    0/16 을 '확률 0%'라고 말하면 거짓말에 가깝다. 실제로는 '0~19% 어딘가'가
+    맞다. 표본이 적을 때 점추정을 그대로 내보내지 않기 위해 쓴다.
+    """
+    if n <= 0:
+        return 0.0, 1.0
+    p = hits / n
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    margin = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    return max(0.0, center - margin), min(1.0, center + margin)
+
+
+def josa(word: str, pair: str = "이/가") -> str:
+    """받침 유무에 따라 조사를 고른다. '환율가' 같은 어색한 문장을 막는다."""
+    a, b = pair.split("/")
+    if not word:
+        return b
+    last = word[-1]
+    if not ("가" <= last <= "힣"):
+        return b
+    return a if (ord(last) - 0xAC00) % 28 else b
+
+
+# ─────────────────────────────────────────────────────────────
+#  라운드 넘버 — 시장이 실제로 의식하는 심리적 가격대
+# ─────────────────────────────────────────────────────────────
+
+def round_step(value: float) -> float:
+    """값 크기의 1% 수준에서 가장 자연스러운 눈금(1/2/5 × 10^n)을 고른다."""
+    if value <= 0:
+        return 1.0
+    rough = abs(value) * 0.01
+    mag = 10 ** math.floor(math.log10(rough))
+    for m in (1, 2, 5, 10):
+        if rough <= m * mag:
+            return m * mag
+    return 10 * mag
+
+
+def nearest_levels(value: float) -> tuple[float, float]:
+    """현재값 바로 위/아래의 라운드 레벨."""
+    step = round_step(value)
+    below = math.floor(value / step) * step
+    above = below + step
+    return below, above
+
+
+# ─────────────────────────────────────────────────────────────
+#  트리거 후보 생성
+# ─────────────────────────────────────────────────────────────
+
+@dataclass
+class Trigger:
+    instrument: str
+    name: str
+    claim: str                 # 사람이 읽는 문장
+    field: str
+    op: str
+    threshold: float
+    horizon: int
+    probability: float | None
+    samples: int | None
+    kind: str                  # round_level / band_edge / ma_cross / streak / sigma
+    priority: float            # 정렬용. 클수록 위
+
+    def prob_text(self) -> str:
+        if self.probability is None or self.samples is None:
+            return "과거 사례가 부족해 확률을 제시하지 않습니다"
+
+        hits = round(self.probability * self.samples)
+        lo, hi = wilson(hits, self.samples)
+        band = f"{lo:.0%}~{hi:.0%}"
+
+        # 표본이 적으면 점추정이 과신이 된다. 0/16 을 '0%'라고 말하면 안 된다.
+        if hi - lo > 0.30:
+            return (f"과거 {self.samples}번 중 {hits}번 — "
+                    f"표본이 적어 {band} 사이로만 말할 수 있습니다")
+        return (f"과거 같은 조건 {self.samples}번 중 {hits}번 = "
+                f"{self.probability:.0%} (95% 구간 {band})")
+
+
+def _fmt(v: float, inst: Instrument) -> str:
+    return f"{v:,.{inst.decimals}f}"
+
+
+def build_triggers(conn, rows, instruments: dict[str, Instrument],
+                   cfg: dict) -> list[Trigger]:
+    """각 지표의 최신 상태에서 '내일 지켜볼 조건'을 뽑아낸다.
+
+    rows 는 지표별 최신 스냅샷이다. 하나의 날짜로 묶지 않는 이유는
+    미국장이 한국보다 하루 늦게 마감해 거래일이 어긋나기 때문이다.
+    """
+    out: list[Trigger] = []
+
+    for r in rows:
+        iid = r["instrument"]
+        inst = instruments.get(iid)
+        if not inst or r["close"] is None:
+            continue
+
+        close = r["close"]
+        sigma = r["sigma"]
+        p52 = r["pct_52w"]
+        vs20 = r["vs_ma20"]
+        streak = r["streak"] or 0
+
+        # ── 1. 라운드 레벨 돌파 ──────────────────────────────
+        below, above = nearest_levels(close)
+        dist_up = (above - close) / close * 100
+        dist_dn = (close - below) / close * 100
+
+        if dist_up <= 1.2:
+            br = move_probability(conn, iid, dist_up, "up", 1)
+            out.append(Trigger(
+                iid, inst.name,
+                f"{inst.name}{josa(inst.name)} {_fmt(above, inst)} 위로 마감 "
+                f"(+{dist_up:.2f}% 필요)",
+                "close", ">", above, 1,
+                br[0] if br else None, br[1] if br else None,
+                "round_level", 2.0 - dist_up))
+
+        if dist_dn <= 1.2:
+            br = move_probability(conn, iid, -dist_dn, "down", 1)
+            out.append(Trigger(
+                iid, inst.name,
+                f"{inst.name}{josa(inst.name)} {_fmt(below, inst)} 아래로 마감 "
+                f"(−{dist_dn:.2f}% 필요)",
+                "close", "<", below, 1,
+                br[0] if br else None, br[1] if br else None,
+                "round_level", 2.0 - dist_dn))
+
+        # ── 2. 52주 밴드 극단 ────────────────────────────────
+        # 극단에 '머무는가'를 묻지 않는다 — 자기상관 때문에 거의 항상 맞아서
+        # 적중률만 부풀리는 공짜 예측이 된다. '벗어나는가'를 물어야 예측이다.
+        if p52 is not None and (p52 <= 8 or p52 >= 92):
+            at_low = p52 <= 8
+            edge = "최저" if at_low else "최고"
+            op = ">" if at_low else "<"
+            thr = 8.0 if at_low else 92.0
+            br = base_rate(conn, iid,
+                           "pct_52w IS NOT NULL AND pct_52w "
+                           + ("<= 8" if at_low else ">= 92"),
+                           (), "pct_52w", op, thr, 1)
+            out.append(Trigger(
+                iid, inst.name,
+                f"{inst.name}{josa(inst.name)} 52주 {edge} 구간"
+                f"(현재 밴드 {p52:.0f}%)에서 {'벗어나 반등' if at_low else '꺾여 하락'}",
+                "pct_52w", op, thr, 1,
+                br[0] if br else None, br[1] if br else None,
+                "band_edge", 3.0))
+
+        # ── 3. 20일선 근접 (추세 전환 분기점) ────────────────
+        if vs20 is not None and abs(vs20) <= 0.8:
+            ma20 = r["ma20"]
+            above_ma = vs20 >= 0
+            op = ">" if above_ma else "<"
+            # 지금 20일선 위에 있는지 아래에 있는지까지 조건에 넣어야
+            # "같은 상황"의 과거 사례가 된다. 섞으면 평균으로 뭉개진다.
+            br = base_rate(conn, iid,
+                           "vs_ma20 IS NOT NULL AND ABS(vs_ma20) <= 0.8 AND vs_ma20 "
+                           + (">= 0" if above_ma else "< 0"),
+                           (), "vs_ma20", op, 0.0, 1)
+            out.append(Trigger(
+                iid, inst.name,
+                f"{inst.name}{josa(inst.name)} 20일선({_fmt(ma20, inst)}) "
+                f"{'위를 지킴' if vs20 >= 0 else '아래에 머무름'}",
+                "vs_ma20", op, 0.0, 1,
+                br[0] if br else None, br[1] if br else None,
+                "ma_cross", 2.5))
+
+        # ── 4. 연속 흐름 ─────────────────────────────────────
+        if abs(streak) >= 4:
+            direction = "상승" if streak > 0 else "하락"
+            op = ">" if streak > 0 else "<"
+            br = base_rate(conn, iid,
+                           f"streak {'>=' if streak > 0 else '<='} {streak}", (),
+                           "chg", op, 0.0, 1)
+            out.append(Trigger(
+                iid, inst.name,
+                f"{inst.name} {abs(streak)}일 연속 {direction} 뒤 하루 더 {direction}",
+                "chg", op, 0.0, 1,
+                br[0] if br else None, br[1] if br else None,
+                "streak", 1.5 + abs(streak) * 0.1))
+
+        # ── 5. 이례적 변동 뒤 되돌림 ─────────────────────────
+        if sigma is not None and abs(sigma) >= cfg["sigma_notable"]:
+            op = "<" if sigma > 0 else ">"
+            br = base_rate(conn, iid,
+                           f"sigma IS NOT NULL AND sigma {'>=' if sigma > 0 else '<='} "
+                           f"{cfg['sigma_notable'] if sigma > 0 else -cfg['sigma_notable']}",
+                           (), "chg", op, 0.0, 1)
+            out.append(Trigger(
+                iid, inst.name,
+                f"{inst.name}{josa(inst.name)} 오늘의 이례적 {'급등' if sigma > 0 else '급락'}"
+                f"(σ {sigma:+.1f})을 되돌림",
+                "chg", op, 0.0, 1,
+                br[0] if br else None, br[1] if br else None,
+                "sigma", 4.0 + abs(sigma)))
+
+    out.sort(key=lambda t: -t.priority)
+    return out
+
+
+# ─────────────────────────────────────────────────────────────
+#  지갑 단위 환산 — 비유 대신 쓰는 장치
+# ─────────────────────────────────────────────────────────────
+
+def pocket_translate(iid: str, close: float, chg: float,
+                     chg_pct: float | None, chg_bp: float | None) -> str | None:
+    """추상적 숫자를 생활 단위로 바꾼다. 계산식이 고정이라 틀릴 수 없다."""
+    if iid == "USDKRW":
+        diff = chg * 1_000_000 / close
+        direction = "더 내야" if chg > 0 else "덜 내도"
+        return (f"100만원을 환전하면 어제보다 약 {abs(diff):,.0f}원을 {direction} 합니다."
+                if abs(chg) >= 0.5 else None)
+
+    if iid in ("WTI", "BRENT") and chg_pct is not None and abs(chg_pct) >= 1.0:
+        gas = chg_pct * 0.35        # 유가 변동의 약 1/3이 주유소 가격에 반영
+        return (f"휘발유값에는 보통 이 변동의 3분의 1 정도가 시차를 두고 반영됩니다. "
+                f"지금 흐름이면 리터당 약 {abs(gas):.1f}% "
+                f"{'인상' if gas > 0 else '인하'} 압력입니다.")
+
+    if iid == "US10Y" and chg_bp is not None and abs(chg_bp) >= 5:
+        return (f"3억원을 30년 만기로 빌린다면 금리 {abs(chg_bp):.0f}bp 변화는 "
+                f"연 이자 약 {abs(chg_bp) * 3:,.0f}만원 "
+                f"{'증가' if chg_bp > 0 else '감소'}에 해당합니다.")
+
+    if iid == "VIX" and chg_pct is not None:
+        band = close / math.sqrt(12)
+        return (f"지금 VIX {close:.0f}은 '한 달 뒤 S&P500이 ±{band:.1f}% 안에 있을 확률이 "
+                f"약 68%'라는 시장의 예상입니다.")
+
+    return None
+
+
+if __name__ == "__main__":
+    import yaml
+    root = Path(__file__).resolve().parent.parent.parent
+    cfg = yaml.safe_load((root / "config" / "settings.yaml").read_text(encoding="utf-8"))
+    insts = {i.id: i for i in load_instruments()}
+
+    with db.connect() as c:
+        latest = c.execute("SELECT MAX(trade_date) d FROM metrics").fetchone()["d"]
+        trigs = build_triggers(c, latest, insts, cfg["analysis"])
+
+        print(f"=== {latest} 기준 · 내일 지켜볼 조건 {len(trigs)}개 ===\n")
+        for t in trigs[:10]:
+            print(f"[{t.kind}] {t.claim}")
+            print(f"    → {t.prob_text()}\n")
+
+        print("=== 지갑 단위 환산 ===")
+        for r in c.execute(
+                "SELECT m.*, o.close FROM metrics m JOIN observations o "
+                "ON m.trade_date=o.trade_date AND m.instrument=o.instrument "
+                "WHERE m.trade_date=?", (latest,)):
+            txt = pocket_translate(r["instrument"], r["close"], r["chg"],
+                                   r["chg_pct"], r["chg_bp"])
+            if txt:
+                print(f"  · {insts[r['instrument']].name}: {txt}")

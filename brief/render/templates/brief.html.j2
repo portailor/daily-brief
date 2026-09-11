@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>경제 브리핑 {{ date_kr }}</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#fff; --ink:#14161a; --dim:#5b6270; --line:#e3e6ec;
+    --up:#d4322c; --down:#1f66d0; --flat:#7a8090;
+    --accent:#1a4fa0; --hl:#fff3d6; --warn:#b8560f;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0f1115; --card:#171a21; --ink:#e8eaee; --dim:#9aa2b1; --line:#262b35;
+      --up:#ff6b63; --down:#5b9bff; --flat:#8b93a3;
+      --accent:#7aa7ff; --hl:#2e2a1c; --warn:#e0a45c;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",
+                "Malgun Gothic",system-ui,sans-serif;
+    font-size:16px; line-height:1.72; letter-spacing:-.01em;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:20px 16px 72px}
+
+  /* ── 헤더 ─────────────────────────────── */
+  header{margin:8px 0 22px}
+  .eyebrow{font-size:12.5px; color:var(--dim); letter-spacing:.06em; font-weight:600}
+  h1{font-size:23px; line-height:1.35; margin:6px 0 0; font-weight:800; letter-spacing:-.02em}
+  .verdict{
+    margin-top:14px; padding:15px 16px; background:var(--card);
+    border:1px solid var(--line); border-left:4px solid var(--accent);
+    border-radius:10px; font-size:16.5px; font-weight:650; line-height:1.65;
+  }
+  .verdict .sub{display:block; margin-top:7px; font-size:14px;
+                font-weight:450; color:var(--dim)}
+
+  /* ── 섹션 ─────────────────────────────── */
+  section{margin:30px 0 0}
+  h2{
+    font-size:13px; font-weight:750; color:var(--dim); margin:0 0 11px;
+    letter-spacing:.05em; display:flex; align-items:center; gap:8px;
+  }
+  h2::after{content:""; flex:1; height:1px; background:var(--line)}
+  .card{background:var(--card); border:1px solid var(--line);
+        border-radius:11px; padding:15px 16px}
+  .card + .card{margin-top:9px}
+
+  /* ── 대시보드 표 ───────────────────────── */
+  .scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;
+          border:1px solid var(--line); border-radius:11px; background:var(--card)}
+  table{border-collapse:collapse; width:100%; font-size:14px; min-width:520px}
+  th,td{padding:9px 11px; text-align:right; white-space:nowrap}
+  th{font-size:11.5px; color:var(--dim); font-weight:650; letter-spacing:.03em;
+     border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left; position:sticky; left:0;
+     background:var(--card); font-weight:600}
+  tbody tr + tr td{border-top:1px solid var(--line)}
+  td.num{font-variant-numeric:tabular-nums; font-family:var(--mono); font-size:13px}
+  .asof{display:inline-block; margin-left:6px; padding:1px 5px; font-size:10.5px;
+        font-weight:600; color:var(--dim); background:var(--bg);
+        border:1px solid var(--line); border-radius:4px; font-family:var(--mono)}
+  /* 좁은 화면에서는 200일선을 접는다. 핵심은 종가·전일대비·σ·52주 위치다. */
+  @media (max-width:560px){
+    table{min-width:430px}
+    th:nth-child(6), td:nth-child(6){display:none}
+  }
+  .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--flat)}
+  tr.notable td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+
+  /* 52주 밴드 미니바 */
+  .band{display:inline-block; width:52px; height:5px; background:var(--line);
+        border-radius:3px; position:relative; vertical-align:middle; margin-right:6px}
+  .band i{position:absolute; top:-2px; width:3px; height:9px;
+          background:var(--accent); border-radius:2px}
+
+  /* ── 채점 ─────────────────────────────── */
+  .score-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+              margin-bottom:11px}
+  .score-big{font-size:27px; font-weight:800; font-family:var(--mono);
+             letter-spacing:-.02em}
+  .score-note{font-size:13px; color:var(--dim)}
+  .verdict-row{display:flex; gap:10px; padding:9px 0; font-size:14.5px;
+               align-items:flex-start}
+  .verdict-row + .verdict-row{border-top:1px solid var(--line)}
+  .mark{flex:0 0 21px; height:21px; border-radius:6px; display:grid;
+        place-items:center; font-size:12px; font-weight:800; color:#fff; margin-top:2px}
+  .mark.hit{background:var(--up)} .mark.miss{background:var(--flat)}
+  .verdict-row .detail{display:block; font-size:12.5px; color:var(--dim);
+                       font-family:var(--mono); margin-top:2px}
+
+  /* ── 트리거 ───────────────────────────── */
+  .trig{padding:12px 0}
+  .trig + .trig{border-top:1px solid var(--line)}
+  .trig .claim{font-weight:640; font-size:15px; line-height:1.6}
+  .trig .basis{font-size:13px; color:var(--dim); margin-top:5px}
+  .pbar{display:flex; align-items:center; gap:9px; margin-top:7px}
+  .pbar .track{flex:1; height:6px; background:var(--line);
+               border-radius:4px; overflow:hidden; position:relative}
+  .pbar .fill{height:100%; background:var(--accent); border-radius:4px}
+  .pbar .ci{position:absolute; top:0; height:100%;
+            background:var(--accent); opacity:.22}
+  .pbar .pct{font-family:var(--mono); font-size:13px; font-weight:700;
+             min-width:42px; text-align:right}
+  .nodata{color:var(--dim); font-style:italic}
+
+  /* ── 지갑 환산 ─────────────────────────── */
+  .pocket{padding:11px 0; font-size:14.5px; line-height:1.66}
+  .pocket + .pocket{border-top:1px solid var(--line)}
+  .pocket b{color:var(--accent)}
+
+  /* ── 용어 툴팁 ─────────────────────────── */
+  .term{
+    border-bottom:1px dashed var(--accent); cursor:help; position:relative;
+    outline:none;
+  }
+  .term .tip{
+    display:none; position:absolute; left:0; top:calc(100% + 7px); z-index:40;
+    width:min(310px,78vw); padding:12px 13px; background:var(--card);
+    border:1px solid var(--line); border-radius:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,.16); font-size:13.5px;
+    line-height:1.62; font-weight:400; color:var(--ink); white-space:normal;
+    text-align:left; cursor:default;
+  }
+  .term:hover .tip, .term:focus .tip, .term:focus-within .tip{display:block}
+  .tip-head{display:block; font-size:12.5px; color:var(--accent);
+            margin-bottom:6px; font-weight:750}
+  .tip-body{display:block}
+  .tip-pocket{display:block; margin-top:8px; padding-top:8px;
+              border-top:1px solid var(--line); font-size:12.5px;
+              color:var(--dim); font-style:normal}
+
+  /* ── 접이식 ───────────────────────────── */
+  details{margin-top:11px}
+  summary{cursor:pointer; font-size:13.5px; color:var(--accent);
+          font-weight:620; list-style:none; padding:5px 0}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸ "; font-size:11px}
+  details[open] summary::before{content:"▾ "}
+  .deep{font-size:14px; color:var(--dim); line-height:1.72; padding:4px 0 2px}
+
+  /* ── 용어 목록 ─────────────────────────── */
+  .gloss{padding:11px 0}
+  .gloss + .gloss{border-top:1px solid var(--line)}
+  .gloss dt{font-weight:700; font-size:14.5px}
+  .gloss dt .lv{font-size:11px; color:var(--dim); font-weight:500; margin-left:6px}
+  .gloss dd{margin:4px 0 0; font-size:14px; color:var(--dim); line-height:1.66}
+  .gloss .pk{display:block; margin-top:5px; color:var(--accent); font-size:13.5px}
+
+  footer{margin-top:38px; padding-top:16px; border-top:1px solid var(--line);
+         font-size:12px; color:var(--dim); line-height:1.8}
+  footer code{font-family:var(--mono); font-size:11.5px}
+  .disclaimer{margin-top:10px; font-size:11.5px; opacity:.85}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">매일 경제 브리핑</div>
+  <h1>{{ date_kr }}</h1>
+  <div class="verdict">
+    {{ verdict.headline }}
+    {% if verdict.sub %}<span class="sub">{{ verdict.sub }}</span>{% endif %}
+  </div>
+</header>
+
+{% if score.total or score.resolved %}
+<section>
+  <h2>어제 예측 채점</h2>
+  <div class="card">
+    <div class="score-head">
+      <span class="score-big">{{ score.hit }}/{{ score.total_today }}</span>
+      <span class="score-note">
+        {% if track.total %}
+          누적 {{ track.hit }}/{{ track.total }} · 적중률 {{ '%.0f'|format(track.accuracy*100) }}%
+          (최근 {{ track.window_days }}일)
+        {% else %}
+          누적 기록은 며칠 쌓인 뒤부터 표시됩니다
+        {% endif %}
+      </span>
+    </div>
+    {% for r in score.resolved %}
+    <div class="verdict-row">
+      <span class="mark {{ 'hit' if r.result=='hit' else 'miss' }}">{{ 'O' if r.result=='hit' else 'X' }}</span>
+      <span>{{ r.claim }}
+        <span class="detail">실제 {{ '%.3f'|format(r.actual) }} · 기준 {{ r.op }} {{ '%.3f'|format(r.threshold) }}</span>
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section>
+  <h2>오늘의 시장</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>지표</th><th>종가</th><th>전일대비</th>
+          <th>σ</th><th>52주 위치</th><th>200일선</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in dashboard %}
+        <tr class="{{ 'notable' if row.notable }}">
+          <td>{{ row.name_html|safe }}{% if row.asof %}<span class="asof">{{ row.asof }}</span>{% endif %}</td>
+          <td class="num">{{ row.close }}</td>
+          <td class="num {{ row.dir }}">{{ row.change }}</td>
+          <td class="num {{ row.sigma_cls }}">{{ row.sigma }}</td>
+          <td class="num">
+            <span class="band"><i style="left:{{ row.band_pos }}%"></i></span>{{ row.p52 }}
+          </td>
+          <td class="num {{ row.ma_dir }}">{{ row.vs_ma200 }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <details>
+    <summary>이 표를 읽는 법</summary>
+    <div class="deep">
+      <b>σ(시그마)</b>는 오늘 움직임이 평소 변동폭의 몇 배인지를 나타냅니다.
+      1 안쪽이면 평범한 날, 1.5를 넘으면 눈여겨볼 날, 2.5를 넘으면 드문 일입니다.
+      %만 보면 "1.8% 하락"이 큰 건지 알 수 없지만, σ를 보면 알 수 있습니다.
+      왼쪽에 주황 띠가 있는 줄이 오늘 σ가 큰 지표입니다.<br><br>
+      <b>52주 위치</b>는 지난 1년 최저~최고 사이에서 지금이 어디인지입니다.
+      0%면 1년 최저, 100%면 1년 최고입니다.<br><br>
+      <b>200일선</b> 대비 %는 1년 평균 가격보다 얼마나 비싼지를 뜻합니다.
+      양수면 장기 상승 추세, 음수면 하락 추세로 보는 게 일반적입니다.
+    </div>
+  </details>
+</section>
+
+{% if notable %}
+<section>
+  <h2>오늘 볼 것</h2>
+  <div class="card">
+    {% for n in notable %}
+    <div class="pocket">{{ n|safe }}</div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if flows %}
+<section>
+  <h2>누가 사고 누가 팔았나</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>투자자</th><th>순매수</th><th>연속</th><th>σ</th><th>5일 누적</th></tr>
+      </thead>
+      <tbody>
+      {% for f in flows %}
+        <tr class="{{ 'notable' if f.notable }}">
+          <td>{{ f.label }}</td>
+          <td class="num {{ f.dir }}">{{ f.amount }}</td>
+          <td class="num {{ f.streak_cls }}">{{ f.streak }}</td>
+          <td class="num {{ f.sigma_cls }}">{{ f.sigma }}</td>
+          <td class="num {{ f.ma5_dir }}">{{ f.ma5 }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if flow_lines %}
+  <div class="card" style="margin-top:9px">
+    {% for line in flow_lines %}
+    <div class="pocket">{{ line|safe }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <details>
+    <summary>수급을 왜 보나</summary>
+    <div class="deep">
+      한국 증시는 외국인 비중이 크고 자금 규모가 커서, 지수 방향을 가장 잘
+      설명하는 단일 지표로 꼽힙니다. "코스피가 1.8% 빠졌다"보다
+      "외국인이 사흘 연속 팔았다"가 더 많은 것을 말해줍니다.<br><br>
+      <b>하루치 금액보다 연속일이 중요합니다.</b> 2조원 순매도도 한국 시장
+      규모에서는 그리 드문 일이 아니라(오늘 σ 기준 평소의 0.55배) 하루만
+      보면 의미를 알기 어렵지만, 며칠째 같은 방향이면 추세로 봅니다.<br><br>
+      외국인과 기관의 방향이 엇갈리는 날은 시장이 갈피를 못 잡는 구간으로
+      해석하며, 이런 날 방향에 베팅하는 건 일반적으로 권하지 않습니다.
+    </div>
+  </details>
+</section>
+{% endif %}
+
+{% if pockets %}
+<section>
+  <h2>내 지갑 기준으로는</h2>
+  <div class="card">
+    {% for p in pockets %}
+    <div class="pocket">{{ p|safe }}</div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section>
+  <h2>내일 지켜볼 조건</h2>
+  <div class="card">
+    {% for t in triggers %}
+    <div class="trig">
+      <div class="claim">{{ t.claim_html|safe }}</div>
+      {% if t.probability is not none %}
+      <div class="pbar">
+        <span class="track">
+          <span class="ci" style="left:{{ t.ci_lo }}%; width:{{ t.ci_w }}%"></span>
+          <span class="fill" style="width:{{ t.pct }}%"></span>
+        </span>
+        <span class="pct">{{ t.pct }}%</span>
+      </div>
+      {% endif %}
+      <div class="basis {{ 'nodata' if t.probability is none }}">{{ t.basis }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <details>
+    <summary>이 확률은 어디서 나온 건가</summary>
+    <div class="deep">
+      전부 <b>과거 실제 빈도</b>입니다. 누군가의 전망이나 인공지능의 추측이 아닙니다.
+      예를 들어 "코스피가 6,900 아래로 마감 = 35%"는,
+      지난 2년간 484거래일 중 하루 만에 0.14% 이상 하락한 날이 170번이었다는
+      뜻입니다.<br><br>
+      괄호 안 95% 구간은 표본이 적을 때 생기는 불확실성입니다.
+      "0~19%"처럼 넓게 나오면 그만큼 확신할 수 없다는 뜻이고,
+      이 브리핑은 그럴 때 점 하나로 단정하지 않습니다.<br><br>
+      여기 적힌 조건은 전부 내일 자동으로 채점되어 위쪽 적중률에 반영됩니다.
+      맞히지 못하면 숨기지 않고 그대로 기록됩니다.
+    </div>
+  </details>
+</section>
+
+{% if glossary %}
+<section>
+  <h2>오늘 나온 용어</h2>
+  <div class="card">
+    {% for g in glossary %}
+    <dl class="gloss">
+      <dt>{{ g.name }}<span class="lv">{{ '기본' if g.level==1 else ('중급' if g.level==2 else '심화') }}</span></dt>
+      <dd>{{ g.full }}
+        {% if g.pocket %}<span class="pk">→ {{ g.pocket }}</span>{% endif %}
+      </dd>
+    </dl>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<footer>
+  데이터 출처: {{ sources }}<br>
+  생성 <code>{{ generated_at }}</code> · 기준일 <code>{{ trade_date }}</code>
+  {% if stale %}<br><span style="color:var(--warn)">⚠ 지연 데이터: {{ stale }}</span>{% endif %}
+  <div class="disclaimer">
+    이 문서는 공개 데이터를 기계적으로 집계·계산한 개인용 기록이며, 투자 권유가 아닙니다.
+    확률은 과거 빈도일 뿐 미래를 보장하지 않습니다. 투자 판단과 그 결과는 본인 책임입니다.
+  </div>
+</footer>
+
+</div>
+</body>
+</html>

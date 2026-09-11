@@ -1,0 +1,199 @@
+# ─────────────────────────────────────────────────────────────
+#  매일 경제 브리핑 · 설정
+#  kind: price = 가격(수익률 %로 비교) / rate = 금리(bp 차이로 비교)
+#  국내장 마감 15:30 KST, 미국장 마감 익일 05:00~06:00 KST 기준
+# ─────────────────────────────────────────────────────────────
+
+timezone: Asia/Seoul
+send_at: "07:00"
+
+# ── 추적 지표 ────────────────────────────────────────────────
+instruments:
+
+  # 한국
+  - id: KOSPI
+    name: 코스피
+    ticker: "^KS11"
+    kind: price
+    group: kr_equity
+    unit: "pt"
+    decimals: 2
+
+  - id: KOSDAQ
+    name: 코스닥
+    ticker: "^KQ11"
+    kind: price
+    group: kr_equity
+    unit: "pt"
+    decimals: 2
+
+  - id: USDKRW
+    name: 원/달러 환율
+    ticker: "KRW=X"
+    kind: price
+    group: fx
+    unit: "원"
+    decimals: 2
+
+  # 미국 주식
+  - id: SPX
+    name: S&P 500
+    ticker: "^GSPC"
+    kind: price
+    group: us_equity
+    unit: "pt"
+    decimals: 2
+
+  - id: NASDAQ
+    name: 나스닥
+    ticker: "^IXIC"
+    kind: price
+    group: us_equity
+    unit: "pt"
+    decimals: 2
+
+  - id: DOW
+    name: 다우존스
+    ticker: "^DJI"
+    kind: price
+    group: us_equity
+    unit: "pt"
+    decimals: 2
+
+  - id: RUSSELL2000
+    name: 러셀 2000
+    ticker: "^RUT"
+    kind: price
+    group: us_equity
+    unit: "pt"
+    decimals: 2
+
+  # 변동성 · 심리
+  - id: VIX
+    name: VIX 공포지수
+    ticker: "^VIX"
+    kind: price
+    group: sentiment
+    unit: ""
+    decimals: 2
+
+  # 금리 (bp로 비교)
+  - id: US03M
+    name: 미 국채 3개월물
+    ticker: "^IRX"
+    kind: rate
+    group: rates
+    unit: "%"
+    decimals: 3
+
+  - id: US10Y
+    name: 미 국채 10년물
+    ticker: "^TNX"
+    kind: rate
+    group: rates
+    unit: "%"
+    decimals: 3
+
+  - id: US30Y
+    name: 미 국채 30년물
+    ticker: "^TYX"
+    kind: rate
+    group: rates
+    unit: "%"
+    decimals: 3
+
+  # 원자재 · 달러
+  - id: WTI
+    name: WTI 원유
+    ticker: "CL=F"
+    kind: price
+    group: commodity
+    unit: "$"
+    decimals: 2
+
+  - id: BRENT
+    name: 브렌트유
+    ticker: "BZ=F"
+    kind: price
+    group: commodity
+    unit: "$"
+    decimals: 2
+
+  - id: GOLD
+    name: 국제 금
+    ticker: "GC=F"
+    kind: price
+    group: commodity
+    unit: "$"
+    decimals: 2
+
+  - id: COPPER
+    name: 구리
+    ticker: "HG=F"
+    kind: price
+    group: commodity
+    unit: "$"
+    decimals: 4
+
+  - id: DXY
+    name: 달러인덱스
+    ticker: "DX-Y.NYB"
+    kind: price
+    group: fx
+    unit: ""
+    decimals: 2
+
+  # ── 미국 금리 (FRED = 연준 공식 확정치) ─────────────────────
+  - id: US02Y
+    name: 미 국채 2년물
+    kind: rate
+    group: rates
+    source: fred
+    unit: "%"
+    decimals: 3
+
+  - id: SPREAD_10_2
+    name: 장단기 금리차
+    kind: rate
+    group: rates
+    source: fred
+    unit: "%p"
+    decimals: 3
+
+  # ── 한국 금리 (ECOS = 한국은행 공식 고시) ───────────────────
+  - id: KTB3Y
+    name: 국고채 3년물
+    kind: rate
+    group: kr_rates
+    source: ecos
+    unit: "%"
+    decimals: 3
+
+  - id: KTB10Y
+    name: 국고채 10년물
+    kind: rate
+    group: kr_rates
+    source: ecos
+    unit: "%"
+    decimals: 3
+
+  - id: KR_BASE
+    name: 한국 기준금리
+    kind: rate
+    group: kr_rates
+    source: ecos
+    unit: "%"
+    decimals: 2
+
+# ── 분석 파라미터 ────────────────────────────────────────────
+analysis:
+  sigma_window: 60        # 이례도(σ) 계산에 쓸 거래일 수
+  range_window: 252       # 52주 밴드 (거래일 기준)
+  ma_windows: [20, 60, 200]
+  sigma_notable: 1.5      # 이 값 넘으면 "오늘 볼 것"으로 승격
+  sigma_extreme: 2.5      # 이 값 넘으면 최상단 경보
+
+# ── 내 관심 종목 (금액·수량은 저장하지 않음) ──────────────────
+watchlist:
+  kr: []                  # 예: ["005930", "000660"]
+  us: []                  # 예: ["NVDA", "AAPL"]

@@ -1,0 +1,9 @@
+# 매일 경제 브리핑 — 의존성
+pandas>=2.2
+numpy>=1.26
+requests>=2.32
+PyYAML>=6.0
+Jinja2>=3.1
+yfinance>=0.2.40
+pykrx>=1.2.8
+html5lib>=1.1

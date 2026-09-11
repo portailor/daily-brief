@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>경제 브리핑 2026년 9월 11일 (금)</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#fff; --ink:#14161a; --dim:#5b6270; --line:#e3e6ec;
+    --up:#d4322c; --down:#1f66d0; --flat:#7a8090;
+    --accent:#1a4fa0; --hl:#fff3d6; --warn:#b8560f;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0f1115; --card:#171a21; --ink:#e8eaee; --dim:#9aa2b1; --line:#262b35;
+      --up:#ff6b63; --down:#5b9bff; --flat:#8b93a3;
+      --accent:#7aa7ff; --hl:#2e2a1c; --warn:#e0a45c;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",
+                "Malgun Gothic",system-ui,sans-serif;
+    font-size:16px; line-height:1.72; letter-spacing:-.01em;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:20px 16px 72px}
+
+  /* ── 헤더 ─────────────────────────────── */
+  header{margin:8px 0 22px}
+  .eyebrow{font-size:12.5px; color:var(--dim); letter-spacing:.06em; font-weight:600}
+  h1{font-size:23px; line-height:1.35; margin:6px 0 0; font-weight:800; letter-spacing:-.02em}
+  .verdict{
+    margin-top:14px; padding:15px 16px; background:var(--card);
+    border:1px solid var(--line); border-left:4px solid var(--accent);
+    border-radius:10px; font-size:16.5px; font-weight:650; line-height:1.65;
+  }
+  .verdict .sub{display:block; margin-top:7px; font-size:14px;
+                font-weight:450; color:var(--dim)}
+
+  /* ── 섹션 ─────────────────────────────── */
+  section{margin:30px 0 0}
+  h2{
+    font-size:13px; font-weight:750; color:var(--dim); margin:0 0 11px;
+    letter-spacing:.05em; display:flex; align-items:center; gap:8px;
+  }
+  h2::after{content:""; flex:1; height:1px; background:var(--line)}
+  .card{background:var(--card); border:1px solid var(--line);
+        border-radius:11px; padding:15px 16px}
+  .card + .card{margin-top:9px}
+
+  /* ── 대시보드 표 ───────────────────────── */
+  .scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;
+          border:1px solid var(--line); border-radius:11px; background:var(--card)}
+  table{border-collapse:collapse; width:100%; font-size:14px; min-width:520px}
+  th,td{padding:9px 11px; text-align:right; white-space:nowrap}
+  th{font-size:11.5px; color:var(--dim); font-weight:650; letter-spacing:.03em;
+     border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left; position:sticky; left:0;
+     background:var(--card); font-weight:600}
+  tbody tr + tr td{border-top:1px solid var(--line)}
+  td.num{font-variant-numeric:tabular-nums; font-family:var(--mono); font-size:13px}
+  .asof{display:inline-block; margin-left:6px; padding:1px 5px; font-size:10.5px;
+        font-weight:600; color:var(--dim); background:var(--bg);
+        border:1px solid var(--line); border-radius:4px; font-family:var(--mono)}
+  /* 좁은 화면에서는 200일선을 접는다. 핵심은 종가·전일대비·σ·52주 위치다. */
+  @media (max-width:560px){
+    table{min-width:430px}
+    th:nth-child(6), td:nth-child(6){display:none}
+  }
+  .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--flat)}
+  tr.notable td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+
+  /* 52주 밴드 미니바 */
+  .band{display:inline-block; width:52px; height:5px; background:var(--line);
+        border-radius:3px; position:relative; vertical-align:middle; margin-right:6px}
+  .band i{position:absolute; top:-2px; width:3px; height:9px;
+          background:var(--accent); border-radius:2px}
+
+  /* ── 채점 ─────────────────────────────── */
+  .score-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+              margin-bottom:11px}
+  .score-big{font-size:27px; font-weight:800; font-family:var(--mono);
+             letter-spacing:-.02em}
+  .score-note{font-size:13px; color:var(--dim)}
+  .verdict-row{display:flex; gap:10px; padding:9px 0; font-size:14.5px;
+               align-items:flex-start}
+  .verdict-row + .verdict-row{border-top:1px solid var(--line)}
+  .mark{flex:0 0 21px; height:21px; border-radius:6px; display:grid;
+        place-items:center; font-size:12px; font-weight:800; color:#fff; margin-top:2px}
+  .mark.hit{background:var(--up)} .mark.miss{background:var(--flat)}
+  .verdict-row .detail{display:block; font-size:12.5px; color:var(--dim);
+                       font-family:var(--mono); margin-top:2px}
+
+  /* ── 트리거 ───────────────────────────── */
+  .trig{padding:12px 0}
+  .trig + .trig{border-top:1px solid var(--line)}
+  .trig .claim{font-weight:640; font-size:15px; line-height:1.6}
+  .trig .basis{font-size:13px; color:var(--dim); margin-top:5px}
+  .pbar{display:flex; align-items:center; gap:9px; margin-top:7px}
+  .pbar .track{flex:1; height:6px; background:var(--line);
+               border-radius:4px; overflow:hidden; position:relative}
+  .pbar .fill{height:100%; background:var(--accent); border-radius:4px}
+  .pbar .ci{position:absolute; top:0; height:100%;
+            background:var(--accent); opacity:.22}
+  .pbar .pct{font-family:var(--mono); font-size:13px; font-weight:700;
+             min-width:42px; text-align:right}
+  .nodata{color:var(--dim); font-style:italic}
+
+  /* ── 지갑 환산 ─────────────────────────── */
+  .pocket{padding:11px 0; font-size:14.5px; line-height:1.66}
+  .pocket + .pocket{border-top:1px solid var(--line)}
+  .pocket b{color:var(--accent)}
+
+  /* ── 용어 툴팁 ─────────────────────────── */
+  .term{
+    border-bottom:1px dashed var(--accent); cursor:help; position:relative;
+    outline:none;
+  }
+  .term .tip{
+    display:none; position:absolute; left:0; top:calc(100% + 7px); z-index:40;
+    width:min(310px,78vw); padding:12px 13px; background:var(--card);
+    border:1px solid var(--line); border-radius:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,.16); font-size:13.5px;
+    line-height:1.62; font-weight:400; color:var(--ink); white-space:normal;
+    text-align:left; cursor:default;
+  }
+  .term:hover .tip, .term:focus .tip, .term:focus-within .tip{display:block}
+  .tip-head{display:block; font-size:12.5px; color:var(--accent);
+            margin-bottom:6px; font-weight:750}
+  .tip-body{display:block}
+  .tip-pocket{display:block; margin-top:8px; padding-top:8px;
+              border-top:1px solid var(--line); font-size:12.5px;
+              color:var(--dim); font-style:normal}
+
+  /* ── 접이식 ───────────────────────────── */
+  details{margin-top:11px}
+  summary{cursor:pointer; font-size:13.5px; color:var(--accent);
+          font-weight:620; list-style:none; padding:5px 0}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸ "; font-size:11px}
+  details[open] summary::before{content:"▾ "}
+  .deep{font-size:14px; color:var(--dim); line-height:1.72; padding:4px 0 2px}
+
+  /* ── 용어 목록 ─────────────────────────── */
+  .gloss{padding:11px 0}
+  .gloss + .gloss{border-top:1px solid var(--line)}
+  .gloss dt{font-weight:700; font-size:14.5px}
+  .gloss dt .lv{font-size:11px; color:var(--dim); font-weight:500; margin-left:6px}
+  .gloss dd{margin:4px 0 0; font-size:14px; color:var(--dim); line-height:1.66}
+  .gloss .pk{display:block; margin-top:5px; color:var(--accent); font-size:13.5px}
+
+  footer{margin-top:38px; padding-top:16px; border-top:1px solid var(--line);
+         font-size:12px; color:var(--dim); line-height:1.8}
+  footer code{font-family:var(--mono); font-size:11.5px}
+  .disclaimer{margin-top:10px; font-size:11.5px; opacity:.85}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">매일 경제 브리핑</div>
+  <h1>2026년 9월 11일 (금)</h1>
+  <div class="verdict">
+    국고채 3년물이 평소의 2.2배로 급등했습니다.
+<span class="sub">오늘 평소 범위를 벗어난 지표: 국고채 3년물, 국고채 10년물, VIX 공포지수. 나머지는 평범한 하루였습니다.</span>  </div>
+</header>
+
+
+<section>
+  <h2>오늘의 시장</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>지표</th><th>종가</th><th>전일대비</th>
+          <th>σ</th><th>52주 위치</th><th>200일선</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="">
+          <td>코스닥</td>
+          <td class="num">820.64</td>
+          <td class="num down">-1.95%</td>
+          <td class="num flat">-0.51</td>
+          <td class="num">
+            <span class="band"><i style="left:30%"></i></span>30%
+          </td>
+          <td class="num down">-16.9%</td>
+        </tr>
+        <tr class="">
+          <td>코스피</td>
+          <td class="num">6,909.91</td>
+          <td class="num down">-1.76%</td>
+          <td class="num flat">-0.38</td>
+          <td class="num">
+            <span class="band"><i style="left:63%"></i></span>63%
+          </td>
+          <td class="num up">+12.6%</td>
+        </tr>
+        <tr class="">
+          <td>한국 <span class="term" tabindex="0">기준금리<span class="tip"><strong class="tip-head">기준금리 · 중앙은행이 정하는 최상위 금리</strong><span class="tip-body">한국은행·연준 같은 중앙은행이 물가와 경기를 조절하려고 직접 정하는 금리입니다. 모든 시중 금리의 출발점이라, 여기가 움직이면 예금·대출·채권 금리가 순차로 따라 움직입니다.</span><em class="tip-pocket">기준금리를 올리면 대출이자가 늘어 소비가 줄고, 그 결과 물가가 잡힙니다. 물가를 잡는 대가로 경기를 희생시키는 거래입니다.</em></span></span><span class="asof">9/09</span></td>
+          <td class="num">3.00</td>
+          <td class="num flat">+0bp</td>
+          <td class="num flat">+0.00</td>
+          <td class="num">
+            <span class="band"><i style="left:97%"></i></span>100%
+          </td>
+          <td class="num up">+15.9%</td>
+        </tr>
+        <tr class="notable">
+          <td><span class="term" tabindex="0">국고채 10년물<span class="tip"><strong class="tip-head">국고채 · 한국 정부가 빌리는 이자율</strong><span class="tip-body">정부가 돈을 빌리려고 발행한 채권이 시장에서 거래되는 수익률입니다. 나라가 망하지 않는 한 떼일 일이 없어 가장 안전한 금리로 취급되고, 은행 대출금리·회사채 금리가 전부 이 위에 얹혀서 결정됩니다.</span><em class="tip-pocket">국고채 금리가 1%p 오르면 주택담보대출 금리도 시차를 두고 비슷하게 따라 오릅니다. 3억 대출이면 연 300만원이 더 나갑니다.</em></span></span></td>
+          <td class="num">4.540</td>
+          <td class="num up">+9bp</td>
+          <td class="num up">+1.99</td>
+          <td class="num">
+            <span class="band"><i style="left:97%"></i></span>100%
+          </td>
+          <td class="num up">+17.5%</td>
+        </tr>
+        <tr class="notable">
+          <td>국고채 3년물</td>
+          <td class="num">4.014</td>
+          <td class="num up">+8bp</td>
+          <td class="num up">+2.21</td>
+          <td class="num">
+            <span class="band"><i style="left:97%"></i></span>100%
+          </td>
+          <td class="num up">+16.1%</td>
+        </tr>
+        <tr class="">
+          <td><span class="term" tabindex="0">달러인덱스<span class="tip"><strong class="tip-head">달러인덱스 · 달러의 종합 체력</strong><span class="tip-body">유로·엔·파운드 등 주요 6개 통화 대비 달러 가치를 지수화한 것입니다. 원/달러 환율만 보면 원화가 약한 건지 달러가 강한 건지 구분이 안 되는데, 달러인덱스를 같이 보면 그게 갈립니다.</span><em class="tip-pocket">환율과 달러인덱스가 같이 오르면 달러가 강한 것이고, 환율만 오르고 달러인덱스가 내리면 원화만 약한 것입니다. 후자가 더 나쁜 신호입니다.</em></span></span></td>
+          <td class="num">99.05</td>
+          <td class="num down">-0.04%</td>
+          <td class="num flat">-0.13</td>
+          <td class="num">
+            <span class="band"><i style="left:53%"></i></span>53%
+          </td>
+          <td class="num down">-0.1%</td>
+        </tr>
+        <tr class="">
+          <td>원/달러 환율</td>
+          <td class="num">1,339.42</td>
+          <td class="num up">+0.02%</td>
+          <td class="num flat">+0.03</td>
+          <td class="num">
+            <span class="band"><i style="left:0%"></i></span>0%
+          </td>
+          <td class="num down">-8.7%</td>
+        </tr>
+        <tr class="">
+          <td>다우존스<span class="asof">9/10</span></td>
+          <td class="num">52,064.10</td>
+          <td class="num down">-0.60%</td>
+          <td class="num flat">-0.84</td>
+          <td class="num">
+            <span class="band"><i style="left:75%"></i></span>75%
+          </td>
+          <td class="num up">+4.2%</td>
+        </tr>
+        <tr class="">
+          <td>나스닥<span class="asof">9/10</span></td>
+          <td class="num">26,081.72</td>
+          <td class="num down">-0.65%</td>
+          <td class="num flat">-0.54</td>
+          <td class="num">
+            <span class="band"><i style="left:84%"></i></span>84%
+          </td>
+          <td class="num up">+6.6%</td>
+        </tr>
+        <tr class="">
+          <td>러셀 2000<span class="asof">9/10</span></td>
+          <td class="num">2,890.95</td>
+          <td class="num down">-1.04%</td>
+          <td class="num flat">-1.18</td>
+          <td class="num">
+            <span class="band"><i style="left:77%"></i></span>77%
+          </td>
+          <td class="num up">+5.0%</td>
+        </tr>
+        <tr class="">
+          <td>S&amp;P 500<span class="asof">9/10</span></td>
+          <td class="num">7,591.70</td>
+          <td class="num down">-0.58%</td>
+          <td class="num flat">-0.78</td>
+          <td class="num">
+            <span class="band"><i style="left:86%"></i></span>86%
+          </td>
+          <td class="num up">+6.1%</td>
+        </tr>
+        <tr class="notable">
+          <td><span class="term" tabindex="0">VIX 공포지수<span class="tip"><strong class="tip-head">VIX · 시장의 불안 온도계</strong><span class="tip-body">S&amp;P500 옵션 가격에서 역산한 앞으로 30일간 예상 변동폭입니다. 투자자가 불안할수록 보험(옵션)을 비싸게 사므로 값이 올라갑니다. 통상 20 아래면 평온, 30 넘으면 공포, 40 이상은 패닉으로 봅니다.</span><em class="tip-pocket">VIX 17은 한 달 뒤 S&amp;P500이 지금 대비 ±4.9% 안에 있을 확률이 68%라는 뜻입니다.</em></span></span></td>
+          <td class="num">16.02</td>
+          <td class="num down">-10.20%</td>
+          <td class="num down">-1.56</td>
+          <td class="num">
+            <span class="band"><i style="left:15%"></i></span>15%
+          </td>
+          <td class="num down">-11.5%</td>
+        </tr>
+        <tr class="">
+          <td>장단기 금리차<span class="asof">9/10</span></td>
+          <td class="num">0.390</td>
+          <td class="num down">-1bp</td>
+          <td class="num flat">-0.33</td>
+          <td class="num">
+            <span class="band"><i style="left:26%"></i></span>26%
+          </td>
+          <td class="num down">-24.8%</td>
+        </tr>
+        <tr class="">
+          <td>미 국채 2년물<span class="asof">9/09</span></td>
+          <td class="num">4.430</td>
+          <td class="num up">+4bp</td>
+          <td class="num flat">+0.84</td>
+          <td class="num">
+            <span class="band"><i style="left:97%"></i></span>100%
+          </td>
+          <td class="num up">+15.0%</td>
+        </tr>
+        <tr class="">
+          <td>미 국채 3개월물</td>
+          <td class="num">3.873</td>
+          <td class="num up">+3bp</td>
+          <td class="num flat">+1.09</td>
+          <td class="num">
+            <span class="band"><i style="left:87%"></i></span>87%
+          </td>
+          <td class="num up">+6.7%</td>
+        </tr>
+        <tr class="">
+          <td><span class="term" tabindex="0">미 국채 10년물<span class="tip"><strong class="tip-head">미 국채 10년물 · 세계 금융의 기준 금리</strong><span class="tip-body">미국 정부에 10년간 돈을 빌려주고 받는 이자율로, 전 세계 자산 가격의 기준점입니다. 이게 오르면 안전하게 이만큼 받을 수 있는데 굳이 위험한 주식을 살 이유가 줄어 주가가 눌립니다. 특히 먼 미래 이익을 당겨서 평가받는 성장주가 크게 흔들립니다.</span><em class="tip-pocket">10년물 4.9%는 미국 정부에 돈을 맡기면 떼일 걱정 없이 연 4.9%라는 뜻입니다. 주식이 이걸 못 이기면 위험을 감수할 이유가 없어집니다.</em></span></span></td>
+          <td class="num">4.922</td>
+          <td class="num down">-2bp</td>
+          <td class="num flat">-0.51</td>
+          <td class="num">
+            <span class="band"><i style="left:97%"></i></span>98%
+          </td>
+          <td class="num up">+12.4%</td>
+        </tr>
+        <tr class="">
+          <td>미 국채 30년물</td>
+          <td class="num">5.320</td>
+          <td class="num down">-4bp</td>
+          <td class="num flat">-1.13</td>
+          <td class="num">
+            <span class="band"><i style="left:95%"></i></span>95%
+          </td>
+          <td class="num up">+7.4%</td>
+        </tr>
+        <tr class="">
+          <td><span class="term" tabindex="0">브렌트유<span class="tip"><strong class="tip-head">브렌트유 · 유럽 기준 원유 가격</strong><span class="tip-body">북해에서 나는 원유로 유럽·아프리카 지역의 가격 기준입니다. WTI보다 보통 2~5달러 비싼데, 이 격차가 갑자기 벌어지면 미국 내 공급 과잉이나 운송 병목을 의심합니다.</span><em class="tip-pocket">WTI와 브렌트의 가격차를 보면 미국만의 문제인지, 전 세계 문제인지가 갈립니다.</em></span></span></td>
+          <td class="num">104.34</td>
+          <td class="num down">-3.06%</td>
+          <td class="num flat">-0.88</td>
+          <td class="num">
+            <span class="band"><i style="left:76%"></i></span>76%
+          </td>
+          <td class="num up">+23.3%</td>
+        </tr>
+        <tr class="">
+          <td>구리</td>
+          <td class="num">6.5485</td>
+          <td class="num up">+1.26%</td>
+          <td class="num flat">+0.84</td>
+          <td class="num">
+            <span class="band"><i style="left:89%"></i></span>89%
+          </td>
+          <td class="num up">+8.8%</td>
+        </tr>
+        <tr class="">
+          <td>국제 금</td>
+          <td class="num">4,430.50</td>
+          <td class="num up">+1.51%</td>
+          <td class="num flat">+1.01</td>
+          <td class="num">
+            <span class="band"><i style="left:47%"></i></span>47%
+          </td>
+          <td class="num down">-2.1%</td>
+        </tr>
+        <tr class="">
+          <td><span class="term" tabindex="0">WTI 원유<span class="tip"><strong class="tip-head">WTI · 미국산 원유 가격 기준</strong><span class="tip-body">West Texas Intermediate. 미국 텍사스에서 나는 원유로, 세계 3대 유종(WTI·브렌트·두바이) 중 하나입니다. 한국은 실제로는 중동산 두바이유를 주로 수입하지만, 뉴스에서 국제유가라고 하면 보통 이 WTI를 가리킵니다.</span><em class="tip-pocket">유가가 10% 오르면 주유소 휘발유값은 보통 3~4% 오릅니다. 세금과 유통비가 절반 이상이라 충격이 희석되기 때문입니다.</em></span></span></td>
+          <td class="num">99.08</td>
+          <td class="num down">-3.32%</td>
+          <td class="num flat">-1.02</td>
+          <td class="num">
+            <span class="band"><i style="left:76%"></i></span>76%
+          </td>
+          <td class="num up">+24.5%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <details>
+    <summary>이 표를 읽는 법</summary>
+    <div class="deep">
+      <b>σ(시그마)</b>는 오늘 움직임이 평소 변동폭의 몇 배인지를 나타냅니다.
+      1 안쪽이면 평범한 날, 1.5를 넘으면 눈여겨볼 날, 2.5를 넘으면 드문 일입니다.
+      %만 보면 "1.8% 하락"이 큰 건지 알 수 없지만, σ를 보면 알 수 있습니다.
+      왼쪽에 주황 띠가 있는 줄이 오늘 σ가 큰 지표입니다.<br><br>
+      <b>52주 위치</b>는 지난 1년 최저~최고 사이에서 지금이 어디인지입니다.
+      0%면 1년 최저, 100%면 1년 최고입니다.<br><br>
+      <b>200일선</b> 대비 %는 1년 평균 가격보다 얼마나 비싼지를 뜻합니다.
+      양수면 장기 상승 추세, 음수면 하락 추세로 보는 게 일반적입니다.
+    </div>
+  </details>
+</section>
+
+<section>
+  <h2>오늘 볼 것</h2>
+  <div class="card">
+    <div class="pocket">국고채 3년물 +8<span class="term" tabindex="0">bp<span class="tip"><strong class="tip-head">bp · 금리 단위, 100bp = 1%</strong><span class="tip-body">basis point. 금리를 말할 때 0.01%를 1bp라고 부릅니다. 금리 변화를 %로 말하면 4.83%가 2.3% 올랐다처럼 헷갈리기 때문에, 시장은 항상 11bp 올랐다로 말합니다.</span><em class="tip-pocket">기준금리 인하 한 번이 보통 25bp(0.25%p)입니다.</em></span></span> — 평소 하루 변동폭의 2.2배입니다. <span class="term" tabindex="0">σ<span class="tip"><strong class="tip-head">시그마 · 평소 변동폭의 몇 배인가</strong><span class="tip-body">이 브리핑에서는 오늘 움직임을 최근 60거래일의 평소 변동폭으로 나눠 계산합니다. 1σ 안쪽이면 평범한 날, 2σ를 넘으면 통계적으로 20거래일에 한 번꼴로 드문 움직임입니다. %만 보면 놓치는 이게 큰 일인가를 판별하려고 씁니다.</span><em class="tip-pocket">코스피가 1.8% 빠져도 σ가 0.4면 평소 변동폭 안입니다. 뉴스 제목이 급락이라도 통계적으론 평범한 날입니다.</em></span></span> 기준 눈여겨볼 움직임입니다.</div>
+    <div class="pocket">국고채 3년물이 <span class="term" tabindex="0">52주 최고<span class="tip"><strong class="tip-head">52주 위치 · 최근 1년 범위 중 어디쯤인가</strong><span class="tip-body">최근 1년간의 최고가와 최저가 사이에서 현재 값의 상대 위치를 0~100%로 나타낸 것입니다. 절대 수치만으로는 감이 안 오는 지금이 비싼 구간인가 싼 구간인가를 한눈에 보여줍니다.</span><em class="tip-pocket">환율의 52주 위치가 1%면 지난 1년 중 거의 가장 낮다는 뜻입니다. 달러를 사기엔 1년 내 가장 좋은 자리입니다.</em></span></span> 부근입니다 (밴드 100%, 1년 최고 4.014). 지난 1년 중 가장 비싼 구간에 있다는 뜻입니다.</div>
+    <div class="pocket">국고채 10년물 +9bp — 평소 하루 변동폭의 2.0배입니다. σ 기준 눈여겨볼 움직임입니다.</div>
+    <div class="pocket">국고채 10년물이 52주 최고 부근입니다 (밴드 100%, 1년 최고 4.540). 지난 1년 중 가장 비싼 구간에 있다는 뜻입니다.</div>
+    <div class="pocket">VIX 공포지수 -10.20% — 평소 하루 변동폭의 1.6배입니다. σ 기준 눈여겨볼 움직임입니다.</div>
+    <div class="pocket">미 국채 30년물이 52주 최고 부근입니다 (밴드 95%, 1년 최고 5.361). 지난 1년 중 가장 비싼 구간에 있다는 뜻입니다.</div>
+  </div>
+</section>
+
+<section>
+  <h2>누가 사고 누가 팔았나</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>투자자</th><th>순매수</th><th>연속</th><th>σ</th><th>5일 누적</th></tr>
+      </thead>
+      <tbody>
+        <tr class="notable">
+          <td>KOSPI 외국인</td>
+          <td class="num down">−2.11조</td>
+          <td class="num down">3일</td>
+          <td class="num down">-0.55</td>
+          <td class="num down">−1.80조</td>
+        </tr>
+        <tr class="">
+          <td>KOSPI 기관</td>
+          <td class="num down">−1.92조</td>
+          <td class="num flat">—</td>
+          <td class="num flat">-0.72</td>
+          <td class="num up">+3.52조</td>
+        </tr>
+        <tr class="">
+          <td>KOSPI 개인</td>
+          <td class="num up">+2.36조</td>
+          <td class="num up">2일</td>
+          <td class="num flat">+0.44</td>
+          <td class="num down">−10.18조</td>
+        </tr>
+        <tr class="">
+          <td>KOSDAQ 외국인</td>
+          <td class="num down">−3,123억</td>
+          <td class="num down">2일</td>
+          <td class="num flat">-1.15</td>
+          <td class="num down">−1.09조</td>
+        </tr>
+        <tr class="">
+          <td>KOSDAQ 기관</td>
+          <td class="num down">−2,159억</td>
+          <td class="num flat">—</td>
+          <td class="num flat">-0.74</td>
+          <td class="num up">+8,220억</td>
+        </tr>
+        <tr class="notable">
+          <td>KOSDAQ 개인</td>
+          <td class="num up">+5,120억</td>
+          <td class="num flat">—</td>
+          <td class="num up">+1.57</td>
+          <td class="num up">+2,249억</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card" style="margin-top:9px">
+    <div class="pocket">외국인이 KOSPI에서 2.11조원 순매도 · 3일 연속 순매도 중 · 최근 5일 누적 1.80조원 순매도입니다.</div>
+    <div class="pocket">외국인이 KOSDAQ에서 3,123억원 순매도 · 2일 연속 순매도 중 · 최근 5일 누적 1.09조원 순매도입니다.</div>
+  </div>
+  <details>
+    <summary>수급을 왜 보나</summary>
+    <div class="deep">
+      한국 증시는 외국인 비중이 크고 자금 규모가 커서, 지수 방향을 가장 잘
+      설명하는 단일 지표로 꼽힙니다. "코스피가 1.8% 빠졌다"보다
+      "외국인이 사흘 연속 팔았다"가 더 많은 것을 말해줍니다.<br><br>
+      <b>하루치 금액보다 연속일이 중요합니다.</b> 2조원 순매도도 한국 시장
+      규모에서는 그리 드문 일이 아니라(오늘 σ 기준 평소의 0.55배) 하루만
+      보면 의미를 알기 어렵지만, 며칠째 같은 방향이면 추세로 봅니다.<br><br>
+      외국인과 기관의 방향이 엇갈리는 날은 시장이 갈피를 못 잡는 구간으로
+      해석하며, 이런 날 방향에 베팅하는 건 일반적으로 권하지 않습니다.
+    </div>
+  </details>
+</section>
+
+<section>
+  <h2>내 지갑 기준으로는</h2>
+  <div class="card">
+    <div class="pocket">브렌트유: 휘발유값에는 보통 이 변동의 3분의 1 정도가 시차를 두고 반영됩니다. 지금 흐름이면 리터당 약 1.1% 인하 압력입니다.</div>
+    <div class="pocket">VIX 공포지수: 지금 VIX 16은 &#x27;한 달 뒤 S&amp;P500이 ±4.6% 안에 있을 확률이 약 68%&#x27;라는 시장의 예상입니다.</div>
+    <div class="pocket">WTI 원유: 휘발유값에는 보통 이 변동의 3분의 1 정도가 시차를 두고 반영됩니다. 지금 흐름이면 리터당 약 1.2% 인하 압력입니다.</div>
+  </div>
+</section>
+
+<section>
+  <h2>내일 지켜볼 조건</h2>
+  <div class="card">
+    <div class="trig">
+      <div class="claim">국고채 3년물이 오늘의 이례적 급등(σ +2.2)을 되돌림</div>
+      <div class="pbar">
+        <span class="track">
+          <span class="ci" style="left:45%; width:30%"></span>
+          <span class="fill" style="width:61%"></span>
+        </span>
+        <span class="pct">61%</span>
+      </div>
+      <div class="basis ">과거 36번 중 22번 — 표본이 적어 45%~75% 사이로만 말할 수 있습니다</div>
+    </div>
+    <div class="trig">
+      <div class="claim">국고채 10년물이 오늘의 이례적 급등(σ +2.0)을 되돌림</div>
+      <div class="pbar">
+        <span class="track">
+          <span class="ci" style="left:44%; width:28%"></span>
+          <span class="fill" style="width:60%"></span>
+        </span>
+        <span class="pct">60%</span>
+      </div>
+      <div class="basis ">과거 같은 조건 42번 중 25번 = 60% (95% 구간 44%~73%)</div>
+    </div>
+    <div class="trig">
+      <div class="claim">VIX 공포지수가 오늘의 이례적 급락(σ -1.6)을 되돌림</div>
+      <div class="pbar">
+        <span class="track">
+          <span class="ci" style="left:17%; width:41%"></span>
+          <span class="fill" style="width:35%"></span>
+        </span>
+        <span class="pct">35%</span>
+      </div>
+      <div class="basis ">과거 17번 중 6번 — 표본이 적어 17%~59% 사이로만 말할 수 있습니다</div>
+    </div>
+    <div class="trig">
+      <div class="claim">한국 기준금리가 52주 최고 구간(현재 밴드 100%)에서 꺾여 하락</div>
+      <div class="pbar">
+        <span class="track">
+          <span class="ci" style="left:0%; width:7%"></span>
+          <span class="fill" style="width:0%"></span>
+        </span>
+        <span class="pct">0%</span>
+      </div>
+      <div class="basis ">과거 같은 조건 55번 중 0번 = 0% (95% 구간 0%~7%)</div>
+    </div>
+    <div class="trig">
+      <div class="claim">국고채 10년물이 52주 최고 구간(현재 밴드 100%)에서 꺾여 하락</div>
+      <div class="pbar">
+        <span class="track">
+          <span class="ci" style="left:9%; width:12%"></span>
+          <span class="fill" style="width:14%"></span>
+        </span>
+        <span class="pct">14%</span>
+      </div>
+      <div class="basis ">과거 같은 조건 118번 중 16번 = 14% (95% 구간 9%~21%)</div>
+    </div>
+    <div class="trig">
+      <div class="claim">국고채 3년물이 52주 최고 구간(현재 밴드 100%)에서 꺾여 하락</div>
+      <div class="pbar">
+        <span class="track">
+          <span class="ci" style="left:8%; width:13%"></span>
+          <span class="fill" style="width:13%"></span>
+        </span>
+        <span class="pct">13%</span>
+      </div>
+      <div class="basis ">과거 같은 조건 99번 중 13번 = 13% (95% 구간 8%~21%)</div>
+    </div>
+  </div>
+  <details>
+    <summary>이 확률은 어디서 나온 건가</summary>
+    <div class="deep">
+      전부 <b>과거 실제 빈도</b>입니다. 누군가의 전망이나 인공지능의 추측이 아닙니다.
+      예를 들어 "코스피가 6,900 아래로 마감 = 35%"는,
+      지난 2년간 484거래일 중 하루 만에 0.14% 이상 하락한 날이 170번이었다는
+      뜻입니다.<br><br>
+      괄호 안 95% 구간은 표본이 적을 때 생기는 불확실성입니다.
+      "0~19%"처럼 넓게 나오면 그만큼 확신할 수 없다는 뜻이고,
+      이 브리핑은 그럴 때 점 하나로 단정하지 않습니다.<br><br>
+      여기 적힌 조건은 전부 내일 자동으로 채점되어 위쪽 적중률에 반영됩니다.
+      맞히지 못하면 숨기지 않고 그대로 기록됩니다.
+    </div>
+  </details>
+</section>
+
+<section>
+  <h2>오늘 나온 용어</h2>
+  <div class="card">
+    <dl class="gloss">
+      <dt>52주 위치<span class="lv">기본</span></dt>
+      <dd>최근 1년간의 최고가와 최저가 사이에서 현재 값의 상대 위치를 0~100%로 나타낸 것입니다. 절대 수치만으로는 감이 안 오는 지금이 비싼 구간인가 싼 구간인가를 한눈에 보여줍니다.
+<span class="pk">→ 환율의 52주 위치가 1%면 지난 1년 중 거의 가장 낮다는 뜻입니다. 달러를 사기엔 1년 내 가장 좋은 자리입니다.</span>      </dd>
+    </dl>
+    <dl class="gloss">
+      <dt>VIX<span class="lv">기본</span></dt>
+      <dd>S&P500 옵션 가격에서 역산한 앞으로 30일간 예상 변동폭입니다. 투자자가 불안할수록 보험(옵션)을 비싸게 사므로 값이 올라갑니다. 통상 20 아래면 평온, 30 넘으면 공포, 40 이상은 패닉으로 봅니다.
+<span class="pk">→ VIX 17은 한 달 뒤 S&P500이 지금 대비 ±4.9% 안에 있을 확률이 68%라는 뜻입니다.</span>      </dd>
+    </dl>
+    <dl class="gloss">
+      <dt>WTI<span class="lv">기본</span></dt>
+      <dd>West Texas Intermediate. 미국 텍사스에서 나는 원유로, 세계 3대 유종(WTI·브렌트·두바이) 중 하나입니다. 한국은 실제로는 중동산 두바이유를 주로 수입하지만, 뉴스에서 국제유가라고 하면 보통 이 WTI를 가리킵니다.
+<span class="pk">→ 유가가 10% 오르면 주유소 휘발유값은 보통 3~4% 오릅니다. 세금과 유통비가 절반 이상이라 충격이 희석되기 때문입니다.</span>      </dd>
+    </dl>
+    <dl class="gloss">
+      <dt>bp<span class="lv">기본</span></dt>
+      <dd>basis point. 금리를 말할 때 0.01%를 1bp라고 부릅니다. 금리 변화를 %로 말하면 4.83%가 2.3% 올랐다처럼 헷갈리기 때문에, 시장은 항상 11bp 올랐다로 말합니다.
+<span class="pk">→ 기준금리 인하 한 번이 보통 25bp(0.25%p)입니다.</span>      </dd>
+    </dl>
+    <dl class="gloss">
+      <dt>국고채<span class="lv">기본</span></dt>
+      <dd>정부가 돈을 빌리려고 발행한 채권이 시장에서 거래되는 수익률입니다. 나라가 망하지 않는 한 떼일 일이 없어 가장 안전한 금리로 취급되고, 은행 대출금리·회사채 금리가 전부 이 위에 얹혀서 결정됩니다.
+<span class="pk">→ 국고채 금리가 1%p 오르면 주택담보대출 금리도 시차를 두고 비슷하게 따라 오릅니다. 3억 대출이면 연 300만원이 더 나갑니다.</span>      </dd>
+    </dl>
+    <dl class="gloss">
+      <dt>기준금리<span class="lv">기본</span></dt>
+      <dd>한국은행·연준 같은 중앙은행이 물가와 경기를 조절하려고 직접 정하는 금리입니다. 모든 시중 금리의 출발점이라, 여기가 움직이면 예금·대출·채권 금리가 순차로 따라 움직입니다.
+<span class="pk">→ 기준금리를 올리면 대출이자가 늘어 소비가 줄고, 그 결과 물가가 잡힙니다. 물가를 잡는 대가로 경기를 희생시키는 거래입니다.</span>      </dd>
+    </dl>
+    <dl class="gloss">
+      <dt>미 국채 10년물<span class="lv">기본</span></dt>
+      <dd>미국 정부에 10년간 돈을 빌려주고 받는 이자율로, 전 세계 자산 가격의 기준점입니다. 이게 오르면 안전하게 이만큼 받을 수 있는데 굳이 위험한 주식을 살 이유가 줄어 주가가 눌립니다. 특히 먼 미래 이익을 당겨서 평가받는 성장주가 크게 흔들립니다.
+<span class="pk">→ 10년물 4.9%는 미국 정부에 돈을 맡기면 떼일 걱정 없이 연 4.9%라는 뜻입니다. 주식이 이걸 못 이기면 위험을 감수할 이유가 없어집니다.</span>      </dd>
+    </dl>
+    <dl class="gloss">
+      <dt>달러인덱스<span class="lv">중급</span></dt>
+      <dd>유로·엔·파운드 등 주요 6개 통화 대비 달러 가치를 지수화한 것입니다. 원/달러 환율만 보면 원화가 약한 건지 달러가 강한 건지 구분이 안 되는데, 달러인덱스를 같이 보면 그게 갈립니다.
+<span class="pk">→ 환율과 달러인덱스가 같이 오르면 달러가 강한 것이고, 환율만 오르고 달러인덱스가 내리면 원화만 약한 것입니다. 후자가 더 나쁜 신호입니다.</span>      </dd>
+    </dl>
+    <dl class="gloss">
+      <dt>브렌트유<span class="lv">중급</span></dt>
+      <dd>북해에서 나는 원유로 유럽·아프리카 지역의 가격 기준입니다. WTI보다 보통 2~5달러 비싼데, 이 격차가 갑자기 벌어지면 미국 내 공급 과잉이나 운송 병목을 의심합니다.
+<span class="pk">→ WTI와 브렌트의 가격차를 보면 미국만의 문제인지, 전 세계 문제인지가 갈립니다.</span>      </dd>
+    </dl>
+    <dl class="gloss">
+      <dt>시그마<span class="lv">중급</span></dt>
+      <dd>이 브리핑에서는 오늘 움직임을 최근 60거래일의 평소 변동폭으로 나눠 계산합니다. 1σ 안쪽이면 평범한 날, 2σ를 넘으면 통계적으로 20거래일에 한 번꼴로 드문 움직임입니다. %만 보면 놓치는 이게 큰 일인가를 판별하려고 씁니다.
+<span class="pk">→ 코스피가 1.8% 빠져도 σ가 0.4면 평소 변동폭 안입니다. 뉴스 제목이 급락이라도 통계적으론 평범한 날입니다.</span>      </dd>
+    </dl>
+  </div>
+</section>
+
+<footer>
+  데이터 출처: 한국거래소·yfinance(시세), 미 연준 FRED(거시지표), 한국은행 ECOS(국내금리)<br>
+  생성 <code>2026-09-11 22:24</code> · 기준일 <code>2026-09-11</code>
+  <div class="disclaimer">
+    이 문서는 공개 데이터를 기계적으로 집계·계산한 개인용 기록이며, 투자 권유가 아닙니다.
+    확률은 과거 빈도일 뿐 미래를 보장하지 않습니다. 투자 판단과 그 결과는 본인 책임입니다.
+  </div>
+</footer>
+
+</div>
+</body>
+</html>

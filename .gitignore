@@ -1,0 +1,32 @@
+# ── 비밀 정보 (절대 올리지 말 것) ──────────────────────────
+# 공개 저장소이므로 여기 빠지면 API 키와 KRX 비밀번호가 그대로 노출된다.
+.env
+*.env
+config/.env
+config/.env.*
+config/.kakao_token.json
+*token*.json
+*secret*
+*credential*
+
+# ── 로컬 데이터 ────────────────────────────────────────────
+data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+
+# ── 파이썬 ────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+
+# ── 편집기 / OS ───────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
