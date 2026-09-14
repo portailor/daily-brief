@@ -5,6 +5,13 @@
   python run.py --send-only    만들어 둔 메시지(outbox)만 발송
   python run.py --no-fetch     수집 없이 기존 데이터로
   python run.py --no-publish   웹 발행 없이
+  python run.py --weekly       요일과 상관없이 주간 정리로
+  python run.py --force        일요일에도 실행
+
+요일별 동작 (한국시간)
+  화~토  일일 브리핑 — 전날 한국·미국 마감 반영
+  일     쉼 — 새로 마감된 거래가 없다
+  월     주간 정리 + 이번 주 일정 — 일요일과 데이터가 같으므로 한 주를 묶어 본다
 
 발송은 반드시 리포트가 웹에 올라간 뒤에 한다.
 예전에는 카톡이 먼저 도착하고 리포트는 그 뒤에 올라가서, 곧바로 링크를
@@ -102,14 +109,20 @@ def publish(message: str) -> bool:
     return True
 
 
-def wait_until_live(url: str, timeout_s: int = 240) -> bool:
-    """링크가 실제로 열릴 때까지 기다린다. GitHub Pages 배포는 보통 30~90초."""
+def wait_until_live(url: str, build_id: str, timeout_s: int = 300) -> bool:
+    """방금 만든 페이지가 웹에 반영될 때까지 기다린다. GitHub Pages 배포는 보통 30~90초.
+
+    응답 코드 200 만 보면 안 된다. 같은 날짜 페이지가 이미 올라가 있으면
+    옛 내용으로도 200 이 나온다. 페이지에 심어 둔 빌드 번호가 맞는지 본다.
+    """
     import requests
 
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         try:
-            if requests.get(url, timeout=10).status_code == 200:
+            # 쿼리를 붙여 CDN 캐시를 우회한다
+            res = requests.get(f"{url}?check={int(time.time())}", timeout=10)
+            if res.status_code == 200 and build_id in res.text:
                 return True
         except requests.RequestException:
             pass
@@ -123,7 +136,15 @@ def wait_until_live(url: str, timeout_s: int = 240) -> bool:
 
 def generate(args) -> int:
     log("=" * 52)
-    log("브리핑 생성 시작")
+    today = clock.today_kst()
+
+    if today.weekday() == 6 and not (args.force or args.weekly):
+        log("일요일 — 새로 마감된 거래가 없어 쉬는 날입니다")
+        _write_json(OUTBOX, {"skip": True, "brief_date": today.isoformat()})
+        return 0
+
+    mode = "weekly" if (args.weekly or today.weekday() == 0) else "daily"
+    log(f"브리핑 생성 시작 ({'주간 정리' if mode == 'weekly' else '일일'})")
     failures: list[str] = []
 
     db.init()
@@ -172,7 +193,7 @@ def generate(args) -> int:
         else:
             log(f"✓ 지표 계산: {n} rows")
 
-    result, err = step("리포트 생성", report.render)
+    result, err = step("리포트 생성", report.render, mode=mode)
     if err or result is None:
         log("✗ 리포트를 만들지 못했습니다. 중단합니다.")
         return 1
@@ -193,11 +214,17 @@ def generate(args) -> int:
     # 한국·미국 대표 지수의 기준일이 지난번 브리핑과 같으면 주말·휴장이다.
     # 같은 날 다시 돌린 경우(수동 재실행)는 새 브리핑으로 취급한다.
     state = _read_json(STATE)
-    today = clock.today_kst()
     is_new = (payload["market_key"] != state.get("market_key")
               or state.get("brief_date") == today.isoformat())
 
-    if is_new:
+    if mode == "weekly":
+        # 주간 정리는 새 거래가 없어도 보낸다 — 원래 그런 날을 위한 메시지다
+        is_new = True
+        message = kakao_text.build_weekly(payload)
+        _write_json(STATE, {"market_key": payload["market_key"],
+                            "brief_date": today.isoformat()})
+        log(f"  주간 정리: {payload['week'].period if payload['week'] else '-'}")
+    elif is_new:
         message = kakao_text.build(payload)
         _write_json(STATE, {"market_key": payload["market_key"],
                             "brief_date": today.isoformat()})
@@ -210,6 +237,7 @@ def generate(args) -> int:
     link = (base.rstrip("/") + "/" + payload["page_name"]) if base else None
 
     _write_json(OUTBOX, {"message": message, "link": link,
+                         "build_id": payload["build_id"],
                          "brief_date": today.isoformat(), "is_new": is_new})
     log(f"✓ 발송 대기 메시지 준비 ({len(message)}자)")
 
@@ -224,17 +252,22 @@ def generate(args) -> int:
 
 def send() -> int:
     box = _read_json(OUTBOX)
+    if box.get("skip"):
+        log("오늘은 발송하지 않는 날입니다")
+        return 0
     if not box.get("message"):
         log("✗ 보낼 메시지가 없습니다. 먼저 생성 단계를 실행하세요.")
         return 1
 
     link = box.get("link")
     if link:
-        if wait_until_live(link):
-            log(f"✓ 링크 확인: {link}")
+        if wait_until_live(link, box.get("build_id", "")):
+            log(f"✓ 새 리포트 반영 확인: {link}")
         else:
-            # 링크가 늦어도 본문은 보낸다. 몇 분 뒤면 열린다.
-            log(f"△ 링크가 아직 열리지 않지만 발송합니다: {link}")
+            # 반영이 늦어도 본문은 보낸다. 몇 분 뒤면 새 내용으로 열린다.
+            log(f"△ 새 리포트가 아직 반영되지 않았지만 발송합니다: {link}")
+        # 폰 브라우저가 예전에 연 페이지를 캐시해 둔 경우를 피한다
+        link = f"{link}?v={box.get('build_id', '')}"
 
     from brief.deliver import kakao                       # noqa: PLC0415
     try:
@@ -254,6 +287,8 @@ def main() -> int:
     ap.add_argument("--send-only", action="store_true", help="만들어 둔 메시지만 발송")
     ap.add_argument("--no-fetch", action="store_true", help="수집 생략")
     ap.add_argument("--no-publish", action="store_true", help="GitHub 발행 생략")
+    ap.add_argument("--weekly", action="store_true", help="요일과 상관없이 주간 정리")
+    ap.add_argument("--force", action="store_true", help="일요일에도 실행")
     args = ap.parse_args()
 
     if args.send_only:
@@ -262,6 +297,8 @@ def main() -> int:
     code = generate(args)
     if code != 0:
         return code
+    if _read_json(OUTBOX).get("skip"):
+        return 0
 
     if not args.no_publish:
         step("리포트 발행", publish, f"브리핑 {clock.today_kst().isoformat()}")

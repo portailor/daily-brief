@@ -17,7 +17,7 @@ def _eok(v: float) -> str:
     return f"{a / 10_000:.1f}조원" if a >= 10_000 else f"{a:,.0f}억원"
 
 
-def _compose(date_short: str, candidates: list[str]) -> str:
+def _compose(date_short: str, candidates: list[str], title: str = "경제 브리핑") -> str:
     """후보를 앞에서부터 3줄 고른다. 상한을 넘는 문장은 자르지 않고 건너뛴다."""
     picked: list[str] = []
     for c in candidates:
@@ -28,7 +28,7 @@ def _compose(date_short: str, candidates: list[str]) -> str:
             break
 
     body = "\n".join(f"{i}. {line}" for i, line in enumerate(picked, 1))
-    text = f"📊 {date_short} 경제 브리핑\n\n{body}\n\n{FOOTER}"
+    text = f"📊 {date_short} {title}\n\n{body}\n\n{FOOTER}"
     assert len(text) <= LIMIT, f"카카오 제한 초과: {len(text)}자"
     return text
 
@@ -75,6 +75,47 @@ def build_no_new_data(payload: dict, weekday: int) -> str:
         "다음 거래일 마감 후 새 브리핑이 옵니다.",
     ]
     return _compose(payload["date_short"], candidates)
+
+
+def _short_event(e) -> str:
+    """카톡 한 줄에 들어갈 짧은 일정 이름. 화면과 달리 국가 표시가 없으므로 붙인다."""
+    title = e.title.replace(" 금리 결정", "")
+    if e.region == "US" and not title.startswith("FOMC"):
+        title = "미국 " + title
+    return title
+
+
+def build_weekly(payload: dict) -> str:
+    """월요일 아침 — 지난주 정리 + 이번 주 준비."""
+    week = payload["week"]
+    moves = {m.id: m for m in week.moves} if week else {}
+    candidates: list[str] = []
+
+    kr, us = moves.get("KOSPI"), moves.get("SPX")
+    if kr and us:
+        candidates.append(f"지난주 코스피 {kr.change_text} · S&P500 {us.change_text}")
+
+    # 이번 주 핵심 일정 — 한 주를 준비하는 게 월요일 메시지의 목적이다
+    key = sorted([e for e in payload["events"] if e.importance >= 2],
+                 key=lambda e: (-e.importance, e.day))[:2]
+    if key:
+        key.sort(key=lambda e: e.day)
+        candidates.append("이번 주: " + " · ".join(
+            f"{e.when().split(' ')[0]} {_short_event(e)}" for e in key))
+
+    if week:
+        for f in week.flows[:1]:
+            verb = "순매수" if f["total_eok"] > 0 else "순매도"
+            candidates.append(f"외국인 {f['market']} 주간 {_eok(f['total_eok'])} {verb}"
+                              f" ({f['days']}일 중 {f['sell_days']}일 매도)")
+        if week.top_day:
+            t = week.top_day
+            candidates.append(f"가장 이례적인 날: {t['day']} {t['name']} {t['move']}")
+        if week.pred_total:
+            candidates.append(f"지난주 예측 {week.pred_hit}/{week.pred_total} 적중")
+
+    candidates.append(payload["basis"])
+    return _compose(payload["date_short"], candidates, title="주간 브리핑")
 
 
 if __name__ == "__main__":

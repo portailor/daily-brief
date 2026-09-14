@@ -19,7 +19,8 @@ from brief import db                                            # noqa: E402
 from brief.collect.market import Instrument, load_instruments   # noqa: E402
 from brief.collect import flows as flows_mod                    # noqa: E402
 from brief import clock                                         # noqa: E402
-from brief.interpret import rules                               # noqa: E402
+from brief.interpret import rules, weekly as weekly_mod          # noqa: E402
+from brief.collect import events as events_mod                  # noqa: E402
 from brief.render.terms import Glossary                         # noqa: E402
 from brief.score import scorer                                  # noqa: E402
 
@@ -187,7 +188,9 @@ def build_flows(conn, gloss: Glossary, seen: set[str]) -> tuple[list[dict], list
 
 
 def render(trade_date: str | None = None,
-           save_predictions: bool = True) -> tuple[Path, dict]:
+           save_predictions: bool = True,
+           mode: str = "daily") -> tuple[Path, dict]:
+    """mode='daily' 는 일일 브리핑, 'weekly' 는 월요일 주간 정리."""
     cfg = yaml.safe_load((ROOT / "config" / "settings.yaml").read_text(encoding="utf-8"))
     acfg = cfg["analysis"]
     insts = {i.id: i for i in load_instruments()}
@@ -240,6 +243,23 @@ def render(trade_date: str | None = None,
 
         track = scorer.track_record(conn)
 
+        week = (weekly_mod.summarize(conn, clock.today_kst(), insts)
+                if mode == "weekly" else None)
+
+    # 일정: 주간 정리는 이번 주 전체, 일일 브리핑은 앞으로 일주일
+    from datetime import timedelta
+    today = clock.today_kst()
+    if mode == "weekly":
+        ev_start, ev_end = today, today + timedelta(days=6 - today.weekday())
+        calendar_title = "이번 주 일정"
+    else:
+        ev_start, ev_end = today, today + timedelta(days=6)
+        calendar_title = "다가오는 일정"
+    try:
+        upcoming, calendar_missing = events_mod.upcoming(ev_start, ev_end)
+    except Exception:                                          # noqa: BLE001
+        upcoming, calendar_missing = [], ["일정 전체"]
+
     trig_view = []
     for t in trigs:
         item = {"claim_html": gloss.annotate(t.claim, seen),
@@ -252,6 +272,9 @@ def render(trade_date: str | None = None,
         trig_view.append(item)
 
     brief_date = clock.today_kst()
+    # 이 페이지만의 표식. 발송 전에 '웹에 올라간 게 정말 방금 만든 것인지'를
+    # 확인하는 데 쓴다. 같은 날짜 페이지가 이미 있으면 200 응답만으로는 구분이 안 된다.
+    build_id = datetime.now().strftime("%Y%m%d%H%M%S")
     basis = f"한국 {clock.label(kr_date)} · 미국 {clock.label(us_date)} 마감 기준"
     page_name = f"{brief_date.isoformat()}.html"
 
@@ -261,6 +284,12 @@ def render(trade_date: str | None = None,
 
     html = env.get_template("brief.html.j2").render(
         date_kr=clock.label_long(brief_date),
+        is_weekly=(mode == "weekly"),
+        week=week,
+        calendar=[{"when": e.when(), "title": e.title, "note": e.note,
+                   "region": e.region, "importance": e.importance} for e in upcoming],
+        calendar_title=calendar_title,
+        calendar_missing=calendar_missing,
         basis=basis,
         trade_date=trade_date,
         verdict=verdict,
@@ -276,6 +305,7 @@ def render(trade_date: str | None = None,
         triggers=trig_view,
         sources="한국거래소·yfinance(시세), 미 연준 FRED(거시지표), 한국은행 ECOS(국내금리)",
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        build_id=build_id,
         stale="",
     )
 
@@ -306,6 +336,10 @@ def render(trade_date: str | None = None,
         "date_short": clock.label(brief_date),
         "basis": basis,
         "page_name": page_name,
+        "build_id": build_id,
+        "mode": mode,
+        "week": week,
+        "events": upcoming,
         # 새 거래일 데이터가 들어왔는지 판단하는 열쇠 — 한국·미국 대표 지수의 기준일
         "market_key": f"KOSPI:{kr_date}|SPX:{us_date}",
         "kr_date": kr_date,

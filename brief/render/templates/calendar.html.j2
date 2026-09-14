@@ -1,0 +1,29 @@
+<section>
+  <h2>{{ calendar_title }}</h2>
+  <div class="card">
+    {% for e in calendar %}
+    <div class="ev">
+      <span class="ev-when">{{ e.when }}</span>
+      <span>
+        <span class="ev-title"><span class="ev-flag">{{ '한국' if e.region == 'KR' else '미국' }}</span>{{ e.title }}{% if e.importance >= 3 %}<span class="imp">●●●</span>{% endif %}</span>
+        {% if e.note %}<span class="ev-note">{{ e.note }}</span>{% endif %}
+      </span>
+    </div>
+    {% else %}
+    <div class="pocket nodata">이 기간에 잡힌 주요 일정이 없습니다.</div>
+    {% endfor %}
+    {% if calendar_missing %}
+    <div class="pocket nodata">가져오지 못한 일정: {{ calendar_missing|join(', ') }}</div>
+    {% endif %}
+  </div>
+  <details>
+    <summary>시각은 한국시간입니다</summary>
+    <div class="deep">
+      미국 지표는 대부분 미국 동부 오전 8시 30분에 발표돼 한국시간으로는 같은 날 밤
+      9시 30분(서머타임) 또는 10시 30분입니다. FOMC 금리 결정은 한국시간 새벽에 나오므로
+      날짜가 하루 뒤로 넘어갑니다.<br><br>
+      실적 발표는 '미국 장 마감 후'면 한국시간 다음날 새벽, '장 시작 전'이면 같은 날 밤입니다.
+      선물옵션 만기일은 거래소 규칙으로 계산한 날짜라, 휴장일과 겹치면 앞당겨질 수 있습니다.
+    </div>
+  </details>
+</section>

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>경제 브리핑 {{ date_kr }}</title>
+<meta name="brief-build" content="{{ build_id }}">
 <style>
   :root{
     --bg:#f7f8fa; --card:#fff; --ink:#14161a; --dim:#5b6270; --line:#e3e6ec;
@@ -33,6 +34,14 @@
   .eyebrow{font-size:12.5px; color:var(--dim); letter-spacing:.06em; font-weight:600}
   h1{font-size:23px; line-height:1.35; margin:6px 0 0; font-weight:800; letter-spacing:-.02em}
   .basis-line{margin-top:4px; font-size:13px; color:var(--dim); font-weight:500}
+  .ev{display:flex; gap:12px; padding:10px 0; align-items:baseline}
+  .ev + .ev{border-top:1px solid var(--line)}
+  .ev-when{flex:0 0 96px; font-family:var(--mono); font-size:12.5px; color:var(--dim)}
+  .ev-title{font-weight:640; font-size:14.5px}
+  .ev-title .imp{color:var(--warn); font-size:11px; margin-left:4px; letter-spacing:-1px}
+  .ev-note{display:block; font-size:12.5px; color:var(--dim); font-weight:400; margin-top:1px}
+  .ev-flag{font-size:10.5px; font-weight:700; color:var(--dim); border:1px solid var(--line);
+           border-radius:4px; padding:0 4px; margin-right:5px}
   .verdict{
     margin-top:14px; padding:15px 16px; background:var(--card);
     border:1px solid var(--line); border-left:4px solid var(--accent);
@@ -71,6 +80,8 @@
     table{min-width:430px}
     th:nth-child(6), td:nth-child(6){display:none}
   }
+  /* 열이 적은 표는 가로 스크롤이 필요 없다 — 최소 폭을 풀어 한 화면에 담는다 */
+  table.compact{min-width:0 !important}
   .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--flat)}
   tr.notable td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 
@@ -174,7 +185,7 @@
 <div class="wrap">
 
 <header>
-  <div class="eyebrow">매일 경제 브리핑</div>
+  <div class="eyebrow">{{ '주간 경제 브리핑' if is_weekly else '매일 경제 브리핑' }}</div>
   <h1>{{ date_kr }}</h1>
   <div class="basis-line">{{ basis }}</div>
   <div class="verdict">
@@ -182,6 +193,42 @@
     {% if verdict.sub %}<span class="sub">{{ verdict.sub }}</span>{% endif %}
   </div>
 </header>
+
+{% if is_weekly and week %}
+<section>
+  <h2>지난주 정리 · {{ week.period }}</h2>
+  <div class="scroll">
+    <table class="compact">
+      <thead><tr><th>지표</th><th>주간 종가</th><th>한 주 변화</th></tr></thead>
+      <tbody>
+      {% for m in week.moves %}
+        <tr>
+          <td>{{ m.name }}</td>
+          <td class="num">{{ '{:,.{}f}'.format(m.close, m.decimals) }}</td>
+          <td class="num {{ m.direction }}">{{ m.change_text }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card" style="margin-top:9px">
+    {% if week.top_day %}
+    <div class="pocket">가장 이례적이었던 날: <b>{{ week.top_day.day }}</b> {{ week.top_day.name }}
+      {{ week.top_day.move }} — 평소 하루 변동폭의 {{ '%.1f'|format(week.top_day.sigma|abs) }}배</div>
+    {% endif %}
+    {% for f in week.flows %}
+    <div class="pocket">외국인 {{ f.market }} 주간 {{ '순매수' if f.total_eok > 0 else '순매도' }}
+      <b>{{ '%.2f조원'|format((f.total_eok|abs)/10000) if (f.total_eok|abs) >= 10000 else '{:,.0f}억원'.format(f.total_eok|abs) }}</b>
+      · {{ f.days }}일 중 {{ f.sell_days }}일 매도</div>
+    {% endfor %}
+    <div class="pocket">지난주 예측 채점:
+      {% if week.pred_total %}<b>{{ week.pred_hit }}/{{ week.pred_total }}</b> 적중{% else %}채점된 예측 없음{% endif %}
+      {% if track.total %} · 누적 {{ '%.0f'|format(track.accuracy*100) }}%{% endif %}</div>
+  </div>
+</section>
+
+{% include 'calendar.html.j2' %}
+{% endif %}
 
 {% if score.total or score.resolved %}
 <section>
@@ -318,8 +365,10 @@
 </section>
 {% endif %}
 
+{% if not is_weekly %}{% include 'calendar.html.j2' %}{% endif %}
+
 <section>
-  <h2>내일 지켜볼 조건</h2>
+  <h2>{{ '이번 주 지켜볼 조건' if is_weekly else '내일 지켜볼 조건' }}</h2>
   <div class="card">
     {% for t in triggers %}
     <div class="trig">

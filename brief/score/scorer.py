@@ -70,7 +70,19 @@ def score_pending() -> ScoreCard:
     """아직 채점 안 된 예측 중 기한이 도래한 것을 전부 처리한다."""
     card = ScoreCard(resolved=[])
 
+    # 정책금리처럼 예측 대상에서 뺀 지표(settings.yaml 의 predict: false)는
+    # 과거에 만들어져 채점까지 끝난 기록도 무효로 돌린다. 적중률을 오염시키기 때문이다.
+    from brief.collect.market import load_instruments
+    excluded = [i.id for i in load_instruments() if not i.predict]
+
     with db.session() as conn:
+        if excluded:
+            ph = ",".join("?" * len(excluded))
+            conn.execute(
+                f"UPDATE predictions SET result='void' "
+                f"WHERE instrument IN ({ph}) AND (result IS NULL OR result != 'void')",
+                excluded)
+
         pending = conn.execute(
             "SELECT * FROM predictions WHERE result IS NULL ORDER BY made_on, id"
         ).fetchall()
