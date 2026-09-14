@@ -118,7 +118,7 @@
   .pbar .ci{position:absolute; top:0; height:100%;
             background:var(--accent); opacity:.22}
   .pbar .pct{font-family:var(--mono); font-size:13px; font-weight:700;
-             min-width:42px; text-align:right}
+             min-width:42px; text-align:right; white-space:nowrap}
   .nodata{color:var(--dim); font-style:italic}
 
   /* ── 지갑 환산 ─────────────────────────── */
@@ -203,7 +203,7 @@
       <tbody>
       {% for m in week.moves %}
         <tr>
-          <td>{{ m.name }}</td>
+          <td>{{ m.name }}{% if m.futures %}<span class="asof">선물</span>{% endif %}</td>
           <td class="num">{{ '{:,.{}f}'.format(m.close, m.decimals) }}</td>
           <td class="num {{ m.direction }}">{{ m.change_text }}</td>
         </tr>
@@ -271,7 +271,7 @@
       <tbody>
       {% for row in dashboard %}
         <tr class="{{ 'notable' if row.notable }}">
-          <td>{{ row.name_html|safe }}{% if row.asof %}<span class="asof">{{ row.asof }}</span>{% endif %}</td>
+          <td>{{ row.name_html|safe }}{% if row.futures %}<span class="asof">선물</span>{% endif %}{% if row.asof %}<span class="asof">{{ row.asof }}</span>{% endif %}</td>
           <td class="num">{{ row.close }}</td>
           <td class="num {{ row.dir }}">{{ row.change }}</td>
           <td class="num {{ row.sigma_cls }}">{{ row.sigma }}</td>
@@ -288,13 +288,17 @@
     <summary>이 표를 읽는 법</summary>
     <div class="deep">
       <b>σ(시그마)</b>는 오늘 움직임이 평소 변동폭의 몇 배인지를 나타냅니다.
-      1 안쪽이면 평범한 날, 1.5를 넘으면 눈여겨볼 날, 2.5를 넘으면 드문 일입니다.
+      이 브리핑은 절댓값 1.5 이상을 '평소와 다른 날', 2.5 이상을 '드문 움직임'으로
+      표시합니다. 기준값은 이 브리핑이 정한 것이며 업계 표준은 아닙니다.
       %만 보면 "1.8% 하락"이 큰 건지 알 수 없지만, σ를 보면 알 수 있습니다.
       왼쪽에 주황 띠가 있는 줄이 오늘 σ가 큰 지표입니다.<br><br>
       <b>52주 위치</b>는 지난 1년 최저~최고 사이에서 지금이 어디인지입니다.
       0%면 1년 최저, 100%면 1년 최고입니다.<br><br>
       <b>200일선</b> 대비 %는 1년 평균 가격보다 얼마나 비싼지를 뜻합니다.
-      양수면 장기 상승 추세, 음수면 하락 추세로 보는 게 일반적입니다.
+      양수면 현재 가격이 200일 평균보다 높고, 음수면 낮다는 뜻입니다.<br><br>
+      <b>선물</b> 표시가 붙은 원자재는 최근월 선물을 이어 붙인 가격이라, 계약이
+      다음 월물로 넘어가는 날 실제 거래와 무관한 변동이 찍힐 수 있습니다.
+      그래서 이 지표들은 표에만 보여주고 자동 문장의 근거로는 쓰지 않습니다.
     </div>
   </details>
 </section>
@@ -341,14 +345,13 @@
   <details>
     <summary>수급을 왜 보나</summary>
     <div class="deep">
-      한국 증시는 외국인 비중이 크고 자금 규모가 커서, 지수 방향을 가장 잘
-      설명하는 단일 지표로 꼽힙니다. "코스피가 1.8% 빠졌다"보다
-      "외국인이 사흘 연속 팔았다"가 더 많은 것을 말해줍니다.<br><br>
-      <b>하루치 금액보다 연속일이 중요합니다.</b> 2조원 순매도도 한국 시장
-      규모에서는 그리 드문 일이 아니라(오늘 σ 기준 평소의 0.55배) 하루만
-      보면 의미를 알기 어렵지만, 며칠째 같은 방향이면 추세로 봅니다.<br><br>
-      외국인과 기관의 방향이 엇갈리는 날은 시장이 갈피를 못 잡는 구간으로
-      해석하며, 이런 날 방향에 베팅하는 건 일반적으로 권하지 않습니다.
+      지수가 오르내린 날, 어떤 투자자가 사고 팔았는지를 함께 보기 위한 표입니다.<br><br>
+      표의 <b>σ</b>는 그날 순매수 금액이 직전 60거래일 평균에서 표준편차의
+      몇 배만큼 떨어져 있는지입니다. 금액이 커 보여도 σ가 작으면 최근 흐름에서
+      드문 규모는 아니라는 뜻입니다.<br><br>
+      <b>연속</b>은 같은 방향(순매수 또는 순매도)이 며칠째 이어지는지,
+      <b>5일 누적</b>은 최근 5거래일 순매수 금액의 합입니다.
+      모든 금액은 한국거래소 투자자별 거래실적 기준입니다.
     </div>
   </details>
 </section>
@@ -379,7 +382,7 @@
           <span class="ci" style="left:{{ t.ci_lo }}%; width:{{ t.ci_w }}%"></span>
           <span class="fill" style="width:{{ t.pct }}%"></span>
         </span>
-        <span class="pct">{{ t.pct }}%</span>
+        <span class="pct">{{ t.label }}</span>
       </div>
       {% endif %}
       <div class="basis {{ 'nodata' if t.probability is none }}">{{ t.basis }}</div>
@@ -390,9 +393,9 @@
     <summary>이 확률은 어디서 나온 건가</summary>
     <div class="deep">
       전부 <b>과거 실제 빈도</b>입니다. 누군가의 전망이나 인공지능의 추측이 아닙니다.
-      예를 들어 "코스피가 6,900 아래로 마감 = 35%"는,
-      지난 2년간 484거래일 중 하루 만에 0.14% 이상 하락한 날이 170번이었다는
-      뜻입니다.<br><br>
+      각 조건 아래 적힌 "과거 N번 중 M번"이 그 계산의 분모와 분자입니다.
+      예를 들어 라운드 숫자 돌파 조건은, 지난 약 2년 동안 하루에 그만큼 이상
+      움직인 날이 몇 번이었는지를 센 것입니다.<br><br>
       괄호 안 95% 구간은 표본이 적을 때 생기는 불확실성입니다.
       "0~19%"처럼 넓게 나오면 그만큼 확신할 수 없다는 뜻이고,
       이 브리핑은 그럴 때 점 하나로 단정하지 않습니다.<br><br>

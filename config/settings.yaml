@@ -110,6 +110,7 @@ instruments:
     group: commodity
     unit: "$"
     decimals: 2
+    futures: true         # 최근월물 연결 — 월물 교체일 가짜 변동 가능
 
   - id: BRENT
     name: 브렌트유
@@ -118,6 +119,7 @@ instruments:
     group: commodity
     unit: "$"
     decimals: 2
+    futures: true         # 최근월물 연결 — 월물 교체일 가짜 변동 가능
 
   - id: GOLD
     name: 국제 금
@@ -126,6 +128,7 @@ instruments:
     group: commodity
     unit: "$"
     decimals: 2
+    futures: true         # 최근월물 연결 — 월물 교체일 가짜 변동 가능
 
   - id: COPPER
     name: 구리
@@ -134,6 +137,7 @@ instruments:
     group: commodity
     unit: "$"
     decimals: 4
+    futures: true         # 최근월물 연결 — 월물 교체일 가짜 변동 가능
 
   - id: DXY
     name: 달러인덱스

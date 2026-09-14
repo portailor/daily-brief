@@ -56,7 +56,8 @@ def build_dashboard(rows, newest: str, insts: dict[str, Instrument],
 
         direction = "flat" if not chg else ("up" if chg > 0 else "down")
         sigma = r["sigma"] if inst.predict else None
-        notable = sigma is not None and abs(sigma) >= cfg["sigma_notable"]
+        notable = (inst.can_claim and sigma is not None
+                   and abs(sigma) >= cfg["sigma_notable"])
 
         vs200 = r["vs_ma200"]
         # 미국 지표는 한국보다 하루 늦게 마감하므로 기준일이 다르다.
@@ -67,6 +68,7 @@ def build_dashboard(rows, newest: str, insts: dict[str, Instrument],
         out.append({
             "group": inst.group,
             "asof": asof,
+            "futures": inst.futures,
             "name_html": gloss.annotate(inst.name, seen),
             "close": _fmt_num(r["close"], inst.decimals),
             "change": change,
@@ -89,7 +91,7 @@ def build_dashboard(rows, newest: str, insts: dict[str, Instrument],
 def build_verdict(rows, insts: dict[str, Instrument], cfg: dict) -> dict:
     """오늘의 한 줄 결론. '특별한 게 없다'도 정당한 결론으로 취급한다."""
     nb = sorted([r for r in rows if r["sigma"] is not None
-                 and r["instrument"] in insts and insts[r["instrument"]].predict],
+                 and r["instrument"] in insts and insts[r["instrument"]].can_claim],
                 key=lambda r: -abs(r["sigma"]))
     hot = [r for r in nb if abs(r["sigma"]) >= cfg["sigma_notable"]]
 
@@ -108,11 +110,14 @@ def build_verdict(rows, insts: dict[str, Instrument], cfg: dict) -> dict:
     names = ", ".join(insts[r["instrument"]].name for r in hot[:3])
     lead = hot[0]
     lead_name = insts[lead["instrument"]].name
-    word = "급등" if lead["sigma"] > 0 else "급락"
+    word = "크게 올랐습니다" if lead["sigma"] > 0 else "크게 내렸습니다"
+    move = (f"{lead['chg_bp']:+.0f}bp" if insts[lead["instrument"]].kind == "rate"
+            else f"{lead['chg_pct']:+.2f}%")
 
     return {
-        "headline": f"{lead_name}{rules.josa(lead_name)} 평소의 "
-                    f"{abs(lead['sigma']):.1f}배로 {word}했습니다.",
+        # '평소의 N배' 는 σ(직전 60거래일 변동의 표준편차 대비 배수)를 말한다
+        "headline": f"{lead_name}{rules.josa(lead_name)} {move}로 "
+                    f"평소 변동폭의 {abs(lead['sigma']):.1f}배만큼 {word}.",
         "sub": f"오늘 평소 범위를 벗어난 지표: {names}. 나머지는 평범한 하루였습니다.",
     }
 
@@ -124,7 +129,7 @@ def build_notable_lines(rows, insts: dict[str, Instrument],
 
     for r in sorted(rows, key=lambda x: -abs(x["sigma"] or 0)):
         inst = insts.get(r["instrument"])
-        if not inst or not inst.predict:
+        if not inst or not inst.can_claim:
             continue
         s, p52 = r["sigma"], r["pct_52w"]
 
@@ -140,12 +145,12 @@ def build_notable_lines(rows, insts: dict[str, Instrument],
             lines.append(gloss.annotate(
                 f"{inst.name}{rules.josa(inst.name)} 52주 최저 부근입니다 "
                 f"(밴드 {p52:.0f}%, 1년 최저 {_fmt_num(r['low_52w'], inst.decimals)}). "
-                f"지난 1년 중 가장 싼 구간에 있다는 뜻입니다.", seen))
+                f"지난 1년 중 가장 낮은 수준이라는 뜻입니다.", seen))
         elif p52 is not None and p52 >= 95:
             lines.append(gloss.annotate(
                 f"{inst.name}{rules.josa(inst.name)} 52주 최고 부근입니다 "
                 f"(밴드 {p52:.0f}%, 1년 최고 {_fmt_num(r['high_52w'], inst.decimals)}). "
-                f"지난 1년 중 가장 비싼 구간에 있다는 뜻입니다.", seen))
+                f"지난 1년 중 가장 높은 수준이라는 뜻입니다.", seen))
 
     return lines[:6]
 
@@ -267,7 +272,9 @@ def render(trade_date: str | None = None,
         if t.probability is not None and t.samples:
             hits = round(t.probability * t.samples)
             lo, hi = rules.wilson(hits, t.samples)
-            item |= {"pct": round(t.probability * 100),
+            # 표본이 적으면 막대의 진한 부분(점추정)을 그리지 않고 범위만 보여준다
+            item |= {"pct": 0 if t.is_uncertain else round(t.probability * 100),
+                     "label": t.prob_label(),
                      "ci_lo": round(lo * 100), "ci_w": round((hi - lo) * 100)}
         trig_view.append(item)
 
@@ -324,7 +331,7 @@ def render(trade_date: str | None = None,
                     else f"{r['chg_pct']:+.2f}%")}
         for r in sorted(snapshot, key=lambda x: -abs(x["sigma"] or 0))
         if r["sigma"] is not None and abs(r["sigma"]) >= acfg["sigma_notable"]
-        and r["instrument"] in insts and insts[r["instrument"]].predict
+        and r["instrument"] in insts and insts[r["instrument"]].can_claim
     ]
 
     payload = {

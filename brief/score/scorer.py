@@ -73,7 +73,7 @@ def score_pending() -> ScoreCard:
     # 정책금리처럼 예측 대상에서 뺀 지표(settings.yaml 의 predict: false)는
     # 과거에 만들어져 채점까지 끝난 기록도 무효로 돌린다. 적중률을 오염시키기 때문이다.
     from brief.collect.market import load_instruments
-    excluded = [i.id for i in load_instruments() if not i.predict]
+    excluded = [i.id for i in load_instruments() if not i.can_claim]
 
     with db.session() as conn:
         if excluded:

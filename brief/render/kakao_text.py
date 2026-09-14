@@ -55,7 +55,7 @@ def build(payload: dict) -> str:
         candidates.append(f"지난 예측 {card.hit}/{card.hit + card.miss} 적중{tail}")
 
     for t in payload["triggers"][:1]:
-        p = f" — 과거 확률 {t.probability:.0%}" if t.probability is not None else ""
+        p = f" — 과거 빈도 {t.prob_label()}" if t.probability is not None else ""
         candidates.append(f"주목: {t.claim}{p}")
 
     # 위에서 3줄이 안 채워져도 항상 채울 수 있는 줄

@@ -29,6 +29,7 @@ class WeekMove:
     change: float            # % 또는 bp
     kind: str
     decimals: int
+    futures: bool = False
 
     @property
     def change_text(self) -> str:
@@ -81,10 +82,11 @@ def summarize(conn, today: date, insts: dict[str, Instrument]) -> WeekSummary:
             continue
         c1, c0 = end_row["close"], base_row["close"]
         chg = (c1 - c0) * 100 if inst.kind == "rate" else (c1 / c0 - 1) * 100
-        s.moves.append(WeekMove(iid, inst.name, c1, chg, inst.kind, inst.decimals))
+        s.moves.append(WeekMove(iid, inst.name, c1, chg, inst.kind, inst.decimals,
+                                inst.futures))
 
     # ── 한 주 중 가장 이례적이었던 하루 ──
-    predictable = [i for i, v in insts.items() if v.predict]
+    predictable = [i for i, v in insts.items() if v.can_claim]
     if predictable:
         ph = ",".join("?" * len(predictable))
         row = conn.execute(

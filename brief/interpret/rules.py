@@ -72,7 +72,8 @@ def base_rate(conn, instrument: str, where_sql: str, params: tuple,
 
 
 def move_probability(conn, instrument: str, required_pct: float,
-                     direction: str, horizon: int = 1) -> tuple[float, int] | None:
+                     direction: str, horizon: int = 1,
+                     unit: str = "pct") -> tuple[float, int] | None:
     """'하루 만에 required_pct 만큼 움직일 확률'을 과거 수익률 분포에서 센다.
 
     라운드 레벨 돌파에는 이쪽을 쓴다. 절대 가격으로 세면
@@ -86,9 +87,14 @@ def move_probability(conn, instrument: str, required_pct: float,
     if len(closes) < 60 + horizon:
         return None
 
-    rets = [(closes[i + horizon] / closes[i] - 1) * 100
-            for i in range(len(closes) - horizon)
-            if closes[i]]
+    if unit == "bp":
+        # 금리는 수준 대비 %가 아니라 bp 차이로 센다
+        rets = [(closes[i + horizon] - closes[i]) * 100
+                for i in range(len(closes) - horizon)]
+    else:
+        rets = [(closes[i + horizon] / closes[i] - 1) * 100
+                for i in range(len(closes) - horizon)
+                if closes[i]]
     if len(rets) < MIN_SAMPLES:
         return None
 
@@ -167,6 +173,26 @@ class Trigger:
     kind: str                  # round_level / band_edge / ma_cross / streak / sigma
     priority: float            # 정렬용. 클수록 위
 
+    def interval(self) -> tuple[float, float] | None:
+        if self.probability is None or not self.samples:
+            return None
+        return wilson(round(self.probability * self.samples), self.samples)
+
+    @property
+    def is_uncertain(self) -> bool:
+        """신뢰구간이 30%p 보다 넓으면 숫자 하나로 말하지 않는다."""
+        iv = self.interval()
+        return iv is None or (iv[1] - iv[0]) > 0.30
+
+    def prob_label(self) -> str:
+        """화면·카톡에 크게 보여줄 확률 표기. 불확실하면 범위로."""
+        iv = self.interval()
+        if iv is None:
+            return "—"
+        if self.is_uncertain:
+            return f"{iv[0]:.0%}~{iv[1]:.0%}"
+        return f"{self.probability:.0%}"
+
     def prob_text(self) -> str:
         if self.probability is None or self.samples is None:
             return "과거 사례가 부족해 확률을 제시하지 않습니다"
@@ -199,7 +225,7 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
     for r in rows:
         iid = r["instrument"]
         inst = instruments.get(iid)
-        if not inst or r["close"] is None or not inst.predict:
+        if not inst or r["close"] is None or not inst.can_claim:
             continue
 
         close = r["close"]
@@ -213,22 +239,30 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
         dist_up = (above - close) / close * 100
         dist_dn = (close - below) / close * 100
 
+        # 금리는 필요한 움직임을 bp 로 계산하고 표시한다
+        is_rate = inst.kind == "rate"
+        unit = "bp" if is_rate else "pct"
+        need_up = (above - close) * 100 if is_rate else dist_up
+        need_dn = (close - below) * 100 if is_rate else dist_dn
+        up_txt = f"+{need_up:.0f}bp 필요" if is_rate else f"+{dist_up:.2f}% 필요"
+        dn_txt = f"−{need_dn:.0f}bp 필요" if is_rate else f"−{dist_dn:.2f}% 필요"
+
         if dist_up <= 1.2:
-            br = move_probability(conn, iid, dist_up, "up", 1)
+            br = move_probability(conn, iid, need_up, "up", 1, unit)
             out.append(Trigger(
                 iid, inst.name,
                 f"{inst.name}{josa(inst.name)} {_fmt(above, inst)} 위로 마감 "
-                f"(+{dist_up:.2f}% 필요)",
+                f"({up_txt})",
                 "close", ">", above, 1,
                 br[0] if br else None, br[1] if br else None,
                 "round_level", 2.0 - dist_up))
 
         if dist_dn <= 1.2:
-            br = move_probability(conn, iid, -dist_dn, "down", 1)
+            br = move_probability(conn, iid, -need_dn, "down", 1, unit)
             out.append(Trigger(
                 iid, inst.name,
                 f"{inst.name}{josa(inst.name)} {_fmt(below, inst)} 아래로 마감 "
-                f"(−{dist_dn:.2f}% 필요)",
+                f"({dn_txt})",
                 "close", "<", below, 1,
                 br[0] if br else None, br[1] if br else None,
                 "round_level", 2.0 - dist_dn))
@@ -295,7 +329,7 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
                            (), "chg", op, 0.0, 1)
             out.append(Trigger(
                 iid, inst.name,
-                f"{inst.name}{josa(inst.name)} 오늘의 이례적 {'급등' if sigma > 0 else '급락'}"
+                f"{inst.name}{josa(inst.name)} 직전 거래일의 큰 {'상승' if sigma > 0 else '하락'}"
                 f"(σ {sigma:+.1f})을 되돌림",
                 "chg", op, 0.0, 1,
                 br[0] if br else None, br[1] if br else None,
@@ -311,28 +345,26 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
 
 def pocket_translate(iid: str, close: float, chg: float,
                      chg_pct: float | None, chg_bp: float | None) -> str | None:
-    """추상적 숫자를 생활 단위로 바꾼다. 계산식이 고정이라 틀릴 수 없다."""
-    if iid == "USDKRW":
-        diff = chg * 1_000_000 / close
-        direction = "더 내야" if chg > 0 else "덜 내도"
-        return (f"100만원을 환전하면 어제보다 약 {abs(diff):,.0f}원을 {direction} 합니다."
-                if abs(chg) >= 0.5 else None)
+    """추상적 숫자를 생활 단위로 바꾼다.
 
-    if iid in ("WTI", "BRENT") and chg_pct is not None and abs(chg_pct) >= 1.0:
-        gas = chg_pct * 0.35        # 유가 변동의 약 1/3이 주유소 가격에 반영
-        return (f"휘발유값에는 보통 이 변동의 3분의 1 정도가 시차를 두고 반영됩니다. "
-                f"지금 흐름이면 리터당 약 {abs(gas):.1f}% "
-                f"{'인상' if gas > 0 else '인하'} 압력입니다.")
+    여기 들어가는 문장은 '누구나 다시 계산해 볼 수 있는 산수'여야 한다.
+    반영 비율·연동 관계처럼 출처로 뒷받침할 수 없는 환산(유가→휘발유값,
+    미 국채→국내 대출이자)은 그럴듯한 거짓이 되기 쉬워 두지 않는다.
+    """
+    if iid == "USDKRW" and abs(chg) >= 0.5:
+        prev = close - chg
+        # 어제 100만원으로 살 수 있던 달러를 오늘 사는 데 드는 돈의 차이
+        diff = 1_000_000 * close / prev - 1_000_000
+        dollars = 1_000_000 / prev
+        more = "더" if diff > 0 else "덜"
+        return (f"환율이 {prev:,.2f}원에서 {close:,.2f}원이 됐습니다. "
+                f"어제 100만원으로 살 수 있던 {dollars:,.0f}달러를 오늘 사려면 "
+                f"약 {abs(diff):,.0f}원이 {more} 듭니다(수수료 제외).")
 
-    if iid == "US10Y" and chg_bp is not None and abs(chg_bp) >= 5:
-        return (f"3억원을 30년 만기로 빌린다면 금리 {abs(chg_bp):.0f}bp 변화는 "
-                f"연 이자 약 {abs(chg_bp) * 3:,.0f}만원 "
-                f"{'증가' if chg_bp > 0 else '감소'}에 해당합니다.")
-
-    if iid == "VIX" and chg_pct is not None:
+    if iid == "VIX":
         band = close / math.sqrt(12)
-        return (f"지금 VIX {close:.0f}은 '한 달 뒤 S&P500이 ±{band:.1f}% 안에 있을 확률이 "
-                f"약 68%'라는 시장의 예상입니다.")
+        return (f"VIX {close:.1f}을 한 달 기준으로 환산하면 약 ±{band:.1f}%입니다"
+                f"({close:.1f} ÷ √12). S&P500 옵션 가격에 반영된 한 달 예상 변동폭입니다.")
 
     return None
 
