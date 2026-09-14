@@ -7,3 +7,4 @@ Jinja2>=3.1
 yfinance>=0.2.40
 pykrx>=1.2.8
 html5lib>=1.1
+tzdata>=2024.1        # Windows 에서 zoneinfo('Asia/Seoul') 를 쓰기 위해

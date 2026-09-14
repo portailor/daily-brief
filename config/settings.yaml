@@ -182,6 +182,7 @@ instruments:
     kind: rate
     group: kr_rates
     source: ecos
+    predict: false        # 금통위 회의 때만 바뀐다 — 예측·이례도 판단에서 제외
     unit: "%"
     decimals: 2
 

@@ -139,6 +139,30 @@ def latest_snapshot(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(LATEST_SNAPSHOT_SQL).fetchall()
 
 
+def purge_unfinished(conn: sqlite3.Connection) -> int:
+    """마감되지 않은 거래일(오늘 이후)과 주말 날짜 행을 지운다.
+
+    수집기는 이미 이런 행을 받지 않지만, 이전 버전이 저장해 둔 행이
+    로컬 DB 에 남아 있으면 σ와 채점이 계속 오염되므로 한 번 더 걸러낸다.
+    월간 계열은 매월 1일로 찍혀 주말일 수 있어 제외한다.
+    """
+    from brief.clock import today_kst
+
+    today = today_kst().isoformat()
+    monthly = ("CPI_YOY", "UNRATE")
+    weekend = "strftime('%w', trade_date) IN ('0','6')"
+
+    n = 0
+    for table in ("observations", "metrics"):
+        n += conn.execute(
+            f"DELETE FROM {table} WHERE trade_date >= ? "
+            f"OR ({weekend} AND instrument NOT IN (?, ?))",
+            (today, *monthly)).rowcount
+    n += conn.execute(
+        f"DELETE FROM flows WHERE trade_date >= ? OR {weekend}", (today,)).rowcount
+    return n
+
+
 # ── 예측 기록 보존 ───────────────────────────────────────────
 # 클라우드(GitHub Actions)에서는 매 실행이 빈 서버에서 시작하므로
 # DB가 남지 않는다. 시세·지표는 매번 API에서 다시 받으면 그만이지만,

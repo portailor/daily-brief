@@ -15,6 +15,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from brief import db  # noqa: E402
+from brief.clock import is_finished_session, today_kst  # noqa: E402
 
 CONFIG = Path(__file__).resolve().parent.parent.parent / "config" / "settings.yaml"
 
@@ -29,6 +30,9 @@ class Instrument:
     source: str = "yfinance"   # yfinance | fred | ecos | krx
     unit: str = ""
     decimals: int = 2
+    # 정책금리처럼 회의 때만 바뀌는 값은 매일 오르내리는 시장 지표가 아니다.
+    # σ가 튀어도 '오늘 볼 것'이 아니고, 예측 대상으로 삼으면 채점만 오염된다.
+    predict: bool = True
 
 
 @dataclass
@@ -82,7 +86,7 @@ def collect(instruments: list[Instrument] | None = None,
     instruments = instruments or load_instruments(source="yfinance")
     report = CollectReport()
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    today = datetime.now().date()
+    today = today_kst()
 
     with db.session() as conn:
         for inst in instruments:
@@ -90,6 +94,12 @@ def collect(instruments: list[Instrument] | None = None,
                 frame = fetch_one(inst, period)
             except Exception as exc:                      # noqa: BLE001
                 report.failed[inst.id] = type(exc).__name__
+                continue
+
+            # 장중 값(오늘 날짜)과 주말 날짜는 버린다. brief/clock.py 참고.
+            frame = frame[frame["trade_date"].map(is_finished_session)]
+            if frame.empty:
+                report.failed[inst.id] = "마감 데이터 없음"
                 continue
 
             rows = [

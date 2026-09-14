@@ -199,7 +199,7 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
     for r in rows:
         iid = r["instrument"]
         inst = instruments.get(iid)
-        if not inst or r["close"] is None:
+        if not inst or r["close"] is None or not inst.predict:
             continue
 
         close = r["close"]

@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 from brief import db  # noqa: E402
 from brief.retry import with_retry  # noqa: E402
+from brief.clock import is_finished_session  # noqa: E402
 
 FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 ECOS_URL = "https://ecos.bok.or.kr/api/StatisticSearch"
@@ -48,6 +49,8 @@ def _load_env() -> dict[str, str]:
 
 # ── FRED ────────────────────────────────────────────────────
 # 여기 담긴 것들은 yfinance로는 못 구하거나, 구해도 부정확한 값들이다.
+# 월간 계열은 '매월 1일'로 날짜가 찍혀 주말일 수 있으므로 평일 필터를 걸지 않는다.
+MONTHLY = {"CPI_YOY", "UNRATE"}
 FRED_SERIES = {
     "US02Y":    ("DGS2",     "미 국채 2년물",      "rate"),
     "US10Y":    ("DGS10",    "미 국채 10년물",     "rate"),
@@ -149,6 +152,8 @@ def collect(years: int = 2) -> MacroReport:
             for iid, (sid, _name, _kind) in FRED_SERIES.items():
                 try:
                     data = fetch_fred(sid, fred_key, start_iso)
+                    if iid not in MONTHLY:
+                        data = [(d, v) for d, v in data if is_finished_session(d)]
                     if not data:
                         raise ValueError("빈 응답")
                 except Exception as exc:                      # noqa: BLE001
@@ -173,6 +178,9 @@ def collect(years: int = 2) -> MacroReport:
             for iid, (stat, cyc, item, _name, _kind) in ECOS_SERIES.items():
                 try:
                     data = fetch_ecos(stat, cyc, item, ecos_key, start_raw, end_raw)
+                    # 기준금리는 달력 기준으로 매일(주말 포함) 값이 찍힌다.
+                    if cyc == "D":
+                        data = [(d, v) for d, v in data if is_finished_session(d)]
                     if not data:
                         raise ValueError("빈 응답")
                 except Exception as exc:                      # noqa: BLE001

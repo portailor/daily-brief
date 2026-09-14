@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 from brief import db                       # noqa: E402
 from brief.collect.macro import _load_env  # noqa: E402
+from brief.clock import is_finished_session  # noqa: E402
 
 MARKETS = ["KOSPI", "KOSDAQ"]
 INVESTORS = ["외국인합계", "기관합계", "개인"]
@@ -76,6 +77,8 @@ def collect(days: int = 400) -> FlowReport:
             batch = []
             for date, row in df.iterrows():
                 d = date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else str(date)
+                if not is_finished_session(d):          # 장중 집계는 버린다
+                    continue
                 for inv in INVESTORS:
                     if inv in row and row[inv] is not None:
                         batch.append((d, market, inv, float(row[inv]), "KRX", ))

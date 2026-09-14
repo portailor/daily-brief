@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 from brief import db                                            # noqa: E402
 from brief.collect.market import Instrument, load_instruments   # noqa: E402
 from brief.collect import flows as flows_mod                    # noqa: E402
+from brief import clock                                         # noqa: E402
 from brief.interpret import rules                               # noqa: E402
 from brief.render.terms import Glossary                         # noqa: E402
 from brief.score import scorer                                  # noqa: E402
@@ -53,16 +54,14 @@ def build_dashboard(rows, newest: str, insts: dict[str, Instrument],
             change = "—" if chg is None else f"{chg:+.2f}%"
 
         direction = "flat" if not chg else ("up" if chg > 0 else "down")
-        sigma = r["sigma"]
+        sigma = r["sigma"] if inst.predict else None
         notable = sigma is not None and abs(sigma) >= cfg["sigma_notable"]
 
         vs200 = r["vs_ma200"]
         # 미국 지표는 한국보다 하루 늦게 마감하므로 기준일이 다르다.
         # 다른 날짜의 값이 한 표에 섞여 있다는 사실을 숨기지 않는다.
         asof = "" if r["trade_date"] == newest else \
-            datetime.strptime(r["trade_date"], "%Y-%m-%d").strftime("%-m/%-d") \
-            if sys.platform != "win32" else \
-            datetime.strptime(r["trade_date"], "%Y-%m-%d").strftime("%m/%d").lstrip("0")
+            clock.label(r["trade_date"]).split("(")[0]
 
         out.append({
             "group": inst.group,
@@ -88,7 +87,8 @@ def build_dashboard(rows, newest: str, insts: dict[str, Instrument],
 
 def build_verdict(rows, insts: dict[str, Instrument], cfg: dict) -> dict:
     """오늘의 한 줄 결론. '특별한 게 없다'도 정당한 결론으로 취급한다."""
-    nb = sorted([r for r in rows if r["sigma"] is not None],
+    nb = sorted([r for r in rows if r["sigma"] is not None
+                 and r["instrument"] in insts and insts[r["instrument"]].predict],
                 key=lambda r: -abs(r["sigma"]))
     hot = [r for r in nb if abs(r["sigma"]) >= cfg["sigma_notable"]]
 
@@ -123,7 +123,7 @@ def build_notable_lines(rows, insts: dict[str, Instrument],
 
     for r in sorted(rows, key=lambda x: -abs(x["sigma"] or 0)):
         inst = insts.get(r["instrument"])
-        if not inst:
+        if not inst or not inst.predict:
             continue
         s, p52 = r["sigma"], r["pct_52w"]
 
@@ -201,8 +201,16 @@ def render(trade_date: str | None = None,
         if not snapshot:
             raise SystemExit("데이터가 없습니다. 먼저 수집과 분석을 실행하세요.")
 
-        newest = max(r["trade_date"] for r in snapshot)
-        trade_date = trade_date or newest
+        # 표의 기준일은 '가장 많은 지표가 공유하는 날짜'로 잡는다.
+        # 최신 날짜 하나를 기준으로 하면, 한 계열만 먼저 들어와도
+        # 나머지 전부에 다른 날짜 배지가 붙어 오히려 읽기 어렵다.
+        from collections import Counter
+        newest = Counter(r["trade_date"] for r in snapshot).most_common(1)[0][0]
+
+        by_id = {r["instrument"]: r["trade_date"] for r in snapshot}
+        kr_date = by_id.get("KOSPI", newest)
+        us_date = by_id.get("SPX", newest)
+        trade_date = trade_date or max(kr_date, us_date)
 
         seen_table: set[str] = set()
         dashboard = build_dashboard(snapshot, newest, insts, acfg, gloss, seen_table)
@@ -243,13 +251,17 @@ def render(trade_date: str | None = None,
                      "ci_lo": round(lo * 100), "ci_w": round((hi - lo) * 100)}
         trig_view.append(item)
 
-    d = datetime.strptime(trade_date, "%Y-%m-%d")
+    brief_date = clock.today_kst()
+    basis = f"한국 {clock.label(kr_date)} · 미국 {clock.label(us_date)} 마감 기준"
+    page_name = f"{brief_date.isoformat()}.html"
+
     env = Environment(loader=FileSystemLoader(TPL_DIR),
                       autoescape=select_autoescape(["html"]),
                       trim_blocks=True, lstrip_blocks=True)
 
     html = env.get_template("brief.html.j2").render(
-        date_kr=f"{d.year}년 {d.month}월 {d.day}일 ({WEEKDAY_KR[d.weekday()]})",
+        date_kr=clock.label_long(brief_date),
+        basis=basis,
         trade_date=trade_date,
         verdict=verdict,
         score={"hit": card.hit, "miss": card.miss,
@@ -270,7 +282,10 @@ def render(trade_date: str | None = None,
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / "index.html"
     out.write_text(html, encoding="utf-8")
-    (OUT_DIR / f"{trade_date}.html").write_text(html, encoding="utf-8")
+    # 날짜별 주소로도 남긴다. 카톡 링크는 이쪽을 가리킨다 —
+    # index.html 은 매일 같은 주소라 GitHub Pages 캐시(약 10분)에 걸리면
+    # 어제 내용이 그대로 보일 수 있다.
+    (OUT_DIR / page_name).write_text(html, encoding="utf-8")
 
     notable_rows = [
         {"name": insts[r["instrument"]].name,
@@ -279,14 +294,22 @@ def render(trade_date: str | None = None,
                     else f"{r['chg_pct']:+.2f}%")}
         for r in sorted(snapshot, key=lambda x: -abs(x["sigma"] or 0))
         if r["sigma"] is not None and abs(r["sigma"]) >= acfg["sigma_notable"]
-        and r["instrument"] in insts
+        and r["instrument"] in insts and insts[r["instrument"]].predict
     ]
 
     payload = {
         "verdict": verdict, "score": card, "track": track,
         "notable_rows": notable_rows, "flow_stats": flow_stats,
         "triggers": trigs, "trade_date": trade_date,
-        "date_kr": f"{d.year}년 {d.month}월 {d.day}일 ({WEEKDAY_KR[d.weekday()]})",
+        "brief_date": brief_date.isoformat(),
+        "date_kr": clock.label_long(brief_date),
+        "date_short": clock.label(brief_date),
+        "basis": basis,
+        "page_name": page_name,
+        # 새 거래일 데이터가 들어왔는지 판단하는 열쇠 — 한국·미국 대표 지수의 기준일
+        "market_key": f"KOSPI:{kr_date}|SPX:{us_date}",
+        "kr_date": kr_date,
+        "us_date": us_date,
     }
     return out, payload
 

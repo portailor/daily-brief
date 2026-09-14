@@ -2,11 +2,11 @@ name: 매일 경제 브리핑
 
 on:
   schedule:
-    # UTC 21:45 = 한국시간 06:45.
-    # GitHub Actions의 cron은 정시를 보장하지 않고 5~30분 늦는 일이 흔하다.
-    # 07:00 정각을 쓰면 전 세계 작업이 몰려 더 밀리므로,
-    # 조금 이르게 잡고 지연을 흡수한다. 미국장 마감(KST 05~06시)은 이미 지났다.
-    - cron: '45 21 * * *'
+    # UTC 20:45 = 한국시간 05:45.
+    # GitHub Actions 의 예약 실행은 정시를 보장하지 않는다. 06:45 로 걸었을 때
+    # 실제 시작은 08:22~08:32 로, 1시간 40분가량 밀렸다. 목표 도착이 07:30 이므로
+    # 그만큼 앞당겨 건다. 미국장 마감(KST 05:00)은 이 시각에 이미 지나 있다.
+    - cron: '45 20 * * *'
   workflow_dispatch:        # 저장소 Actions 탭에서 수동 실행 가능
 
 permissions:
@@ -96,23 +96,31 @@ jobs:
           print("자격증명 파일 생성 완료")
           PY
 
-      - name: 브리핑 생성 및 발송
+      # 순서가 중요하다: 생성 → 웹에 올리기 → 링크가 열리는지 확인 → 발송.
+      # 예전에는 발송이 먼저라, 카톡을 받자마자 링크를 누르면 전날 페이지가 보였다.
+      - name: 브리핑 생성
         env:
           PYTHONUTF8: '1'
           TZ: Asia/Seoul
-        run: python run.py --no-publish
+        run: python run.py --no-send --no-publish
 
-      - name: 리포트와 예측 기록 커밋
+      - name: 리포트와 기록 올리기
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs data/predictions.csv
+          git add docs data/predictions.csv data/state.json
           if git diff --cached --quiet; then
             echo "변경 없음 — 커밋 생략"
           else
-            git commit -m "브리핑 $(date +%Y-%m-%d)"
+            git commit -m "브리핑 $(TZ=Asia/Seoul date +%Y-%m-%d)"
             git push
           fi
+
+      - name: 카카오톡 발송
+        env:
+          PYTHONUTF8: '1'
+          TZ: Asia/Seoul
+        run: python run.py --send-only
 
       - name: 실행 로그 남기기
         if: always()
