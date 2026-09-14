@@ -95,6 +95,43 @@ def collect(days: int = 400) -> FlowReport:
     return rep
 
 
+def collect_indices(days: int = 60) -> int:
+    """코스피·코스닥 종가를 KRX 공식값으로 덮어쓴다.
+
+    yfinance 는 한국 지수의 최근 거래일을 통째로 빠뜨리는 일이 있다
+    (2026-09-15 아침, 9/14 코스피·코스닥이 없었다). 최근 구간만 KRX 로 덮으면
+    과거 10년치는 그대로 두고 최신값의 정확성을 확보할 수 있다.
+    """
+    if not _ensure_credentials():
+        return 0
+    from pykrx import stock                       # noqa: PLC0415
+
+    end = datetime.now().strftime("%Y%m%d")
+    start = (datetime.now() - timedelta(days=days)).strftime("%Y%m%d")
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    n = 0
+    with db.session() as conn:
+        for code, iid in (("1001", "KOSPI"), ("2001", "KOSDAQ")):
+            df = stock.get_index_ohlcv(start, end, code)
+            rows = []
+            for dt, r in df.iterrows():
+                d = dt.strftime("%Y-%m-%d")
+                if not is_finished_session(d):
+                    continue
+                rows.append((d, iid, float(r["시가"]), float(r["고가"]), float(r["저가"]),
+                             float(r["종가"]), float(r["거래량"]), "KRX", now))
+            conn.executemany(
+                """INSERT INTO observations
+                   (trade_date, instrument, open, high, low, close, volume, source, fetched_at)
+                   VALUES (?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(trade_date, instrument) DO UPDATE SET
+                     open=excluded.open, high=excluded.high, low=excluded.low,
+                     close=excluded.close, volume=excluded.volume,
+                     source=excluded.source, fetched_at=excluded.fetched_at""", rows)
+            n += len(rows)
+    return n
+
+
 # ─────────────────────────────────────────────────────────────
 #  분석 — 연속일과 이례도
 # ─────────────────────────────────────────────────────────────

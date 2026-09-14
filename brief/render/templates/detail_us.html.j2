@@ -1,0 +1,28 @@
+{% set us = detail.us if detail and detail.us else none %}
+{% if us and not us.error %}
+<section>
+  <h2>미국 대형주 · 섹터 · {{ us_label }}</h2>
+  <div class="two-col">
+    <div class="card mini">
+      <div class="mini-h">대형 기술주</div>
+      {% for s in us.big %}
+      <div class="mini-row">
+        <span>{{ s.name }} <span class="tk">{{ s.ticker }}</span></span>
+        <span class="num">${{ '{:,.2f}'.format(s.close) }}</span>
+        <span class="num mini-chg {{ 'up' if s.chg_pct > 0 else ('down' if s.chg_pct < 0 else 'flat') }}">{{ '%+.2f'|format(s.chg_pct) }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="card mini">
+      <div class="mini-h">섹터 ETF</div>
+      {% for s in us.sectors %}
+      <div class="mini-row">
+        <span>{{ s.name }} <span class="tk">{{ s.ticker }}</span></span>
+        <span class="num mini-chg {{ 'up' if s.chg_pct > 0 else ('down' if s.chg_pct < 0 else 'flat') }}">{{ '%+.2f'|format(s.chg_pct) }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <p class="hint-plain">섹터는 S&amp;P500 업종별 SPDR ETF(반도체는 iShares SOXX) 기준 전일 대비 등락입니다.</p>
+</section>
+{% endif %}

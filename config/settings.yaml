@@ -78,25 +78,10 @@ instruments:
     decimals: 2
 
   # 금리 (bp로 비교)
-  - id: US03M
-    name: 미 국채 3개월물
-    ticker: "^IRX"
-    kind: rate
-    group: rates
-    unit: "%"
-    decimals: 3
 
   - id: US10Y
     name: 미 국채 10년물
     ticker: "^TNX"
-    kind: rate
-    group: rates
-    unit: "%"
-    decimals: 3
-
-  - id: US30Y
-    name: 미 국채 30년물
-    ticker: "^TYX"
     kind: rate
     group: rates
     unit: "%"
@@ -147,34 +132,10 @@ instruments:
     unit: ""
     decimals: 2
 
-  # ── 미국 금리 (FRED = 연준 공식 확정치) ─────────────────────
-  - id: US02Y
-    name: 미 국채 2년물
-    kind: rate
-    group: rates
-    source: fred
-    unit: "%"
-    decimals: 3
-
-  - id: SPREAD_10_2
-    name: 장단기 금리차
-    kind: rate
-    group: rates
-    source: fred
-    unit: "%p"
-    decimals: 3
-
+  
   # ── 한국 금리 (ECOS = 한국은행 공식 고시) ───────────────────
   - id: KTB3Y
     name: 국고채 3년물
-    kind: rate
-    group: kr_rates
-    source: ecos
-    unit: "%"
-    decimals: 3
-
-  - id: KTB10Y
-    name: 국고채 10년물
     kind: rate
     group: kr_rates
     source: ecos

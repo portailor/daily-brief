@@ -36,7 +36,7 @@ sys.path.insert(0, str(ROOT))
 
 from brief import clock, db                             # noqa: E402
 from brief.analyze import metrics                       # noqa: E402
-from brief.collect import flows, macro, market          # noqa: E402
+from brief.collect import detail, flows, macro, market  # noqa: E402
 from brief.render import kakao_text, report             # noqa: E402
 
 LOG_PATH = ROOT / "data" / "run.log"
@@ -164,6 +164,12 @@ def generate(args) -> int:
             if r.failed:
                 failures.append(f"시세일부({','.join(r.failed)})")
 
+        n, err = step("한국 지수(KRX 공식)", flows.collect_indices)
+        if err:
+            failures.append(err)
+        elif n:
+            log(f"✓ 한국 지수 KRX 공식값: {n} rows")
+
         r, err = step("거시지표 수집", macro.collect)
         if err:
             failures.append(err)
@@ -192,6 +198,18 @@ def generate(args) -> int:
             failures.append(err)
         else:
             log(f"✓ 지표 계산: {n} rows")
+
+        d, err = step("종목·업종 상세", detail.collect)
+        if err:
+            failures.append(err)
+        elif d:
+            probs = [x for x in (d.get("kr", {}).get("error"), d.get("us", {}).get("error")) if x]
+            probs += d.get("kr", {}).get("errors", [])
+            if probs:
+                log(f"△ 상세 일부 실패: {', '.join(probs)}")
+                failures.append("상세일부")
+            else:
+                log(f"✓ 종목·업종 상세: 국내 {d.get('kr', {}).get('date')} · 미국 {d.get('us', {}).get('date')}")
 
     result, err = step("리포트 생성", report.render, mode=mode)
     if err or result is None:

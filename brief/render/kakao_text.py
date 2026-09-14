@@ -1,29 +1,37 @@
-"""카카오톡 메시지 한 건 — 항상 '3줄 요약 + 링크 안내' 형태.
+"""카카오톡 메시지 한 건 — 3줄 요약 + 링크.
 
-카카오 텍스트 템플릿은 200자 제한이다. 들어가는 만큼 채우는 방식은
-날마다 줄 수가 달라지고 어중간한 데서 끊겨 오히려 읽기 불편했다.
-그래서 줄 수를 3개로 고정하고, 각 줄의 길이를 상한 안에 두어
-전체가 항상 제한 안에 들어오게 한다. 나머지는 링크에서 본다.
+카카오 텍스트 템플릿은 200자 제한이다. 줄 수를 3개로 고정하고 한 줄 길이에
+상한을 두어 항상 제한 안에 들어오게 한다.
+
+세 줄은 해석이 아니라 그날 실제 숫자다: 지수 등락 · 외국인 매매 · 업종 강약.
 """
 from __future__ import annotations
 
 LIMIT = 190          # 카카오는 이모지를 2자로 세기도 해서 여유를 둔다
-LINE_MAX = 43        # 머리말·꼬리말을 합쳐도 LIMIT 을 넘지 않는 한 줄 상한
-FOOTER = "과거 통계 참고용이며 투자 책임은 본인에게 있습니다."
+LINE_MAX = 44        # 머리말·꼬리말을 합쳐도 LIMIT 을 넘지 않는 한 줄 상한
+FOOTER = "종목·업종 상세는 아래 링크에서 확인하세요."
 
 
 def _eok(v: float) -> str:
     a = abs(v)
-    return f"{a / 10_000:.1f}조원" if a >= 10_000 else f"{a:,.0f}억원"
+    return f"{a / 10_000:.1f}조" if a >= 10_000 else f"{a:,.0f}억"
 
 
-def _compose(date_short: str, candidates: list[str], title: str = "경제 브리핑") -> str:
-    """후보를 앞에서부터 3줄 고른다. 상한을 넘는 문장은 자르지 않고 건너뛴다."""
+def _compose(date_short: str, candidates: list, title: str = "경제 브리핑") -> str:
+    """후보를 앞에서부터 3줄 고른다.
+
+    후보가 튜플이면 '같은 내용의 긴 형태, 짧은 형태'라는 뜻이다.
+    들어가는 첫 형태 하나만 쓴다 — 둘 다 넣으면 같은 말이 두 번 나온다.
+    상한을 넘는 문장은 자르지 않고 건너뛴다.
+    """
     picked: list[str] = []
     for c in candidates:
-        c = c.strip()
-        if c and len(c) <= LINE_MAX and c not in picked:
-            picked.append(c)
+        options = c if isinstance(c, tuple) else (c,)
+        for o in options:
+            o = (o or "").strip()
+            if o and len(o) <= LINE_MAX and o not in picked:
+                picked.append(o)
+                break
         if len(picked) == 3:
             break
 
@@ -33,72 +41,77 @@ def _compose(date_short: str, candidates: list[str], title: str = "경제 브리
     return text
 
 
-def _range_line(payload: dict) -> str:
-    """코스피 1주일 예상 범위 한 줄. 방향이 아니라 흔들림의 크기만 말한다."""
-    for v in payload.get("ranges") or []:
-        if v.id == "KOSPI":
-            return (f"코스피 1주 뒤 80% 범위 {v.lo_pct:+.1f}~{v.hi_pct:+.1f}%"
-                    f" ({v.regime.replace('변동성 ', '변동 ')})")
+def _tiles(payload: dict, ids: tuple[str, ...]) -> str:
+    short = {"KOSPI": "코스피", "KOSDAQ": "코스닥", "SPX": "S&P", "NASDAQ": "나스닥"}
+    parts = [f"{short[t['id']]} {t['change']}"
+             for t in payload.get("tiles", []) if t["id"] in ids]
+    return " · ".join(parts)
+
+
+def _foreign_line(payload: dict) -> str:
+    kr = (payload.get("detail") or {}).get("kr") or {}
+    f = kr.get("foreign") or {}
+    if f.get("buy") and f.get("sell"):
+        b, s = f["buy"][0], f["sell"][0]
+        return f"외국인 매수 {b['name']} {_eok(b['net_eok'])} · 매도 {s['name']} {_eok(s['net_eok'])}"
     return ""
 
 
-def _short_headline(payload: dict) -> str:
-    """결론 문장이 한 줄 상한을 넘을 때 쓰는 짧은 형태."""
-    rows = payload.get("notable_rows") or []
-    if rows:
-        r = rows[0]
-        return f"{r['name']} {r['change']}, 평소 변동폭의 {abs(r['sigma']):.1f}배"
-    return "평소와 다른 큰 움직임은 없었습니다."
+def _foreign_total_line(payload: dict) -> str:
+    for s in payload.get("flow_stats", []):
+        if s.investor == "외국인합계" and s.market == "KOSPI":
+            verb = "순매수" if s.net_buy > 0 else "순매도"
+            run = f" ({abs(s.streak)}일째)" if abs(s.streak) >= 2 else ""
+            return f"외국인 코스피 {_eok(s.eok)}원 {verb}{run}"
+    return ""
+
+
+def _sector_line(payload: dict) -> str:
+    kr = (payload.get("detail") or {}).get("kr") or {}
+    sec = kr.get("sectors") or []
+    if len(sec) >= 2:
+        hi, lo = sec[0], sec[-1]
+        return f"업종 강세 {hi['name']} {hi['chg_pct']:+.1f}% · 약세 {lo['name']} {lo['chg_pct']:+.1f}%"
+    return ""
+
+
+def _us_line(payload: dict) -> str:
+    us = (payload.get("detail") or {}).get("us") or {}
+    big = us.get("big") or []
+    if len(big) >= 2:
+        hi, lo = big[0], big[-1]
+        return f"미국 {hi['name']} {hi['chg_pct']:+.1f}% · {lo['name']} {lo['chg_pct']:+.1f}%"
+    return ""
 
 
 def build(payload: dict) -> str:
     """새 거래일 데이터가 있는 날."""
-    head = payload["verdict"]["headline"]
-    candidates: list[str] = [head if len(head) <= LINE_MAX else _short_headline(payload),
-                             _range_line(payload)]
-
-    # 외국인 수급이 며칠째 한 방향이면 그게 두 번째로 중요하다
-    for s in payload["flow_stats"]:
-        if s.investor == "외국인합계" and abs(s.streak) >= 2:
-            verb = "순매수" if s.net_buy > 0 else "순매도"
-            candidates.append(
-                f"외국인이 {s.market}에서 {_eok(s.eok)} {verb}, {abs(s.streak)}일째입니다.")
-            break
-
-    # 결론에 쓴 지표 다음으로 이례적이었던 것
-    for r in payload["notable_rows"][1:2]:
-        candidates.append(f"{r['name']}도 {r['change']}, 평소의 {abs(r['sigma']):.1f}배였습니다.")
-
-    card, track = payload["score"], payload["track"]
-    if card.hit + card.miss:
-        tail = f" (누적 {track['accuracy']:.0%})" if track.get("total") else ""
-        candidates.append(f"지난 예측 {card.hit}/{card.hit + card.miss} 적중{tail}")
-
-    for t in payload["triggers"][:1]:
-        p = f" — 과거 빈도 {t.prob_label()}" if t.probability is not None else ""
-        candidates.append(f"주목: {t.claim}{p}")
-
-    # 위에서 3줄이 안 채워져도 항상 채울 수 있는 줄
-    candidates.append(payload["basis"])
-
+    candidates = [
+        (_tiles(payload, ("KOSPI", "KOSDAQ", "SPX", "NASDAQ")),
+         _tiles(payload, ("KOSPI", "KOSDAQ", "SPX"))),         # 넘치면 짧은 형태
+        _foreign_line(payload),
+        _sector_line(payload),
+        _foreign_total_line(payload),
+        _us_line(payload),
+        payload["basis"],
+    ]
     return _compose(payload["date_short"], candidates)
 
 
 def build_no_new_data(payload: dict, weekday: int) -> str:
-    """주말·휴장이라 새로 마감된 거래가 없는 날. 같은 내용을 새 브리핑인 척 보내지 않는다."""
+    """휴장이라 새로 마감된 거래가 없는 날. 같은 내용을 새 브리핑인 척 보내지 않는다."""
     reason = "주말이라" if weekday in (5, 6, 0) else "휴장으로"
     last = payload["basis"].replace(" 마감 기준", "")
     candidates = [
         f"{reason} 새로 마감된 거래가 없습니다.",
         f"마지막 마감: {last}",
-        f"지난 결론: {payload['verdict']['headline']}",
         "다음 거래일 마감 후 새 브리핑이 옵니다.",
     ]
     return _compose(payload["date_short"], candidates)
 
 
 def _short_event(e) -> str:
-    """카톡 한 줄에 들어갈 짧은 일정 이름. 화면과 달리 국가 표시가 없으므로 붙인다."""
+    """카톡 한 줄에 들어갈 짧은 일정 이름."""
     title = e.title.replace(" 금리 결정", "")
     if e.region == "US" and not title.startswith("FOMC"):
         title = "미국 " + title
@@ -106,63 +119,28 @@ def _short_event(e) -> str:
 
 
 def build_weekly(payload: dict) -> str:
-    """월요일 아침 — 지난주 정리 + 이번 주 준비."""
+    """월요일 아침 — 지난주 정리 + 이번 주 일정."""
     week = payload["week"]
     moves = {m.id: m for m in week.moves} if week else {}
     candidates: list[str] = []
 
-    kr, us = moves.get("KOSPI"), moves.get("SPX")
+    kr, kq, us = moves.get("KOSPI"), moves.get("KOSDAQ"), moves.get("SPX")
     if kr and us:
-        candidates.append(f"지난주 코스피 {kr.change_text} · S&P500 {us.change_text}")
+        tail = f" · 코스닥 {kq.change_text}" if kq else ""
+        candidates.append((f"지난주 코스피 {kr.change_text}{tail} · S&P {us.change_text}",
+                           f"지난주 코스피 {kr.change_text} · S&P {us.change_text}"))
 
-    # 이번 주 핵심 일정 — 한 주를 준비하는 게 월요일 메시지의 목적이다
     key = sorted([e for e in payload["events"] if e.importance >= 2],
                  key=lambda e: (-e.importance, e.day))[:2]
     if key:
         key.sort(key=lambda e: e.day)
         candidates.append("이번 주: " + " · ".join(
             f"{e.when().split(' ')[0]} {_short_event(e)}" for e in key))
-    candidates.append(_range_line(payload))
 
     if week:
         for f in week.flows[:1]:
             verb = "순매수" if f["total_eok"] > 0 else "순매도"
-            candidates.append(f"외국인 {f['market']} 주간 {_eok(f['total_eok'])} {verb}"
-                              f" ({f['days']}일 중 {f['sell_days']}일 매도)")
-        if week.top_day:
-            t = week.top_day
-            candidates.append(f"가장 이례적인 날: {t['day']} {t['name']} {t['move']}")
-        if week.pred_total:
-            candidates.append(f"지난주 예측 {week.pred_hit}/{week.pred_total} 적중")
+            candidates.append(f"외국인 {f['market']} 주간 {_eok(f['total_eok'])}원 {verb}")
 
-    candidates.append(payload["basis"])
+    candidates += [_sector_line(payload), payload["basis"]]
     return _compose(payload["date_short"], candidates, title="주간 브리핑")
-
-
-if __name__ == "__main__":
-    S = type("S", (), {})
-    card = S(); card.hit, card.miss = 2, 1
-    flow = S()
-    flow.investor, flow.market, flow.eok, flow.net_buy, flow.streak = \
-        "외국인합계", "KOSPI", -21122, -1, -3
-    trig = S(); trig.claim, trig.probability = "코스피가 6,900 아래로 마감", 0.35
-
-    payload = {
-        "date_short": "9/15(화)",
-        "verdict": {"headline": "미 국채 2년물이 평소의 2.7배로 급등했습니다."},
-        "notable_rows": [
-            {"name": "미 국채 2년물", "change": "+13bp", "sigma": 2.7},
-            {"name": "국고채 3년물", "change": "+8bp", "sigma": 2.2},
-        ],
-        "flow_stats": [flow], "score": card,
-        "track": {"total": 12, "accuracy": 0.583},
-        "triggers": [trig],
-        "basis": "한국 9/11(금) · 미국 9/11(금) 마감 기준",
-    }
-    quiet = dict(payload, verdict={"headline": "오늘은 평소와 다른 움직임이 없습니다. 특별히 할 일이 없는 날입니다."},
-                 notable_rows=[], flow_stats=[], triggers=[])
-    for title, msg in [("거래일", build(payload)),
-                       ("조용한 거래일", build(quiet)),
-                       ("주말", build_no_new_data(dict(payload, date_short="9/13(일)"), 6))]:
-        print(f"── {title} ({len(msg)}자 / {LIMIT}) " + "─" * 20)
-        print(msg, "\n")

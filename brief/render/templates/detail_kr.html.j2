@@ -1,0 +1,69 @@
+{% set kr = detail.kr if detail and detail.kr else none %}
+{% if kr and not kr.error %}
+
+{% if kr.kospi_top %}
+<section>
+  <h2>시가총액 상위 종목 · {{ kr_label }}</h2>
+  {% if kr.breadth %}
+  <p class="hint-plain">
+    {% for m, b in kr.breadth.items() %}{{ '코스피' if m == 'KOSPI' else '코스닥' }} 상승 <span class="up">{{ b.up }}</span> · 하락 <span class="down">{{ b.down }}</span>{% if not loop.last %}  |  {% endif %}{% endfor %}
+  </p>
+  {% endif %}
+  <div class="scroll">
+    <table class="compact">
+      <thead><tr><th>코스피</th><th>종가</th><th>등락</th><th>거래대금</th></tr></thead>
+      <tbody>
+      {% for s in kr.kospi_top %}
+        <tr>
+          <td>{{ s.name }}</td>
+          <td class="num">{{ '{:,}'.format(s.close) }}</td>
+          <td class="num {{ 'up' if s.chg_pct > 0 else ('down' if s.chg_pct < 0 else 'flat') }}">{{ '%+.2f'|format(s.chg_pct) }}%</td>
+          <td class="num">{{ eok(s.value_eok) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if kr.kosdaq_top %}
+  <div class="scroll" style="margin-top:9px">
+    <table class="compact">
+      <thead><tr><th>코스닥</th><th>종가</th><th>등락</th><th>거래대금</th></tr></thead>
+      <tbody>
+      {% for s in kr.kosdaq_top %}
+        <tr>
+          <td>{{ s.name }}</td>
+          <td class="num">{{ '{:,}'.format(s.close) }}</td>
+          <td class="num {{ 'up' if s.chg_pct > 0 else ('down' if s.chg_pct < 0 else 'flat') }}">{{ '%+.2f'|format(s.chg_pct) }}%</td>
+          <td class="num">{{ eok(s.value_eok) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if kr.sectors %}
+<section>
+  <h2>업종별 등락 · 코스피</h2>
+  <div class="card">
+    {% set maxabs = (kr.sectors | map(attribute='chg_pct') | map('abs') | max) or 1 %}
+    {% for s in kr.sectors %}
+    <div class="sec-row">
+      <span class="sec-name">{{ s.name }}</span>
+      <span class="sec-bar">
+        {% if s.chg_pct >= 0 %}
+          <i class="pos" style="width:{{ (s.chg_pct / maxabs * 50)|round(1) }}%"></i>
+        {% else %}
+          <i class="neg" style="width:{{ (-s.chg_pct / maxabs * 50)|round(1) }}%"></i>
+        {% endif %}
+      </span>
+      <span class="sec-pct num {{ 'up' if s.chg_pct > 0 else ('down' if s.chg_pct < 0 else 'flat') }}">{{ '%+.2f'|format(s.chg_pct) }}%</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% endif %}

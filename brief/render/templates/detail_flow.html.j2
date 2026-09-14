@@ -1,0 +1,62 @@
+{% set kr = detail.kr if detail and detail.kr else none %}
+{% if kr and not kr.error %}
+
+{% for key, who in [('foreign', '외국인'), ('institution', '기관')] %}
+{% if kr[key] %}
+<section>
+  <h2>{{ who }} 순매수 · 순매도 상위 종목</h2>
+  <div class="two-col">
+    <div class="card mini">
+      <div class="mini-h up">많이 산 종목</div>
+      {% for s in kr[key].buy %}
+      <div class="mini-row">
+        <span>{{ s.name }}{% if s.market == 'KOSDAQ' %}<span class="asof">코스닥</span>{% endif %}</span>
+        <span class="num up">{{ eok(s.net_eok) }}</span>
+        <span class="num mini-chg {{ 'up' if (s.chg_pct or 0) > 0 else ('down' if (s.chg_pct or 0) < 0 else 'flat') }}">{% if s.chg_pct is not none %}{{ '%+.1f'|format(s.chg_pct) }}%{% endif %}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="card mini">
+      <div class="mini-h down">많이 판 종목</div>
+      {% for s in kr[key].sell %}
+      <div class="mini-row">
+        <span>{{ s.name }}{% if s.market == 'KOSDAQ' %}<span class="asof">코스닥</span>{% endif %}</span>
+        <span class="num down">{{ eok(-s.net_eok) }}</span>
+        <span class="num mini-chg {{ 'up' if (s.chg_pct or 0) > 0 else ('down' if (s.chg_pct or 0) < 0 else 'flat') }}">{% if s.chg_pct is not none %}{{ '%+.1f'|format(s.chg_pct) }}%{% endif %}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endfor %}
+<p class="hint-plain">금액은 순매수(산 금액 − 판 금액), 오른쪽 %는 그 종목의 당일 등락률입니다. 코스피·코스닥 합산.</p>
+
+{% if kr.gainers %}
+<section>
+  <h2>크게 오른 · 내린 종목</h2>
+  <p class="hint-plain">거래대금 {{ '{:,.0f}'.format(kr.mover_min_eok) }}억원 이상 종목 중 (거래가 적은 종목의 급등락은 제외)</p>
+  <div class="two-col">
+    <div class="card mini">
+      <div class="mini-h up">상승률 상위</div>
+      {% for s in kr.gainers %}
+      <div class="mini-row">
+        <span>{{ s.name }}{% if s.market == 'KOSDAQ' %}<span class="asof">코스닥</span>{% endif %}</span>
+        <span class="num up">{{ '%+.2f'|format(s.chg_pct) }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="card mini">
+      <div class="mini-h down">하락률 상위</div>
+      {% for s in kr.losers %}
+      <div class="mini-row">
+        <span>{{ s.name }}{% if s.market == 'KOSDAQ' %}<span class="asof">코스닥</span>{% endif %}</span>
+        <span class="num down">{{ '%+.2f'|format(s.chg_pct) }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% endif %}

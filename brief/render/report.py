@@ -21,7 +21,7 @@ from brief.collect import flows as flows_mod                    # noqa: E402
 from brief import clock                                         # noqa: E402
 from brief.interpret import rules, weekly as weekly_mod          # noqa: E402
 from brief.collect import events as events_mod                  # noqa: E402
-from brief.interpret import ranges as ranges_mod                # noqa: E402
+from brief.collect import detail as detail_mod                  # noqa: E402
 from brief.render.terms import Glossary                         # noqa: E402
 from brief.score import scorer                                  # noqa: E402
 
@@ -67,6 +67,7 @@ def build_dashboard(rows, newest: str, insts: dict[str, Instrument],
             clock.label(r["trade_date"]).split("(")[0]
 
         out.append({
+            "id": inst.id,
             "group": inst.group,
             "asof": asof,
             "futures": inst.futures,
@@ -84,8 +85,10 @@ def build_dashboard(rows, newest: str, insts: dict[str, Instrument],
             "notable": notable,
         })
 
-    out.sort(key=lambda x: (GROUP_ORDER.index(x["group"])
-                            if x["group"] in GROUP_ORDER else 99))
+    # 그룹 순서 → 그룹 안에서는 settings.yaml 에 적힌 순서 (코스피가 코스닥보다 위)
+    order = list(insts)
+    out.sort(key=lambda x: (GROUP_ORDER.index(x["group"]) if x["group"] in GROUP_ORDER else 99,
+                            order.index(x["id"])))
     return out
 
 
@@ -193,45 +196,32 @@ def build_flows(conn, gloss: Glossary, seen: set[str]) -> tuple[list[dict], list
     return rows, lines
 
 
-def build_invest(views) -> dict | None:
-    """'확률로 본 투자 참고' 섹션에 필요한 값. 숫자는 전부 ranges.py 계산값."""
-    if not views:
-        return None
+TILE_IDS = [("KOSPI", "코스피"), ("KOSDAQ", "코스닥"), ("SPX", "S&P 500"),
+            ("NASDAQ", "나스닥"), ("USDKRW", "원/달러"), ("US10Y", "미 국채 10년")]
 
-    indices = [v for v in views if v.kind == "index" and v.holding]
-    labels = [h["label"] for h in indices[0].holding] if indices else []
 
-    holding = []
-    for v in indices:
-        year = next((h for h in v.holding if h["days"] == 250), None)
-        holding.append({"name": v.name, "cells": v.holding,
-                        "year_q10": year["q10"] if year else float("nan"),
-                        "year_up": year["up_rate"] if year else None})
+def build_tiles(rows, insts: dict[str, Instrument]) -> list[dict]:
+    """머리말의 핵심 숫자. 해석 없이 종가와 변화만."""
+    by_id = {r["instrument"]: r for r in rows}
+    out = []
+    for iid, short in TILE_IDS:
+        r, inst = by_id.get(iid), insts.get(iid)
+        if not r or not inst:
+            continue
+        if inst.kind == "rate":
+            chg, txt = r["chg_bp"], ("—" if r["chg_bp"] is None else f"{r['chg_bp']:+.0f}bp")
+        else:
+            chg, txt = r["chg_pct"], ("—" if r["chg_pct"] is None else f"{r['chg_pct']:+.2f}%")
+        out.append({"id": iid, "name": short, "close": _fmt_num(r["close"], inst.decimals),
+                    "change": txt, "chg": chg or 0,
+                    "dir": "flat" if not chg else ("up" if chg > 0 else "down"),
+                    "date": clock.label(r["trade_date"])})
+    return out
 
-    # 설명에 쓸 예시: 1년 이익 비율이 가장 높은 지수 (숫자가 클수록 예시로 이해하기 쉽다)
-    example = None
-    with_year = [h for h in holding if h["year_up"] is not None]
-    if with_year:
-        best = max(with_year, key=lambda h: h["year_up"])
-        example = {"name": best["name"], "up": best["year_up"], "q10": best["year_q10"]}
 
-    dir_rows = [{"name": v.name, "acc": v.dir_acc, "base": v.dir_base}
-                for v in views if v.dir_acc is not None]
-    dir_acc = sum(d["acc"] for d in dir_rows) / len(dir_rows) if dir_rows else None
-    dir_base = sum(d["base"] for d in dir_rows) / len(dir_rows) if dir_rows else None
-
-    years = max((v.history_years for v in views), default=10)
-    year_periods = min((next((h["periods"] for h in v.holding if h["days"] == 250), 0)
-                        for v in indices), default=0)
-    week_periods = min((next((h["periods"] for h in v.holding if h["days"] == 5), 0)
-                        for v in indices), default=0)
-
-    return {
-        "ranges": views, "holding": holding, "holding_labels": labels,
-        "example": example, "dir_rows": dir_rows,
-        "dir_acc": dir_acc, "dir_base": dir_base,
-        "years": years, "year_periods": year_periods, "week_periods": week_periods,
-    }
+def _eok_text(v: float) -> str:
+    a = abs(v)
+    return f"{a / 10_000:.2f}조원" if a >= 10_000 else f"{a:,.0f}억원"
 
 
 def render(trade_date: str | None = None,
@@ -265,6 +255,8 @@ def render(trade_date: str | None = None,
         seen_table: set[str] = set()
         dashboard = build_dashboard(snapshot, newest, insts, acfg, gloss, seen_table)
         verdict = build_verdict(snapshot, insts, acfg)
+        tiles = build_tiles(snapshot, insts)
+        detail = detail_mod.load()
         notable = build_notable_lines(snapshot, insts, acfg, gloss, seen)
         trigs = rules.build_triggers(conn, snapshot, insts, acfg)[:6]
 
@@ -293,11 +285,6 @@ def render(trade_date: str | None = None,
         week = (weekly_mod.summarize(conn, clock.today_kst(), insts)
                 if mode == "weekly" else None)
 
-        try:
-            range_views = ranges_mod.build_all(conn)
-        except Exception:                                      # noqa: BLE001
-            range_views = []
-        invest = build_invest(range_views)
 
     # 일정: 주간 정리는 이번 주 전체, 일일 브리핑은 앞으로 일주일
     from datetime import timedelta
@@ -336,11 +323,15 @@ def render(trade_date: str | None = None,
     env = Environment(loader=FileSystemLoader(TPL_DIR),
                       autoescape=select_autoescape(["html"]),
                       trim_blocks=True, lstrip_blocks=True)
+    env.globals["eok"] = _eok_text
 
     html = env.get_template("brief.html.j2").render(
         date_kr=clock.label_long(brief_date),
         is_weekly=(mode == "weekly"),
-        invest=invest,
+        tiles=tiles,
+        detail=detail,
+        kr_label=clock.label(detail["kr"]["date"]) if detail.get("kr", {}).get("date") else "",
+        us_label=clock.label(detail["us"]["date"]) if detail.get("us", {}).get("date") else "",
         week=week,
         calendar=[{"when": e.when(), "title": e.title, "note": e.note,
                    "region": e.region, "importance": e.importance} for e in upcoming],
@@ -395,7 +386,8 @@ def render(trade_date: str | None = None,
         "build_id": build_id,
         "mode": mode,
         "week": week,
-        "ranges": range_views,
+        "tiles": tiles,
+        "detail": detail,
         "events": upcoming,
         # 새 거래일 데이터가 들어왔는지 판단하는 열쇠 — 한국·미국 대표 지수의 기준일
         "market_key": f"KOSPI:{kr_date}|SPX:{us_date}",

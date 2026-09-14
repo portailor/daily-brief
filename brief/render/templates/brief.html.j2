@@ -34,6 +34,30 @@
   .eyebrow{font-size:12.5px; color:var(--dim); letter-spacing:.06em; font-weight:600}
   h1{font-size:23px; line-height:1.35; margin:6px 0 0; font-weight:800; letter-spacing:-.02em}
   .basis-line{margin-top:4px; font-size:13px; color:var(--dim); font-weight:500}
+  .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:14px}
+  .tile{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:9px 10px}
+  .tile-name{font-size:11.5px; color:var(--dim); font-weight:650}
+  .tile-val{font-size:16px; font-weight:800; margin-top:1px; letter-spacing:-.02em}
+  .tile-chg{font-size:12.5px; font-weight:700}
+  .hint-plain{margin:-4px 0 9px; font-size:12px; color:var(--dim)}
+  .sec-row{display:grid; grid-template-columns:92px 1fr 64px; align-items:center; gap:8px; padding:5px 0}
+  .sec-name{font-size:13.5px; font-weight:600; white-space:nowrap}
+  .sec-bar{position:relative; height:8px; background:var(--bg); border-radius:4px}
+  .sec-bar::after{content:""; position:absolute; left:50%; top:-2px; width:1px; height:12px; background:var(--line)}
+  .sec-bar i{position:absolute; top:0; height:100%; border-radius:4px}
+  .sec-bar i.pos{left:50%; background:var(--up)}
+  .sec-bar i.neg{right:50%; background:var(--down)}
+  .sec-pct{text-align:right; font-size:12.5px}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  @media (max-width:560px){ .two-col{grid-template-columns:1fr} }
+  .card.mini{padding:11px 13px}
+  .mini-h{font-size:12px; font-weight:750; margin-bottom:5px}
+  .mini-row{display:flex; align-items:baseline; gap:8px; padding:4px 0; font-size:13.5px}
+  .mini-row + .mini-row{border-top:1px solid var(--line)}
+  .mini-row > span:first-child{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .mini-row .num{font-size:12.5px}
+  .mini-chg{min-width:52px; text-align:right}
+  .tk{font-size:10.5px; color:var(--dim); font-family:var(--mono)}
   .sub-h{font-size:14.5px; font-weight:750; margin:20px 0 9px}
   .invest-intro{font-size:14.5px; line-height:1.7}
   .invest-intro ol{margin:8px 0 0; padding-left:20px}
@@ -209,9 +233,14 @@
   <div class="eyebrow">{{ '주간 경제 브리핑' if is_weekly else '매일 경제 브리핑' }}</div>
   <h1>{{ date_kr }}</h1>
   <div class="basis-line">{{ basis }}</div>
-  <div class="verdict">
-    {{ verdict.headline }}
-    {% if verdict.sub %}<span class="sub">{{ verdict.sub }}</span>{% endif %}
+  <div class="tiles">
+    {% for t in tiles %}
+    <div class="tile">
+      <div class="tile-name">{{ t.name }}</div>
+      <div class="tile-val num">{{ t.close }}</div>
+      <div class="tile-chg num {{ t.dir }}">{{ t.change }}</div>
+    </div>
+    {% endfor %}
   </div>
 </header>
 
@@ -242,40 +271,10 @@
       <b>{{ '%.2f조원'|format((f.total_eok|abs)/10000) if (f.total_eok|abs) >= 10000 else '{:,.0f}억원'.format(f.total_eok|abs) }}</b>
       · {{ f.days }}일 중 {{ f.sell_days }}일 매도</div>
     {% endfor %}
-    <div class="pocket">지난주 예측 채점:
-      {% if week.pred_total %}<b>{{ week.pred_hit }}/{{ week.pred_total }}</b> 적중{% else %}채점된 예측 없음{% endif %}
-      {% if track.total %} · 누적 {{ '%.0f'|format(track.accuracy*100) }}%{% endif %}</div>
   </div>
 </section>
 
 {% include 'calendar.html.j2' %}
-{% endif %}
-
-{% if score.total or score.resolved %}
-<section>
-  <h2>어제 예측 채점</h2>
-  <div class="card">
-    <div class="score-head">
-      <span class="score-big">{{ score.hit }}/{{ score.total_today }}</span>
-      <span class="score-note">
-        {% if track.total %}
-          누적 {{ track.hit }}/{{ track.total }} · 적중률 {{ '%.0f'|format(track.accuracy*100) }}%
-          (최근 {{ track.window_days }}일)
-        {% else %}
-          누적 기록은 며칠 쌓인 뒤부터 표시됩니다
-        {% endif %}
-      </span>
-    </div>
-    {% for r in score.resolved %}
-    <div class="verdict-row">
-      <span class="mark {{ 'hit' if r.result=='hit' else 'miss' }}">{{ 'O' if r.result=='hit' else 'X' }}</span>
-      <span>{{ r.claim }}
-        <span class="detail">실제 {{ '%.3f'|format(r.actual) }} · 기준 {{ r.op }} {{ '%.3f'|format(r.threshold) }}</span>
-      </span>
-    </div>
-    {% endfor %}
-  </div>
-</section>
 {% endif %}
 
 <section>
@@ -335,7 +334,7 @@
 </section>
 {% endif %}
 
-{% include 'invest.html.j2' %}
+{% include 'detail_kr.html.j2' %}
 
 {% if flows %}
 <section>
@@ -379,6 +378,10 @@
   </details>
 </section>
 {% endif %}
+
+{% include 'detail_flow.html.j2' %}
+
+{% include 'detail_us.html.j2' %}
 
 {% if pockets %}
 <section>
