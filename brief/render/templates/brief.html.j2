@@ -34,6 +34,27 @@
   .eyebrow{font-size:12.5px; color:var(--dim); letter-spacing:.06em; font-weight:600}
   h1{font-size:23px; line-height:1.35; margin:6px 0 0; font-weight:800; letter-spacing:-.02em}
   .basis-line{margin-top:4px; font-size:13px; color:var(--dim); font-weight:500}
+  .sub-h{font-size:14.5px; font-weight:750; margin:20px 0 9px}
+  .invest-intro{font-size:14.5px; line-height:1.7}
+  .invest-intro ol{margin:8px 0 0; padding-left:20px}
+  .inv + .inv{margin-top:9px}
+  .inv-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:15.5px}
+  .regime{font-size:11.5px; font-weight:700; padding:2px 7px; border-radius:20px;
+          background:var(--bg); border:1px solid var(--line); color:var(--dim)}
+  .regime.hot{color:var(--warn); border-color:var(--warn)}
+  .regime.calm{color:var(--down); border-color:var(--down)}
+  .inv-rank{font-size:12px; color:var(--dim)}
+  .inv-range{margin-top:10px; font-size:13px; color:var(--dim)}
+  .inv-nums{font-size:19px; font-weight:800; color:var(--ink); font-family:var(--mono);
+            letter-spacing:-.02em; margin-top:2px}
+  .inv-pct{font-size:13px; font-weight:600; color:var(--dim); margin-left:4px}
+  .inv-money{margin-top:4px; font-size:13.5px; color:var(--ink)}
+  .inv-guide{margin-top:9px; font-size:14px; line-height:1.66}
+  .inv-check{margin-top:10px; padding-top:9px; border-top:1px solid var(--line);
+             font-size:12.5px; color:var(--dim)}
+  .dir-list{display:block; margin-top:6px; font-size:12.5px; color:var(--dim)}
+  .disclaimer-box{margin-top:12px; padding:13px 15px; border-radius:10px;
+                  background:var(--hl); font-size:13px; line-height:1.7; color:var(--ink)}
   .ev{display:flex; gap:12px; padding:10px 0; align-items:baseline}
   .ev + .ev{border-top:1px solid var(--line)}
   .ev-when{flex:0 0 96px; font-family:var(--mono); font-size:12.5px; color:var(--dim)}
@@ -314,6 +335,8 @@
 </section>
 {% endif %}
 
+{% include 'invest.html.j2' %}
+
 {% if flows %}
 <section>
   <h2>누가 사고 누가 팔았나</h2>
@@ -394,7 +417,7 @@
     <div class="deep">
       전부 <b>과거 실제 빈도</b>입니다. 누군가의 전망이나 인공지능의 추측이 아닙니다.
       각 조건 아래 적힌 "과거 N번 중 M번"이 그 계산의 분모와 분자입니다.
-      예를 들어 라운드 숫자 돌파 조건은, 지난 약 2년 동안 하루에 그만큼 이상
+      예를 들어 라운드 숫자 돌파 조건은, 수집된 과거 데이터 전체에서 하루에 그만큼 이상
       움직인 날이 몇 번이었는지를 센 것입니다.<br><br>
       괄호 안 95% 구간은 표본이 적을 때 생기는 불확실성입니다.
       "0~19%"처럼 넓게 나오면 그만큼 확신할 수 없다는 뜻이고,
@@ -410,8 +433,11 @@
   생성 <code>{{ generated_at }}</code> · 기준일 <code>{{ trade_date }}</code>
   {% if stale %}<br><span style="color:var(--warn)">⚠ 지연 데이터: {{ stale }}</span>{% endif %}
   <div class="disclaimer">
-    이 문서는 공개 데이터를 기계적으로 집계·계산한 개인용 기록이며, 투자 권유가 아닙니다.
-    확률은 과거 빈도일 뿐 미래를 보장하지 않습니다. 투자 판단과 그 결과는 본인 책임입니다.
+    이 문서는 공개 데이터를 기계적으로 집계·계산한 개인용 참고 자료이며, 투자 권유나
+    개인 맞춤 자문이 아닙니다. 투자자문업으로 등록된 곳에서 만든 것이 아닙니다.
+    확률은 과거 빈도일 뿐 미래를 보장하지 않습니다. 이 내용을 참고한 투자 판단과
+    그 결과에 대한 책임은 전적으로 본인에게 있으며, 제작자는 어떠한 손실에도
+    책임을 지지 않습니다.
   </div>
 </footer>
 

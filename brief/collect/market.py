@@ -90,7 +90,7 @@ def fetch_one(inst: Instrument, period: str = "2y") -> pd.DataFrame:
 
 
 def collect(instruments: list[Instrument] | None = None,
-            period: str = "2y",
+            period: str = "10y",      # 투자 관점 통계에 표본이 필요하다 (약 2,500거래일)
             stale_days: int = 5) -> CollectReport:
     # yfinance로 받을 수 있는 것만. 국고채·기준금리 같은 건 macro.py 담당이다.
     instruments = instruments or load_instruments(source="yfinance")

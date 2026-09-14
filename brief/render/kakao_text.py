@@ -8,8 +8,8 @@
 from __future__ import annotations
 
 LIMIT = 190          # 카카오는 이모지를 2자로 세기도 해서 여유를 둔다
-LINE_MAX = 46        # 머리말·꼬리말을 합쳐도 LIMIT 을 넘지 않는 한 줄 상한
-FOOTER = "자세한 내용은 아래 링크에서 확인하세요."
+LINE_MAX = 43        # 머리말·꼬리말을 합쳐도 LIMIT 을 넘지 않는 한 줄 상한
+FOOTER = "과거 통계 참고용이며 투자 책임은 본인에게 있습니다."
 
 
 def _eok(v: float) -> str:
@@ -33,9 +33,29 @@ def _compose(date_short: str, candidates: list[str], title: str = "경제 브리
     return text
 
 
+def _range_line(payload: dict) -> str:
+    """코스피 1주일 예상 범위 한 줄. 방향이 아니라 흔들림의 크기만 말한다."""
+    for v in payload.get("ranges") or []:
+        if v.id == "KOSPI":
+            return (f"코스피 1주 뒤 80% 범위 {v.lo_pct:+.1f}~{v.hi_pct:+.1f}%"
+                    f" ({v.regime.replace('변동성 ', '변동 ')})")
+    return ""
+
+
+def _short_headline(payload: dict) -> str:
+    """결론 문장이 한 줄 상한을 넘을 때 쓰는 짧은 형태."""
+    rows = payload.get("notable_rows") or []
+    if rows:
+        r = rows[0]
+        return f"{r['name']} {r['change']}, 평소 변동폭의 {abs(r['sigma']):.1f}배"
+    return "평소와 다른 큰 움직임은 없었습니다."
+
+
 def build(payload: dict) -> str:
     """새 거래일 데이터가 있는 날."""
-    candidates: list[str] = [payload["verdict"]["headline"]]
+    head = payload["verdict"]["headline"]
+    candidates: list[str] = [head if len(head) <= LINE_MAX else _short_headline(payload),
+                             _range_line(payload)]
 
     # 외국인 수급이 며칠째 한 방향이면 그게 두 번째로 중요하다
     for s in payload["flow_stats"]:
@@ -102,6 +122,7 @@ def build_weekly(payload: dict) -> str:
         key.sort(key=lambda e: e.day)
         candidates.append("이번 주: " + " · ".join(
             f"{e.when().split(' ')[0]} {_short_event(e)}" for e in key))
+    candidates.append(_range_line(payload))
 
     if week:
         for f in week.flows[:1]:
