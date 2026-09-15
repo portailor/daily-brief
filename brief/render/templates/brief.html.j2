@@ -58,6 +58,8 @@
   .mini-row .num{font-size:12.5px}
   .mini-chg{min-width:52px; text-align:right}
   .tk{font-size:10.5px; color:var(--dim); font-family:var(--mono)}
+  .situ{font-size:13px; color:var(--dim); margin-top:3px; line-height:1.55}
+  .plab{flex:0 0 auto; font-size:11.5px; font-weight:700; color:var(--dim)}
   .issue + .issue{margin-top:8px}
   .card.issue{padding:11px 13px}
   .issue-head{display:flex; align-items:baseline; gap:6px; font-size:14.5px; margin-bottom:4px}
@@ -423,12 +425,19 @@
 
 <section>
   <h2>{{ '이번 주 지켜볼 조건' if is_weekly else '내일 지켜볼 조건' }}</h2>
+  <p class="hint-plain">
+    {{ '이번 주' if is_weekly else '내일' }} 이렇게 될 <b>가능성이 몇 퍼센트인지</b>를 적은 것입니다.
+    맞히라는 뜻이 아니라, <b>과거에 같은 상황이 몇 번이나 그렇게 끝났는지</b>를 센 숫자입니다.
+    오른쪽 퍼센트가 높을수록 과거에 자주 그랬다는 뜻입니다.
+  </p>
   <div class="card">
     {% for t in triggers %}
     <div class="trig">
       <div class="claim">{{ t.claim_html|safe }}</div>
+      {% if t.situation %}<div class="situ">{{ t.situation|safe }}</div>{% endif %}
       {% if t.probability is not none %}
       <div class="pbar">
+        <span class="plab">그럴 확률</span>
         <span class="track">
           <span class="ci" style="left:{{ t.ci_lo }}%; width:{{ t.ci_w }}%"></span>
           <span class="fill" style="width:{{ t.pct }}%"></span>
@@ -443,11 +452,15 @@
   <details>
     <summary>이 확률은 어디서 나온 건가</summary>
     <div class="deep">
-      전부 <b>과거 실제 빈도</b>입니다. 누군가의 전망이나 인공지능의 추측이 아닙니다.
-      각 조건 아래 적힌 "과거 N번 중 M번"이 그 계산의 분모와 분자입니다.
-      예를 들어 라운드 숫자 돌파 조건은, 수집된 과거 데이터 전체에서 하루에 그만큼 이상
-      움직인 날이 몇 번이었는지를 센 것입니다.<br><br>
-      괄호 안 95% 구간은 표본이 적을 때 생기는 불확실성입니다.
+      전부 <b>과거에 실제로 몇 번 그랬는지를 센 숫자</b>입니다.
+      누군가의 전망이나 인공지능의 추측이 아닙니다.<br><br>
+      읽는 법을 예로 들면, "국고채 3년물이 고점에서 내려온다 · 그럴 확률 13%"는
+      <b>과거에 국고채 3년물이 지금처럼 1년 최고 수준에 있던 날이 100번 있었는데,
+      그중 다음 날 내려간 날이 13번이었다</b>는 뜻입니다.
+      나머지 87번은 내려가지 않았습니다. 그래서 13%입니다.<br><br>
+      조건 문장 안에 들어간 숫자(가격, 평균선 값, 1년 범위에서의 위치)는 <b>확률이 아니라
+      지금 상태</b>입니다. 확률은 오른쪽에 "그럴 확률"이라고 적힌 하나뿐입니다.<br><br>
+      괄호 안 95% 구간은 센 횟수가 적을 때 생기는 불확실성입니다.
       "0~19%"처럼 넓게 나오면 그만큼 확신할 수 없다는 뜻이고,
       이 브리핑은 그럴 때 점 하나로 단정하지 않습니다.<br><br>
       여기 적힌 조건은 전부 내일 자동으로 채점되어 위쪽 적중률에 반영됩니다.
