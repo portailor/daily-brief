@@ -39,6 +39,8 @@ DART_CORP = "https://opendart.fss.or.kr/api/corpCode.xml"
 DART_VIEW = "https://dart.fss.or.kr/dsaf001/main.do?rcpNo={}"
 NAVER_NEWS = "https://naverapihub.apigw.ntruss.com/search/v1/news"
 
+PRICE_ONLY = re.compile(r"주가,?\s*\d{1,2}월\s*\d{1,2}일")
+
 # 주가와 거의 무관한 정기 보고. 목록을 흐리므로 뺀다.
 ROUTINE = ("임원ㆍ주요주주특정증권등소유상황보고서", "임원·주요주주특정증권등소유상황보고서",
            "특수관계인에대한", "증권발행실적보고서")
@@ -108,6 +110,10 @@ def headlines(client_id: str, secret: str, name: str, trade_day: date) -> list[d
             continue
         # 종목명이 제목에 없는 기사는 검색어가 우연히 걸린 것일 수 있어 뺀다
         if not (lo <= pub.date() <= hi) or name not in title or title in seen:
+            continue
+        # "OO 주가, 9월 14일 장중 12,020원 3.45% 하락" 같은 자동 생성 시세 기사는
+        # 이미 표에 있는 숫자를 반복할 뿐이라 뺀다
+        if PRICE_ONLY.search(title):
             continue
         seen.add(title)
         out.append({"time": pub.strftime("%m/%d %H:%M"), "title": title,
