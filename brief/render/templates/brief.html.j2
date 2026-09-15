@@ -58,6 +58,31 @@
   .mini-row .num{font-size:12.5px}
   .mini-chg{min-width:52px; text-align:right}
   .tk{font-size:10.5px; color:var(--dim); font-family:var(--mono)}
+  .issue + .issue{margin-top:8px}
+  .card.issue{padding:11px 13px}
+  .issue-head{display:flex; align-items:baseline; gap:6px; font-size:14.5px; margin-bottom:4px}
+  .issue-head .num{margin-left:auto; font-size:13px; font-weight:700}
+  .issue-row{display:flex; align-items:baseline; gap:7px; padding:5px 0; color:var(--ink);
+             text-decoration:none; font-size:13.5px; border-top:1px solid var(--line)}
+  .issue-row:hover .issue-title{text-decoration:underline}
+  .issue-title{flex:1; min-width:0}
+  .issue-when{font-size:11.5px; color:var(--dim); font-family:var(--mono); white-space:nowrap}
+  .tag{flex:0 0 auto; font-size:10.5px; font-weight:700; padding:1px 5px; border-radius:4px}
+  .tag.dart{background:var(--hl); color:var(--warn)}
+  .tag.news{background:var(--bg); color:var(--accent); border:1px solid var(--line)}
+  .issue-none{font-size:12.5px; color:var(--dim); padding-top:4px; border-top:1px solid var(--line)}
+  .case-title{font-size:16.5px; font-weight:800; line-height:1.45}
+  .case-sum{margin:8px 0 12px; font-size:14.5px; line-height:1.7}
+  .case-fact{display:grid; grid-template-columns:118px 1fr; gap:10px; padding:7px 0;
+             border-top:1px solid var(--line); font-size:14px; line-height:1.6}
+  .case-when{font-size:12.5px; font-weight:700; color:var(--accent)}
+  .case-why{margin-top:12px; padding:10px 12px; background:var(--bg); border-radius:8px}
+  .case-why-h{font-size:12px; font-weight:750; color:var(--dim); margin-bottom:4px}
+  .case-why ul{margin:0; padding-left:18px; font-size:14px; line-height:1.65}
+  .case-src{margin-top:11px; font-size:12px; color:var(--dim)}
+  .case-src a{color:var(--accent)}
+  .case-n{white-space:nowrap}
+  @media (max-width:560px){ .case-fact{grid-template-columns:1fr; gap:0} }
   .sub-h{font-size:14.5px; font-weight:750; margin:20px 0 9px}
   .invest-intro{font-size:14.5px; line-height:1.7}
   .invest-intro ol{margin:8px 0 0; padding-left:20px}
@@ -430,6 +455,10 @@
     </div>
   </details>
 </section>
+
+{% include 'issues.html.j2' %}
+
+{% include 'case.html.j2' %}
 
 <footer>
   데이터 출처: {{ sources }}<br>

@@ -1,0 +1,32 @@
+{% set kr = detail.kr if detail and detail.kr else none %}
+{% if kr and kr.issues %}
+<section>
+  <h2>크게 움직인 종목, 같은 날 나온 소식 · {{ kr_label }}</h2>
+  <p class="hint-plain">
+    공시(DART)와 뉴스 제목을 원문 링크로 모았습니다. 주가가 움직인 <b>원인이라고 확인된 것은 아니며</b>,
+    같은 시기에 나온 소식일 뿐입니다.
+    {% if not kr.issues_sources.naver %}<br>뉴스 헤드라인은 네이버 검색 API 연결 후 표시됩니다.{% endif %}
+  </p>
+  {% for it in kr.issues %}
+  <div class="card issue">
+    <div class="issue-head">
+      <b>{{ it.name }}</b>{% if it.market == 'KOSDAQ' %}<span class="asof">코스닥</span>{% endif %}
+      <span class="num {{ 'up' if it.chg_pct > 0 else 'down' }}">{{ '%+.2f'|format(it.chg_pct) }}%</span>
+    </div>
+    {% for x in it.disclosures %}
+    <a class="issue-row" href="{{ x.url }}" target="_blank" rel="noopener">
+      <span class="tag dart">공시</span><span class="issue-title">{{ x.title }}</span><span class="issue-when">{{ x.date[5:].replace('-', '/') }}</span>
+    </a>
+    {% endfor %}
+    {% for x in it.news %}
+    <a class="issue-row" href="{{ x.url }}" target="_blank" rel="noopener">
+      <span class="tag news">뉴스</span><span class="issue-title">{{ x.title }}</span><span class="issue-when">{{ x.time }}</span>
+    </a>
+    {% endfor %}
+    {% if not it.disclosures and not it.news %}
+    <div class="issue-none">같은 기간 확인된 공시{% if kr.issues_sources.naver %}·뉴스{% endif %}가 없습니다.</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% endif %}

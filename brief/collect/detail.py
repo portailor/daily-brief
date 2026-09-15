@@ -102,7 +102,7 @@ def collect_kr(kr_date: str) -> dict:
         loss = liquid.sort_values("등락률").head(5)
         names = _names(stock, list(gain.index) + list(loss.index))
         pack = lambda frame: [{                          # noqa: E731
-            "name": names[t], "market": r["시장"], "close": int(r["종가"]),
+            "name": names[t], "code": t, "market": r["시장"], "close": int(r["종가"]),
             "chg_pct": float(r["등락률"]), "value_eok": float(r["거래대금"] / EOK),
         } for t, r in frame.iterrows()]
         out["gainers"], out["losers"] = pack(gain), pack(loss)
@@ -184,6 +184,12 @@ def collect() -> dict:
             detail["kr"] = collect_kr(kr_date)
         except Exception as exc:                        # noqa: BLE001
             detail["kr"] = {"error": f"{type(exc).__name__}: {exc}"}
+        # 급등·급락 종목의 같은 날 공시·뉴스 (원인 단정 없이 원문 링크만)
+        try:
+            from brief.collect import news
+            news.attach(detail)
+        except Exception as exc:                        # noqa: BLE001
+            detail["kr"].setdefault("errors", []).append(f"공시·뉴스: {type(exc).__name__}")
     try:
         detail["us"] = collect_us()
     except Exception as exc:                            # noqa: BLE001

@@ -41,7 +41,8 @@ def _load_env() -> dict[str, str]:
             k, v = line.split("=", 1)
             env[k.strip()] = v.strip()
     for k in ("FRED_API_KEY", "ECOS_API_KEY", "DART_API_KEY",
-              "FINNHUB_API_KEY", "KRX_ID", "KRX_PW"):
+              "FINNHUB_API_KEY", "KRX_ID", "KRX_PW",
+              "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"):
         if os.getenv(k):
             env[k] = os.environ[k]
     return env

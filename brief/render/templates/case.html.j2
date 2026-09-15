@@ -1,0 +1,28 @@
+{% if case %}
+<section>
+  <h2>오늘의 시사상식 · {{ case.kind }} 사례</h2>
+  <div class="card case">
+    <div class="case-title">{{ case.title }}</div>
+    <p class="case-sum">{{ case.summary }}</p>
+
+    <div class="case-facts">
+      {% for when, what in case.facts %}
+      <div class="case-fact"><span class="case-when">{{ when }}</span><span>{{ what }}</span></div>
+      {% endfor %}
+    </div>
+
+    {% if case.why %}
+    <div class="case-why">
+      <div class="case-why-h">{{ case.why_label }}</div>
+      <ul>{% for w in case.why %}<li>{{ w }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <div class="case-src">
+      출처:
+      {% for name, url in case.sources %}<a href="{{ url }}" target="_blank" rel="noopener">{{ name }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+      <span class="case-n">· 사례 {{ case_no }}/{{ case_total }}</span>
+    </div>
+  </div>
+</section>
+{% endif %}

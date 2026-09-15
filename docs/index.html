@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>경제 브리핑 2026년 9월 15일 (화)</title>
-<meta name="brief-build" content="20260915091832">
+<meta name="brief-build" content="20260915094833">
 <style>
   :root{
     --bg:#f7f8fa; --card:#fff; --ink:#14161a; --dim:#5b6270; --line:#e3e6ec;
@@ -58,6 +58,31 @@
   .mini-row .num{font-size:12.5px}
   .mini-chg{min-width:52px; text-align:right}
   .tk{font-size:10.5px; color:var(--dim); font-family:var(--mono)}
+  .issue + .issue{margin-top:8px}
+  .card.issue{padding:11px 13px}
+  .issue-head{display:flex; align-items:baseline; gap:6px; font-size:14.5px; margin-bottom:4px}
+  .issue-head .num{margin-left:auto; font-size:13px; font-weight:700}
+  .issue-row{display:flex; align-items:baseline; gap:7px; padding:5px 0; color:var(--ink);
+             text-decoration:none; font-size:13.5px; border-top:1px solid var(--line)}
+  .issue-row:hover .issue-title{text-decoration:underline}
+  .issue-title{flex:1; min-width:0}
+  .issue-when{font-size:11.5px; color:var(--dim); font-family:var(--mono); white-space:nowrap}
+  .tag{flex:0 0 auto; font-size:10.5px; font-weight:700; padding:1px 5px; border-radius:4px}
+  .tag.dart{background:var(--hl); color:var(--warn)}
+  .tag.news{background:var(--bg); color:var(--accent); border:1px solid var(--line)}
+  .issue-none{font-size:12.5px; color:var(--dim); padding-top:4px; border-top:1px solid var(--line)}
+  .case-title{font-size:16.5px; font-weight:800; line-height:1.45}
+  .case-sum{margin:8px 0 12px; font-size:14.5px; line-height:1.7}
+  .case-fact{display:grid; grid-template-columns:118px 1fr; gap:10px; padding:7px 0;
+             border-top:1px solid var(--line); font-size:14px; line-height:1.6}
+  .case-when{font-size:12.5px; font-weight:700; color:var(--accent)}
+  .case-why{margin-top:12px; padding:10px 12px; background:var(--bg); border-radius:8px}
+  .case-why-h{font-size:12px; font-weight:750; color:var(--dim); margin-bottom:4px}
+  .case-why ul{margin:0; padding-left:18px; font-size:14px; line-height:1.65}
+  .case-src{margin-top:11px; font-size:12px; color:var(--dim)}
+  .case-src a{color:var(--accent)}
+  .case-n{white-space:nowrap}
+  @media (max-width:560px){ .case-fact{grid-template-columns:1fr; gap:0} }
   .sub-h{font-size:14.5px; font-weight:750; margin:20px 0 9px}
   .invest-intro{font-size:14.5px; line-height:1.7}
   .invest-intro ol{margin:8px 0 0; padding-left:20px}
@@ -1005,97 +1030,9 @@
   <div class="two-col">
     <div class="card mini">
       <div class="mini-h">대형 기술주</div>
-      <div class="mini-row">
-        <span>알파벳 <span class="tk">GOOGL</span></span>
-        <span class="num">$349.39</span>
-        <span class="num mini-chg up">+3.22%</span>
-      </div>
-      <div class="mini-row">
-        <span>메타 <span class="tk">META</span></span>
-        <span class="num">$665.60</span>
-        <span class="num mini-chg up">+2.71%</span>
-      </div>
-      <div class="mini-row">
-        <span>마이크로소프트 <span class="tk">MSFT</span></span>
-        <span class="num">$505.41</span>
-        <span class="num mini-chg up">+1.97%</span>
-      </div>
-      <div class="mini-row">
-        <span>애플 <span class="tk">AAPL</span></span>
-        <span class="num">$333.08</span>
-        <span class="num mini-chg up">+0.24%</span>
-      </div>
-      <div class="mini-row">
-        <span>아마존 <span class="tk">AMZN</span></span>
-        <span class="num">$253.54</span>
-        <span class="num mini-chg down">-1.26%</span>
-      </div>
-      <div class="mini-row">
-        <span>테슬라 <span class="tk">TSLA</span></span>
-        <span class="num">$358.97</span>
-        <span class="num mini-chg down">-1.77%</span>
-      </div>
-      <div class="mini-row">
-        <span>엔비디아 <span class="tk">NVDA</span></span>
-        <span class="num">$210.96</span>
-        <span class="num mini-chg down">-3.36%</span>
-      </div>
-      <div class="mini-row">
-        <span>브로드컴 <span class="tk">AVGO</span></span>
-        <span class="num">$344.72</span>
-        <span class="num mini-chg down">-4.77%</span>
-      </div>
     </div>
     <div class="card mini">
       <div class="mini-h">섹터 ETF</div>
-      <div class="mini-row">
-        <span>커뮤니케이션 <span class="tk">XLC</span></span>
-        <span class="num mini-chg up">+2.19%</span>
-      </div>
-      <div class="mini-row">
-        <span>헬스케어 <span class="tk">XLV</span></span>
-        <span class="num mini-chg up">+1.45%</span>
-      </div>
-      <div class="mini-row">
-        <span>필수소비재 <span class="tk">XLP</span></span>
-        <span class="num mini-chg up">+1.25%</span>
-      </div>
-      <div class="mini-row">
-        <span>경기소비재 <span class="tk">XLY</span></span>
-        <span class="num mini-chg down">-0.10%</span>
-      </div>
-      <div class="mini-row">
-        <span>금융 <span class="tk">XLF</span></span>
-        <span class="num mini-chg down">-0.38%</span>
-      </div>
-      <div class="mini-row">
-        <span>부동산 <span class="tk">XLRE</span></span>
-        <span class="num mini-chg down">-0.69%</span>
-      </div>
-      <div class="mini-row">
-        <span>소재 <span class="tk">XLB</span></span>
-        <span class="num mini-chg down">-0.90%</span>
-      </div>
-      <div class="mini-row">
-        <span>에너지 <span class="tk">XLE</span></span>
-        <span class="num mini-chg down">-0.94%</span>
-      </div>
-      <div class="mini-row">
-        <span>유틸리티 <span class="tk">XLU</span></span>
-        <span class="num mini-chg down">-1.34%</span>
-      </div>
-      <div class="mini-row">
-        <span>산업재 <span class="tk">XLI</span></span>
-        <span class="num mini-chg down">-1.42%</span>
-      </div>
-      <div class="mini-row">
-        <span>기술 <span class="tk">XLK</span></span>
-        <span class="num mini-chg down">-1.81%</span>
-      </div>
-      <div class="mini-row">
-        <span>반도체 <span class="tk">SOXX</span></span>
-        <span class="num mini-chg down">-5.63%</span>
-      </div>
     </div>
   </div>
   <p class="hint-plain">섹터는 S&amp;P500 업종별 SPDR ETF(반도체는 iShares SOXX) 기준 전일 대비 등락입니다.</p>
@@ -1234,9 +1171,109 @@
   </details>
 </section>
 
+<section>
+  <h2>크게 움직인 종목, 같은 날 나온 소식 · 9/14(월)</h2>
+  <p class="hint-plain">
+    공시(DART)와 뉴스 제목을 원문 링크로 모았습니다. 주가가 움직인 <b>원인이라고 확인된 것은 아니며</b>,
+    같은 시기에 나온 소식일 뿐입니다.
+<br>뉴스 헤드라인은 네이버 검색 API 연결 후 표시됩니다.  </p>
+  <div class="card issue">
+    <div class="issue-head">
+      <b>광전자</b>      <span class="num up">+30.00%</span>
+    </div>
+    <div class="issue-none">같은 기간 확인된 공시가 없습니다.</div>
+  </div>
+  <div class="card issue">
+    <div class="issue-head">
+      <b>빛샘전자</b><span class="asof">코스닥</span>      <span class="num up">+26.29%</span>
+    </div>
+    <div class="issue-none">같은 기간 확인된 공시가 없습니다.</div>
+  </div>
+  <div class="card issue">
+    <div class="issue-head">
+      <b>샌즈랩</b><span class="asof">코스닥</span>      <span class="num up">+25.23%</span>
+    </div>
+    <div class="issue-none">같은 기간 확인된 공시가 없습니다.</div>
+  </div>
+  <div class="card issue">
+    <div class="issue-head">
+      <b>라온시큐어</b><span class="asof">코스닥</span>      <span class="num up">+20.47%</span>
+    </div>
+    <div class="issue-none">같은 기간 확인된 공시가 없습니다.</div>
+  </div>
+  <div class="card issue">
+    <div class="issue-head">
+      <b>티엠씨</b>      <span class="num up">+17.37%</span>
+    </div>
+    <div class="issue-none">같은 기간 확인된 공시가 없습니다.</div>
+  </div>
+  <div class="card issue">
+    <div class="issue-head">
+      <b>금호전기</b>      <span class="num down">-13.49%</span>
+    </div>
+    <a class="issue-row" href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260911000574" target="_blank" rel="noopener">
+      <span class="tag dart">공시</span><span class="issue-title">[기재정정]주요사항보고서(전환사채권발행결정)</span><span class="issue-when">09/11</span>
+    </a>
+  </div>
+  <div class="card issue">
+    <div class="issue-head">
+      <b>한전기술</b>      <span class="num down">-9.08%</span>
+    </div>
+    <div class="issue-none">같은 기간 확인된 공시가 없습니다.</div>
+  </div>
+  <div class="card issue">
+    <div class="issue-head">
+      <b>SK스퀘어</b>      <span class="num down">-8.17%</span>
+    </div>
+    <div class="issue-none">같은 기간 확인된 공시가 없습니다.</div>
+  </div>
+  <div class="card issue">
+    <div class="issue-head">
+      <b>두산</b>      <span class="num down">-7.45%</span>
+    </div>
+    <div class="issue-none">같은 기간 확인된 공시가 없습니다.</div>
+  </div>
+  <div class="card issue">
+    <div class="issue-head">
+      <b>스카이랩스</b><span class="asof">코스닥</span>      <span class="num down">-7.24%</span>
+    </div>
+    <a class="issue-row" href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260911000369" target="_blank" rel="noopener">
+      <span class="tag dart">공시</span><span class="issue-title">주식등의대량보유상황보고서(일반)</span><span class="issue-when">09/11</span>
+    </a>
+    <a class="issue-row" href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260911000333" target="_blank" rel="noopener">
+      <span class="tag dart">공시</span><span class="issue-title">주식등의대량보유상황보고서(약식)</span><span class="issue-when">09/11</span>
+    </a>
+  </div>
+</section>
+
+<section>
+  <h2>오늘의 시사상식 · 몰락 사례</h2>
+  <div class="card case">
+    <div class="case-title">코닥 — 디지털카메라를 처음 만들고도 무너진 필름 회사</div>
+    <p class="case-sum">세계 최초의 휴대용 디지털카메라 시제품을 자사 엔지니어가 만들었지만, 필름 사업이 줄어드는 흐름 속에서 결국 파산보호를 신청했습니다.</p>
+
+    <div class="case-facts">
+      <div class="case-fact"><span class="case-when">1975년</span><span>코닥 엔지니어 스티븐 새슨이 배터리로 작동하는 휴대용 디지털카메라 시제품을 개발</span></div>
+      <div class="case-fact"><span class="case-when">2001년</span><span>필름 판매가 줄어들기 시작</span></div>
+      <div class="case-fact"><span class="case-when">2012년 1월 19일</span><span>미국 파산법 11장(파산보호) 신청</span></div>
+      <div class="case-fact"><span class="case-when">2013년 9월 3일</span><span>기업용 이미징 기술 회사로 파산보호에서 벗어남</span></div>
+    </div>
+
+    <div class="case-why">
+      <div class="case-why-h">출처가 짚은 원인</div>
+      <ul><li>디지털카메라 개발에 참여했지만 경영진이 디지털로의 전면 전환을 주저함</li><li>디지털카메라는 경쟁이 치열해 이익률이 낮았고, 필름 사업은 계속 줄어듦</li></ul>
+    </div>
+
+    <div class="case-src">
+      출처:
+<a href="https://en.wikipedia.org/wiki/Kodak" target="_blank" rel="noopener">Wikipedia — Kodak</a>      <span class="case-n">· 사례 1/30</span>
+    </div>
+  </div>
+</section>
+
 <footer>
   데이터 출처: 한국거래소·yfinance(시세), 미 연준 FRED(거시지표), 한국은행 ECOS(국내금리)<br>
-  생성 <code>2026-09-15 09:18</code> · 기준일 <code>2026-09-14</code>
+  생성 <code>2026-09-15 09:48</code> · 기준일 <code>2026-09-14</code>
   <div class="disclaimer">
     이 문서는 공개 데이터를 기계적으로 집계·계산한 개인용 참고 자료이며, 투자 권유나
     개인 맞춤 자문이 아닙니다. 투자자문업으로 등록된 곳에서 만든 것이 아닙니다.

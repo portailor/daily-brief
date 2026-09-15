@@ -224,6 +224,24 @@ def _eok_text(v: float) -> str:
     return f"{a / 10_000:.2f}조원" if a >= 10_000 else f"{a:,.0f}억원"
 
 
+CASES_PATH = ROOT / "config" / "cases.json"
+CASE_EPOCH = "2026-09-15"
+
+
+def pick_case(today) -> tuple[dict | None, int, int]:
+    """사례집에서 오늘 차례의 사례. 기준일부터 하루에 하나씩 순서대로 돈다."""
+    import json
+    from datetime import date
+    try:
+        cases = json.loads(CASES_PATH.read_text(encoding="utf-8"))["cases"]
+    except (FileNotFoundError, KeyError, json.JSONDecodeError):
+        return None, 0, 0
+    if not cases:
+        return None, 0, 0
+    i = (today - date.fromisoformat(CASE_EPOCH)).days % len(cases)
+    return cases[i], i + 1, len(cases)
+
+
 def render(trade_date: str | None = None,
            save_predictions: bool = True,
            mode: str = "daily") -> tuple[Path, dict]:
@@ -314,6 +332,7 @@ def render(trade_date: str | None = None,
         trig_view.append(item)
 
     brief_date = clock.today_kst()
+    case, case_no, case_total = pick_case(brief_date)
     # 이 페이지만의 표식. 발송 전에 '웹에 올라간 게 정말 방금 만든 것인지'를
     # 확인하는 데 쓴다. 같은 날짜 페이지가 이미 있으면 200 응답만으로는 구분이 안 된다.
     build_id = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -330,6 +349,7 @@ def render(trade_date: str | None = None,
         is_weekly=(mode == "weekly"),
         tiles=tiles,
         detail=detail,
+        case=case, case_no=case_no, case_total=case_total,
         kr_label=clock.label(detail["kr"]["date"]) if detail.get("kr", {}).get("date") else "",
         us_label=clock.label(detail["us"]["date"]) if detail.get("us", {}).get("date") else "",
         week=week,

@@ -46,6 +46,8 @@ jobs:
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
           REPORT_BASE_URL: ${{ secrets.REPORT_BASE_URL }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         run: |
           mkdir -p config data
 
@@ -54,7 +56,7 @@ jobs:
           echo "── Secrets 등록 상태 ──"
           for name in KAKAO_REST_API_KEY KAKAO_CLIENT_SECRET KAKAO_REFRESH_TOKEN \
                       FRED_API_KEY ECOS_API_KEY DART_API_KEY FINNHUB_API_KEY \
-                      KRX_ID KRX_PW REPORT_BASE_URL; do
+                      KRX_ID KRX_PW REPORT_BASE_URL NAVER_CLIENT_ID NAVER_CLIENT_SECRET; do
             if [ -n "${!name}" ]; then
               echo "  OK      $name (${#name} chars name, value set)"
             else
@@ -84,6 +86,8 @@ jobs:
           KRX_ID=$KRX_ID
           KRX_PW=$KRX_PW
           REPORT_BASE_URL=$REPORT_BASE_URL
+          NAVER_CLIENT_ID=$NAVER_CLIENT_ID
+          NAVER_CLIENT_SECRET=$NAVER_CLIENT_SECRET
           EOF
 
           python - <<'PY'
