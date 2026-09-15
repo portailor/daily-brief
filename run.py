@@ -75,6 +75,32 @@ def _write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def sync_before_publish() -> bool:
+    """발행할 실행이라면, 파일을 새로 만들기 '전에' 원격을 받아 둔다.
+
+    클라우드가 매일 아침 docs/ 와 기록 파일을 커밋한다. 로컬에서 먼저 파일을
+    다시 만든 뒤에 받으면 같은 파일끼리 충돌한다(2026-09-15 실제로 발생).
+    """
+    import subprocess
+    run_git = lambda *a: subprocess.run(                      # noqa: E731
+        ["git", *a], cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+        errors="replace", timeout=120, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+
+    if run_git("rev-parse", "--git-dir").returncode != 0:
+        return True
+    tracked = ["docs", "data/predictions.csv", "data/state.json"]
+    if run_git("status", "--porcelain", "--", *tracked).stdout.strip():
+        # 이전 로컬 실행이 남긴 결과물 — 어차피 이번 실행에서 다시 만든다
+        run_git("checkout", "--", *tracked)
+        run_git("clean", "-fdq", "--", "docs")
+    res = run_git("pull", "--rebase", "-q", "origin", "main")
+    if res.returncode != 0:
+        run_git("rebase", "--abort")
+        log(f"△ 원격 변경을 받지 못했습니다: {res.stderr.strip()[:160]}")
+        return False
+    return True
+
+
 def publish(message: str) -> bool:
     """리포트를 GitHub Pages 에 올린다 (로컬 실행용 — 클라우드는 워크플로우가 커밋한다)."""
     import subprocess
@@ -89,6 +115,17 @@ def publish(message: str) -> bool:
     if git("rev-parse", "--git-dir").returncode != 0:
         log("△ git 저장소가 아닙니다. 리포트 발행을 건너뜁니다.")
         return False
+
+    # 리베이스·병합이 멈춰 있는 상태에서 커밋하면, 스테이징된 다른 변경까지
+    # 엉뚱한 메시지로 함께 커밋된다(2026-09-15 실제로 발생). 그런 때는 발행하지 않는다.
+    git_dir = ROOT / git("rev-parse", "--git-dir").stdout.strip()
+    if any((git_dir / d).exists() for d in ("rebase-merge", "rebase-apply", "MERGE_HEAD")):
+        log("△ git 리베이스/병합이 진행 중이라 발행을 건너뜁니다.")
+        return False
+    if git("symbolic-ref", "-q", "HEAD").returncode != 0:
+        log("△ 브랜치에 있지 않아(detached HEAD) 발행을 건너뜁니다.")
+        return False
+
 
     git("add", "docs", "data/predictions.csv", "data/state.json")
     if not git("diff", "--cached", "--quiet").returncode:
@@ -311,6 +348,10 @@ def main() -> int:
 
     if args.send_only:
         return send()
+
+    if not args.no_publish and not sync_before_publish():
+        log("원격과 맞추지 못해 이번 실행은 발행하지 않습니다.")
+        args.no_publish = True
 
     code = generate(args)
     if code != 0:
