@@ -5,7 +5,9 @@
 보여줄 뿐이다. 문장을 새로 쓰지 않으므로 지어낼 여지가 없다.
 
   공시   금융감독원 DART (공식)          DART_API_KEY
-  뉴스   네이버 검색 API (헤드라인만)      NAVER_CLIENT_ID / NAVER_CLIENT_SECRET
+  뉴스   NAVER API HUB 뉴스 검색 (헤드라인만)  NAVER_CLIENT_ID / NAVER_CLIENT_SECRET
+         네이버 검색 API 는 네이버 클라우드 플랫폼의 NAVER API HUB 로 옮겨졌다.
+         (api.ncloud-docs.com/docs/naver-api-hub-search-news, 하루 25,000회)
 
 뉴스 본문은 가져오지 않는다. 제목과 링크만 쓴다.
 """
@@ -35,7 +37,7 @@ CORP_CACHE = ROOT / "data" / "corp_codes.json"
 DART_LIST = "https://opendart.fss.or.kr/api/list.json"
 DART_CORP = "https://opendart.fss.or.kr/api/corpCode.xml"
 DART_VIEW = "https://dart.fss.or.kr/dsaf001/main.do?rcpNo={}"
-NAVER_NEWS = "https://openapi.naver.com/v1/search/news.json"
+NAVER_NEWS = "https://naverapihub.apigw.ntruss.com/search/v1/news"
 
 # 주가와 거의 무관한 정기 보고. 목록을 흐리므로 뺀다.
 ROUTINE = ("임원ㆍ주요주주특정증권등소유상황보고서", "임원·주요주주특정증권등소유상황보고서",
@@ -90,8 +92,9 @@ def _clean(s: str) -> str:
 def headlines(client_id: str, secret: str, name: str, trade_day: date) -> list[dict]:
     """거래일 전날~당일(한국시간)에 나온 기사 제목. 종목명이 제목에 들어간 것만."""
     res = with_retry(lambda: requests.get(
-        NAVER_NEWS, params={"query": f"{name} 주가", "display": 30, "sort": "date"},
-        headers={"X-Naver-Client-Id": client_id, "X-Naver-Client-Secret": secret},
+        NAVER_NEWS, params={"query": f"{name} 주가", "display": 30, "sort": "date",
+                            "format": "json"},
+        headers={"X-NCP-APIGW-API-KEY-ID": client_id, "X-NCP-APIGW-API-KEY": secret},
         timeout=20), attempts=2, label="네이버 뉴스")
     res.raise_for_status()
 
