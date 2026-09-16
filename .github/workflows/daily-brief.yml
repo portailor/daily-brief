@@ -53,15 +53,7 @@ jobs:
         if: steps.guard.outputs.skip != 'true' && github.event_name == 'schedule'
         # 미국 정규장 마감은 한국시간 05:00(서머타임) 또는 06:00(표준시).
         # 겨울에도 전날 미국 종가가 확정된 뒤에 만들도록 06:15 까지 기다린다.
-        run: |
-          target=$(TZ=Asia/Seoul date -d "today 06:15" +%s)
-          now=$(date +%s)
-          if [ "$now" -lt "$target" ]; then
-            echo "$(( (target - now) / 60 ))분 대기"
-            sleep $(( target - now ))
-          else
-            echo "이미 지남 — 바로 진행"
-          fi
+        run: python3 scripts/wait_until_kst.py 06:15
 
       - uses: actions/setup-python@v6
         if: steps.guard.outputs.skip != 'true'
@@ -178,15 +170,7 @@ jobs:
 
       - name: 발송 시각까지 대기 (한국시간 07:25)
         if: steps.guard.outputs.skip != 'true' && github.event_name == 'schedule'
-        run: |
-          target=$(TZ=Asia/Seoul date -d "today 07:25" +%s)
-          now=$(date +%s)
-          if [ "$now" -lt "$target" ]; then
-            echo "$(( (target - now) / 60 ))분 대기"
-            sleep $(( target - now ))
-          else
-            echo "이미 지남 — 바로 발송"
-          fi
+        run: python3 scripts/wait_until_kst.py 07:25
 
       - name: 카카오톡 발송
         if: steps.guard.outputs.skip != 'true'
