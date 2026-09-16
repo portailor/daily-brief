@@ -104,11 +104,11 @@ def authorize(rest_api_key: str, client_secret: str = "") -> dict:
 
     token = res.json()
     if "friends" not in token.get("scope", ""):
-        print("
-주의: 'friends' 동의항목이 빠졌습니다. 친구에게는 보낼 수 없습니다.")
+        print()
+        print("주의: 'friends' 동의항목이 빠졌습니다. 친구에게는 보낼 수 없습니다.")
         print("      카카오 개발자 콘솔 > 카카오 로그인 > 동의항목에서")
-        print("      '카카오 서비스 내 친구목록'을 켠 뒤 다시 실행하세요.
-")
+        print("      '카카오 서비스 내 친구목록'을 '이용 중 동의'로 켠 뒤 다시 실행하세요.")
+        print()
     if "talk_message" not in token.get("scope", ""):
         print("\n⚠ 경고: talk_message 스코프가 없습니다.")
         print("  카카오 로그인 > 동의항목 에서 '카카오톡 메시지 전송'을 활성화하세요.")
@@ -128,12 +128,29 @@ def save(token: dict, rest_api_key: str, client_secret: str = "") -> None:
         TOKEN_PATH.chmod(0o600)
 
 
+def _saved(field: str) -> str:
+    """이미 인증한 적이 있으면 그때 쓴 값을 그대로 쓴다.
+
+    재인증(동의항목을 새로 켰을 때)은 앞으로도 종종 하게 된다. 그때마다
+    키와 Client Secret 을 다시 찾아 붙여넣게 하면 KOE010 으로 헛돈다.
+    """
+    if not TOKEN_PATH.exists():
+        return ""
+    try:
+        return json.loads(TOKEN_PATH.read_text(encoding="utf-8")).get(field, "")
+    except (json.JSONDecodeError, OSError):
+        return ""
+
+
 if __name__ == "__main__":
     key = sys.argv[1] if len(sys.argv) > 1 else os.getenv("KAKAO_REST_API_KEY", "")
-    key = key.strip() or input("카카오 REST API 키를 붙여넣으세요: ").strip()
+    key = key.strip() or _saved("rest_api_key")
+    key = key or input("카카오 REST API 키를 붙여넣으세요: ").strip()
 
     secret = sys.argv[2] if len(sys.argv) > 2 else os.getenv("KAKAO_CLIENT_SECRET", "")
-    secret = secret.strip()
+    secret = secret.strip() or _saved("client_secret")
+    if secret:
+        print("저장된 자격증명을 사용합니다 (REST API 키 + Client Secret).")
 
     tok = authorize(key, secret)
     save(tok, key, secret)
