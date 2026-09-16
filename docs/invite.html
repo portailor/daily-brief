@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>경제 브리핑 받기</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#1a1d21;--dim:#6b7280;--line:#e5e7eb;--accent:#2563eb;--hl:#fef3c7}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#15171a;--card:#1e2126;--ink:#e8eaed;--dim:#9aa0a6;--line:#2f3338;--accent:#7aa2ff;--hl:#3a3320}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;
+       line-height:1.7;display:flex;justify-content:center;padding:32px 16px}
+  main{width:100%;max-width:440px}
+  h1{font-size:21px;margin:0 0 6px}
+  .sub{color:var(--dim);font-size:14px;margin:0 0 20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:14px}
+  .btn{display:block;text-align:center;background:#FEE500;color:#191600;font-weight:700;font-size:16px;
+       padding:15px;border-radius:10px;text-decoration:none}
+  ol{padding-left:20px;margin:0;font-size:14.5px}
+  li{margin-bottom:7px}
+  .code{font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:700;letter-spacing:.5px;
+        background:var(--hl);padding:14px;border-radius:9px;word-break:break-all;text-align:center;margin:12px 0}
+  .copy{width:100%;padding:12px;font-size:15px;font-weight:600;border:1px solid var(--line);
+        background:var(--bg);color:var(--ink);border-radius:9px;cursor:pointer}
+  .note{font-size:13px;color:var(--dim);margin-top:14px}
+  .err{color:#b91c1c}
+  #done,#fail{display:none}
+</style></head><body><main>
+
+<div id="start">
+  <h1>매일 아침 경제 브리핑</h1>
+  <p class="sub">코스피·환율·미국 증시 요약이 카카오톡으로 옵니다.</p>
+  <div class="card">
+    <p style="margin:0 0 14px;font-size:14.5px">받으시려면 카카오 로그인을 한 번 해주세요.
+      이 버튼을 누르면 카카오 동의 화면이 열립니다.</p>
+    <a class="btn" id="go" href="#">카카오로 시작하기</a>
+    <p class="note">카카오톡 메시지를 보내는 데만 쓰입니다.
+      비밀번호는 카카오에서만 입력하고, 이 페이지는 볼 수 없습니다.</p>
+  </div>
+</div>
+
+<div id="done">
+  <h1>거의 다 됐습니다</h1>
+  <p class="sub">아래 확인 코드를 보내주시면 연결이 끝납니다.</p>
+  <div class="card">
+    <div class="code" id="code"></div>
+    <button class="copy" id="copy">코드 복사하기</button>
+    <p class="note">10분 안에 전달해 주세요. 시간이 지나면 이 페이지를 다시 열어 새로 받으면 됩니다.</p>
+  </div>
+</div>
+
+<div id="fail">
+  <h1>연결되지 않았습니다</h1>
+  <div class="card">
+    <p class="err" id="why" style="margin:0 0 14px;font-size:14.5px"></p>
+    <a class="btn" href="./invite.html">다시 시도하기</a>
+  </div>
+</div>
+
+<script>
+  var REST_KEY = "20a612fca871fa1bfb2140010bdc31cd";
+  var REDIRECT = "https://portailor.github.io/daily-brief/invite.html";
+  var p = new URLSearchParams(location.search);
+  var code = p.get("code"), err = p.get("error_description") || p.get("error");
+
+  function show(id){ document.getElementById(id).style.display = "block"; }
+
+  if (code) {
+    document.getElementById("start").style.display = "none";
+    document.getElementById("code").textContent = code;
+    show("done");
+    document.getElementById("copy").onclick = function(){
+      navigator.clipboard.writeText(code).then(function(){
+        document.getElementById("copy").textContent = "복사했습니다";
+      }, function(){
+        document.getElementById("copy").textContent = "위 코드를 길게 눌러 복사해 주세요";
+      });
+    };
+  } else if (err) {
+    document.getElementById("start").style.display = "none";
+    document.getElementById("why").textContent = err;
+    show("fail");
+  } else {
+    document.getElementById("go").href =
+      "https://kauth.kakao.com/oauth/authorize?client_id=" + REST_KEY +
+      "&redirect_uri=" + encodeURIComponent(REDIRECT) +
+      "&response_type=code&scope=talk_message";
+  }
+</script>
+</main></body></html>

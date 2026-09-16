@@ -48,6 +48,7 @@ jobs:
           REPORT_BASE_URL: ${{ secrets.REPORT_BASE_URL }}
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          KAKAO_FRIENDS: ${{ secrets.KAKAO_FRIENDS }}
         run: |
           mkdir -p config data
 
@@ -56,7 +57,7 @@ jobs:
           echo "── Secrets 등록 상태 ──"
           for name in KAKAO_REST_API_KEY KAKAO_CLIENT_SECRET KAKAO_REFRESH_TOKEN \
                       FRED_API_KEY ECOS_API_KEY DART_API_KEY FINNHUB_API_KEY \
-                      KRX_ID KRX_PW REPORT_BASE_URL NAVER_CLIENT_ID NAVER_CLIENT_SECRET; do
+                      KRX_ID KRX_PW REPORT_BASE_URL NAVER_CLIENT_ID NAVER_CLIENT_SECRET \n                      KAKAO_FRIENDS; do
             if [ -n "${!name}" ]; then
               echo "  OK      $name (${#name} chars name, value set)"
             else
@@ -89,6 +90,12 @@ jobs:
           NAVER_CLIENT_ID=$NAVER_CLIENT_ID
           NAVER_CLIENT_SECRET=$NAVER_CLIENT_SECRET
           EOF
+
+          # 함께 받을 사람 목록. 없으면 본인에게만 간다.
+          if [ -n "$KAKAO_FRIENDS" ]; then
+            printf '%s' "$KAKAO_FRIENDS" > config/friends.json
+            echo "친구 목록 파일 생성 완료"
+          fi
 
           python - <<'PY'
           import json, os, pathlib

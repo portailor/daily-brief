@@ -25,7 +25,9 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 TOKEN_PATH = ROOT / "config" / ".kakao_token.json"
 REDIRECT_URI = "http://localhost:5000/oauth"
 PORT = 5000
-SCOPE = "talk_message"
+# talk_message = 메시지 전송, friends = 카카오 서비스 내 친구목록.
+# friends 가 빠지면 친구 목록 조회(/v1/api/talk/friends)가 403 으로 막힌다.
+SCOPE = "talk_message,friends"
 
 AUTH_URL = "https://kauth.kakao.com/oauth/authorize"
 TOKEN_URL = "https://kauth.kakao.com/oauth/token"
@@ -101,6 +103,12 @@ def authorize(rest_api_key: str, client_secret: str = "") -> dict:
         raise RuntimeError(f"토큰 발급 실패 [{res.status_code}] {res.text}{hint}")
 
     token = res.json()
+    if "friends" not in token.get("scope", ""):
+        print("
+주의: 'friends' 동의항목이 빠졌습니다. 친구에게는 보낼 수 없습니다.")
+        print("      카카오 개발자 콘솔 > 카카오 로그인 > 동의항목에서")
+        print("      '카카오 서비스 내 친구목록'을 켠 뒤 다시 실행하세요.
+")
     if "talk_message" not in token.get("scope", ""):
         print("\n⚠ 경고: talk_message 스코프가 없습니다.")
         print("  카카오 로그인 > 동의항목 에서 '카카오톡 메시지 전송'을 활성화하세요.")

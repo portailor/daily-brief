@@ -327,10 +327,24 @@ def send() -> int:
     from brief.deliver import kakao                       # noqa: PLC0415
     try:
         kakao.send_text(box["message"], link_url=link, button_title="전체 브리핑 보기")
-        log("✓ 카카오톡 1건 발송")
+        log("✓ 카카오톡 1건 발송 (나에게)")
     except Exception as exc:                              # noqa: BLE001
         log(f"✗ 카카오 발송 실패: {exc}")
         return 1
+
+    # 친구 발송은 본인 발송과 분리한다. 친구 쪽이 막혀도 내 브리핑은 이미 갔고,
+    # 실패를 이유로 전체를 실패로 만들면 매일 아침 워크플로가 빨갛게 뜬다.
+    from brief.deliver import friends                     # noqa: PLC0415
+    if friends.load_recipients():
+        try:
+            sent, problems = friends.send_to_friends(
+                box["message"], link_url=link, button_title="전체 브리핑 보기")
+            if sent:
+                log(f"✓ 카카오톡 {len(sent)}건 발송 (친구: {', '.join(sent)})")
+            for why in problems:
+                log(f"△ 친구 발송 실패 — {why}")
+        except Exception as exc:                          # noqa: BLE001
+            log(f"△ 친구 발송 건너뜀: {exc}")
 
     log("완료")
     return 0

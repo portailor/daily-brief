@@ -5,6 +5,8 @@
 config/.env
 config/.env.*
 config/.kakao_token.json
+# 친구의 uuid·닉네임. 공개 저장소에 남기지 않고 GitHub Secret 으로만 전달한다.
+config/friends.json
 *token*.json
 *secret*
 *credential*
