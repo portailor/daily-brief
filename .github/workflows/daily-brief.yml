@@ -49,6 +49,9 @@ jobs:
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
           KAKAO_FRIENDS: ${{ secrets.KAKAO_FRIENDS }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
         run: |
           mkdir -p config data
 
@@ -57,7 +60,7 @@ jobs:
           echo "── Secrets 등록 상태 ──"
           for name in KAKAO_REST_API_KEY KAKAO_CLIENT_SECRET KAKAO_REFRESH_TOKEN \
                       FRED_API_KEY ECOS_API_KEY DART_API_KEY FINNHUB_API_KEY \
-                      KRX_ID KRX_PW REPORT_BASE_URL NAVER_CLIENT_ID NAVER_CLIENT_SECRET \n                      KAKAO_FRIENDS; do
+                      KRX_ID KRX_PW REPORT_BASE_URL NAVER_CLIENT_ID NAVER_CLIENT_SECRET \n                      KAKAO_FRIENDS SMTP_USER SMTP_PASS MAIL_TO; do
             if [ -n "${!name}" ]; then
               echo "  OK      $name (${#name} chars name, value set)"
             else
@@ -89,6 +92,9 @@ jobs:
           REPORT_BASE_URL=$REPORT_BASE_URL
           NAVER_CLIENT_ID=$NAVER_CLIENT_ID
           NAVER_CLIENT_SECRET=$NAVER_CLIENT_SECRET
+          SMTP_USER=$SMTP_USER
+          SMTP_PASS=$SMTP_PASS
+          MAIL_TO=$MAIL_TO
           EOF
 
           # 함께 받을 사람 목록. 없으면 본인에게만 간다.

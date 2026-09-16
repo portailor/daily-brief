@@ -408,6 +408,7 @@ def render(trade_date: str | None = None,
         "mode": mode,
         "week": week,
         "tiles": tiles,
+        "dashboard": dashboard,   # 메일 본문 표에 쓴다
         "detail": detail,
         "events": upcoming,
         # 새 거래일 데이터가 들어왔는지 판단하는 열쇠 — 한국·미국 대표 지수의 기준일

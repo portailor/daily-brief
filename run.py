@@ -293,7 +293,9 @@ def generate(args) -> int:
 
     _write_json(OUTBOX, {"message": message, "link": link,
                          "build_id": payload["build_id"],
-                         "brief_date": today.isoformat(), "is_new": is_new})
+                         "brief_date": today.isoformat(), "is_new": is_new,
+                         # 메일은 200자 제한이 없어 표도 함께 보낸다
+                         "dashboard": payload.get("dashboard", [])})
     log(f"✓ 발송 대기 메시지 준비 ({len(message)}자)")
 
     if failures:
@@ -334,6 +336,18 @@ def send() -> int:
 
     # 친구 발송은 본인 발송과 분리한다. 친구 쪽이 막혀도 내 브리핑은 이미 갔고,
     # 실패를 이유로 전체를 실패로 만들면 매일 아침 워크플로가 빨갛게 뜬다.
+    # 이메일 — 카카오톡 친구 발송은 받는 사람이 카카오디벨로퍼스 계정을 만들고
+    # 팀원 초대를 수락해야만 가능해서, 함께 받을 사람에게는 메일로 보낸다.
+    from brief.deliver import mailer                      # noqa: PLC0415
+    if mailer.recipients():
+        sent, problem = mailer.send(box["message"], link=link,
+                                    payload={"dashboard": box.get("dashboard", [])},
+                                    subject=f"경제 브리핑 {box.get('brief_date', '')}")
+        if sent:
+            log(f"✓ 이메일 발송: {', '.join(sent)}")
+        if problem:
+            log(f"△ 이메일 발송 실패 — {problem}")
+
     from brief.deliver import friends                     # noqa: PLC0415
     if friends.load_recipients():
         try:
