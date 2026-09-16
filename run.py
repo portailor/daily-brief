@@ -331,6 +331,9 @@ def send() -> int:
     try:
         kakao.send_text(box["message"], link_url=link, button_title="전체 브리핑 보기")
         log("✓ 카카오톡 1건 발송 (나에게)")
+        # 오늘 보냈다는 기록. 예약 실행을 두 번 걸어 두었기 때문에(정시 보장이 안 돼서)
+        # 앞의 실행이 이미 보냈으면 뒤의 실행은 이 값을 보고 아무것도 하지 않는다.
+        _write_json(STATE, {**_read_json(STATE), "sent_date": box.get("brief_date", "")})
     except Exception as exc:                              # noqa: BLE001
         log(f"✗ 카카오 발송 실패: {exc}")
         return 1

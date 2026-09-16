@@ -2,17 +2,22 @@ name: 매일 경제 브리핑
 
 on:
   schedule:
-    # UTC 20:45 = 한국시간 05:45.
-    # GitHub Actions 의 예약 실행은 정시를 보장하지 않는다. 06:45 로 걸었을 때
-    # 실제 시작은 08:22~08:32 로, 1시간 40분가량 밀렸다. 목표 도착이 07:30 이므로
-    # 그만큼 앞당겨 건다. 미국장 마감(KST 05:00)은 이 시각에 이미 지나 있다.
-    # 요일은 UTC 기준이다. UTC 일~금 20:45 = 한국시간 월~토 05:45.
-    # 한국시간 일요일은 새 거래가 없어 쉰다 (코드에서도 한 번 더 막는다).
-    - cron: '45 20 * * 0-5'
-  workflow_dispatch:        # 저장소 Actions 탭에서 수동 실행 가능
+    # ── 왜 두 번, 왜 새벽 3시 30분인가 ─────────────────────────
+    # GitHub 의 예약 실행은 정시를 보장하지 않는다. 05:45 로 걸었을 때 실제 시작은
+    # 9/13~16 나흘 내내 08:10~08:32 — 매일 2시간 반가량 밀렸다.
+    # 그래서 훨씬 일찍 걸고, 일찍 시작되면 그 자리에서 기다렸다가 정해진 시각에 보낸다.
+    #   ① 미국장 마감 + 데이터 반영까지 기다린 뒤 생성 (06:15)
+    #   ② 발송 시각까지 기다린 뒤 발송 (07:25 → 카톡 도착 07:30 전후)
+    # 둘째 줄은 첫 예약이 누락될 때를 위한 예비다. 첫 실행이 이미 보냈으면
+    # 둘째 실행은 state.json 의 sent_date 를 보고 곧바로 끝난다.
+    # 요일은 UTC 기준: UTC 일~금 = 한국시간 월~토. 한국시간 일요일은 쉰다.
+    # 공개 저장소라 기다리는 시간도 Actions 사용량 요금이 붙지 않는다.
+    - cron: '30 18 * * 0-5'     # 한국시간 03:30
+    - cron: '45 20 * * 0-5'     # 한국시간 05:45 (예비)
+  workflow_dispatch:            # 수동 실행은 기다리지 않고 바로 만들고 보낸다
 
 permissions:
-  contents: write           # 리포트와 예측 기록을 커밋하기 위해 필요
+  contents: write           # 리포트와 기록을 커밋하기 위해 필요
 
 concurrency:
   group: daily-brief
@@ -21,20 +26,55 @@ concurrency:
 jobs:
   brief:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 03:30 에 시작하면 07:25 발송까지 약 4시간을 기다린다
+    timeout-minutes: 330
 
     steps:
       - uses: actions/checkout@v5
 
+      - name: 오늘 이미 보냈는지 확인
+        id: guard
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          from datetime import datetime, timedelta, timezone
+          today = (datetime.now(timezone.utc) + timedelta(hours=9)).date().isoformat()
+          p = pathlib.Path("data/state.json")
+          sent = json.loads(p.read_text(encoding="utf-8")).get("sent_date") if p.exists() else None
+          skip = os.environ["EVENT"] == "schedule" and sent == today
+          print(f"오늘(한국) {today} · 마지막 발송 {sent} · 건너뜀 {skip}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              print(f"skip={'true' if skip else 'false'}", file=f)
+          PY
+
+      - name: 미국장 마감 반영까지 대기 (한국시간 06:15)
+        if: steps.guard.outputs.skip != 'true' && github.event_name == 'schedule'
+        # 미국 정규장 마감은 한국시간 05:00(서머타임) 또는 06:00(표준시).
+        # 겨울에도 전날 미국 종가가 확정된 뒤에 만들도록 06:15 까지 기다린다.
+        run: |
+          target=$(TZ=Asia/Seoul date -d "today 06:15" +%s)
+          now=$(date +%s)
+          if [ "$now" -lt "$target" ]; then
+            echo "$(( (target - now) / 60 ))분 대기"
+            sleep $(( target - now ))
+          else
+            echo "이미 지남 — 바로 진행"
+          fi
+
       - uses: actions/setup-python@v6
+        if: steps.guard.outputs.skip != 'true'
         with:
           python-version: '3.12'
           cache: pip
 
       - name: 의존성 설치
+        if: steps.guard.outputs.skip != 'true'
         run: pip install -r requirements.txt
 
       - name: 자격증명 파일 생성
+        if: steps.guard.outputs.skip != 'true'
         env:
           KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
           KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
@@ -115,15 +155,16 @@ jobs:
           print("자격증명 파일 생성 완료")
           PY
 
-      # 순서가 중요하다: 생성 → 웹에 올리기 → 링크가 열리는지 확인 → 발송.
-      # 예전에는 발송이 먼저라, 카톡을 받자마자 링크를 누르면 전날 페이지가 보였다.
+      # 순서: 생성 → 웹에 올리기 → (발송 시각까지 대기) → 링크 반영 확인 → 발송
       - name: 브리핑 생성
+        if: steps.guard.outputs.skip != 'true'
         env:
           PYTHONUTF8: '1'
           TZ: Asia/Seoul
         run: python run.py --no-send --no-publish
 
       - name: 리포트와 기록 올리기
+        if: steps.guard.outputs.skip != 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -135,11 +176,58 @@ jobs:
             git push
           fi
 
+      - name: 발송 시각까지 대기 (한국시간 07:25)
+        if: steps.guard.outputs.skip != 'true' && github.event_name == 'schedule'
+        run: |
+          target=$(TZ=Asia/Seoul date -d "today 07:25" +%s)
+          now=$(date +%s)
+          if [ "$now" -lt "$target" ]; then
+            echo "$(( (target - now) / 60 ))분 대기"
+            sleep $(( target - now ))
+          else
+            echo "이미 지남 — 바로 발송"
+          fi
+
       - name: 카카오톡 발송
+        if: steps.guard.outputs.skip != 'true'
         env:
           PYTHONUTF8: '1'
           TZ: Asia/Seoul
         run: python run.py --send-only
+
+      - name: 발송 기록 올리기
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          git add data/state.json
+          if git diff --cached --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "발송 기록 $(TZ=Asia/Seoul date +%Y-%m-%d)"
+            git pull --rebase -q origin main && git push
+          fi
+
+      # ── 카카오 토큰 자동 교체 ───────────────────────────────
+      # 카카오는 refresh_token 잔여 기간이 1개월 미만일 때 새 토큰(60일)을 준다.
+      # 매일 도니까 그때마다 Secret 을 갈아 끼우면 토큰은 영영 만료되지 않는다.
+      # 기본 GITHUB_TOKEN 은 Secret 을 쓸 권한이 없어 SECRETS_PAT 이 필요하다.
+      - name: 카카오 토큰 자동 교체
+        if: always() && steps.guard.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.SECRETS_PAT }}
+        run: |
+          f=data/.kakao_refresh_rotated
+          if [ ! -s "$f" ]; then
+            echo "새 토큰 없음 — 교체할 것 없음"
+            exit 0
+          fi
+          echo "::add-mask::$(cat "$f")"
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::카카오 토큰이 새로 발급됐지만 SECRETS_PAT 이 없어 자동 교체하지 못했습니다. 로컬에서 kakao_auth.py 재인증 후 Secret 을 갱신하세요."
+            exit 0
+          fi
+          gh secret set KAKAO_REFRESH_TOKEN --repo "$GITHUB_REPOSITORY" < "$f"
+          echo "✓ KAKAO_REFRESH_TOKEN 자동 교체 완료"
+          rm -f "$f"
 
       - name: 실행 로그 남기기
         if: always()

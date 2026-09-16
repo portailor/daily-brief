@@ -10,6 +10,7 @@ access_token 은 6시간이면 만료되므로 매 발송마다 refresh_token �
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -18,6 +19,8 @@ import requests
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 TOKEN_PATH = ROOT / "config" / ".kakao_token.json"
+# 새로 발급된 refresh_token 을 워크플로에 넘기는 자리. data/* 라 커밋되지 않는다.
+ROTATED = ROOT / "data" / ".kakao_refresh_rotated"
 
 sys.path.insert(0, str(ROOT))
 from brief.retry import with_retry  # noqa: E402
@@ -66,20 +69,26 @@ def refresh_access_token() -> str:
     tok = res.json()
     cfg["access_token"] = tok["access_token"]
 
-    # 카카오는 refresh_token 잔여 기간이 1개월 미만일 때만 새 것을 내려준다.
-    # 즉 이 값이 왔다는 건 "곧 만료된다"는 신호다.
-    # GitHub Actions 는 자기 Secret 을 고칠 수 없으므로 자동 저장이 불가능하다.
-    # 조용히 끊기면 어느 날 갑자기 브리핑이 안 오므로, 크게 알린다.
+    # 카카오는 refresh_token 잔여 기간이 1개월 미만일 때만 새 것(60일)을 내려준다
+    # (카카오 로그인 REST API 문서 '토큰 갱신하기'). 매일 돌기 때문에, 이때마다
+    # 새 값을 저장해 두면 토큰은 영영 만료되지 않는다.
+    #
+    # 클라우드에서는 이 파일이 실행이 끝나면 사라지므로, 새 값을 ROTATED 에 남기고
+    # 워크플로의 다음 단계가 GitHub Secret 을 갈아 끼운다.
+    #
+    # 저장소가 공개라 Actions 로그도 누구나 볼 수 있다. 토큰 값은 절대 출력하지
+    # 않는다. 혹시 다른 곳에서 찍히더라도 가려지도록 마스킹을 먼저 등록한다.
     if "refresh_token" in tok:
-        cfg["refresh_token"] = tok["refresh_token"]
+        new_rt = tok["refresh_token"]
+        if os.getenv("GITHUB_ACTIONS") == "true":
+            print(f"::add-mask::{new_rt}")
+        cfg["refresh_token"] = new_rt
         cfg["refresh_rotated_at"] = time.strftime("%Y-%m-%d %H:%M")
-        print("\n" + "!" * 58)
-        print("  카카오 refresh_token 이 갱신됐습니다 (만료 임박 신호).")
-        print("  클라우드에서 돌고 있다면 GitHub Secrets 의")
-        print("  KAKAO_REFRESH_TOKEN 을 아래 값으로 바꿔야 합니다:")
-        print(f"\n  {tok['refresh_token']}\n")
-        print("  바꾸지 않으면 한 달 안에 발송이 멈춥니다.")
-        print("!" * 58 + "\n")
+        ROTATED.parent.mkdir(parents=True, exist_ok=True)
+        ROTATED.write_text(new_rt, encoding="utf-8")
+        days = int(tok.get("refresh_token_expires_in", 0)) // 86400
+        print(f"카카오 refresh_token 이 새로 발급됐습니다 (유효 {days}일). "
+              "값은 로그에 남기지 않습니다.")
 
     _save(cfg)
     return cfg["access_token"]
