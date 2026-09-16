@@ -31,6 +31,7 @@ INVITE_REDIRECT = "https://portailor.github.io/daily-brief/invite.html"
 LIST_URL = "https://kapi.kakao.com/v1/api/talk/friends"
 SEND_URL = "https://kapi.kakao.com/v1/api/talk/friends/message/default/send"
 MAX_RECEIVERS = 5           # 카카오 제한: 한 요청에 최대 5명
+NL = chr(10)
 
 
 def fetch_friends(access_token: str) -> list[dict]:
@@ -40,10 +41,18 @@ def fetch_friends(access_token: str) -> list[dict]:
         params={"limit": 100}, timeout=20), label="카카오 친구 목록")
 
     if res.status_code != 200:
-        raise KakaoError(
-            f"친구 목록 조회 실패 [{res.status_code}] {res.text}\n"
-            "'카카오 서비스 내 친구목록' 동의항목이 켜져 있고, "
-            "재인증(kakao_auth.py)을 마쳤는지 확인하세요.")
+        body = res.text
+        if "team member" in body:
+            why = ("  검수받지 않은 앱은 '팀원'으로 등록된 사람에게만 쓸 수 있습니다." + NL +
+                   "  콘솔 > 앱 설정 > 멤버 에서 받을 사람을 팀원으로 초대하고," + NL +
+                   "  그 사람이 초대를 수락한 뒤 다시 실행하세요.")
+        elif "scope" in body:
+            why = ("  '카카오 서비스 내 친구목록' 동의항목이 꺼져 있습니다." + NL +
+                   "  콘솔 > 카카오 로그인 > 동의항목에서 '이용 중 동의'로 켠 뒤," + NL +
+                   "  python brief/deliver/kakao_auth.py 로 재인증하세요.")
+        else:
+            why = "  동의항목과 재인증(kakao_auth.py) 상태를 확인하세요."
+        raise KakaoError(f"친구 목록 조회 실패 [{res.status_code}] {body}" + NL + why)
     return res.json().get("elements", [])
 
 
