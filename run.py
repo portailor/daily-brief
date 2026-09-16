@@ -294,8 +294,9 @@ def generate(args) -> int:
     _write_json(OUTBOX, {"message": message, "link": link,
                          "build_id": payload["build_id"],
                          "brief_date": today.isoformat(), "is_new": is_new,
-                         # 메일은 200자 제한이 없어 표도 함께 보낸다
-                         "dashboard": payload.get("dashboard", [])})
+                         # 메일은 200자 제한이 없어 표와 상세도 함께 보낸다
+                         "dashboard": payload.get("dashboard", []),
+                         "detail": payload.get("detail", {})})
     log(f"✓ 발송 대기 메시지 준비 ({len(message)}자)")
 
     if failures:
@@ -341,7 +342,8 @@ def send() -> int:
     from brief.deliver import mailer                      # noqa: PLC0415
     if mailer.recipients():
         sent, problem = mailer.send(box["message"], link=link,
-                                    payload={"dashboard": box.get("dashboard", [])},
+                                    payload={"dashboard": box.get("dashboard", []),
+                                             "detail": box.get("detail", {})},
                                     subject=f"경제 브리핑 {box.get('brief_date', '')}")
         if sent:
             log(f"✓ 이메일 발송: {', '.join(sent)}")
