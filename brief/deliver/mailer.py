@@ -8,8 +8,8 @@
 브리핑 하나 받자고 시킬 일이 아니라서 이메일 경로를 따로 둔다.
 받는 사람은 가입할 것이 없고, 주소만 있으면 된다.
 
-카카오톡의 200자 제한이 없으니 요약을 조금 더 담는다. 다만 길다고 좋은 게
-아니라서, 표로 끊어 한눈에 들어오게 하고 중요한 것만 남긴다.
+메일은 짧게 간다. 세 줄 요약 + 막대그래프 두 개 + 외국인 매매 두 줄 + 링크.
+전체 표는 넣지 않는다 — 링크를 누르면 어차피 다 보인다(동화님 피드백).
 여기서 새로 쓰는 문장은 없다 — 전부 이미 계산된 값을 옮겨 담을 뿐이다.
 
   SMTP_HOST / SMTP_PORT   기본값은 Gmail
@@ -34,8 +34,17 @@ from brief.collect.macro import _load_env  # noqa: E402
 DEFAULT_HOST = "smtp.gmail.com"
 DEFAULT_PORT = 465
 
-UP, DOWN, FLAT = "#c0392b", "#1d6fb8", "#6b7280"
-CARD_IDS = ("KOSPI", "KOSDAQ", "SPX", "NASDAQ", "USDKRW", "US10Y")
+UP, DOWN, FLAT = "#d64545", "#2f6fd6", "#9ca3af"
+TRACK = "#f1f3f5"
+
+# 막대그래프에 올릴 지표. 금리(bp)는 %와 눈금이 달라 섞지 않는다.
+BAR_IDS = ("KOSPI", "KOSDAQ", "SPX", "NASDAQ", "USDKRW")
+
+# ── 메일 호환 원칙 ───────────────────────────────────────────
+# 받는 사람이 Gmail·네이버·다음·Outlook 어느 것을 쓸지 모른다. 이 중 가장 좁은
+# 쪽에 맞춘다: 레이아웃은 전부 <table>, 스타일은 전부 인라인, 색은 bgcolor
+# 속성을 함께 준다. SVG·스크립트·flex·class·외부 CSS 는 쓰지 않는다
+# (Gmail 은 SVG 를 지우고, 네이버·Outlook 은 flex 를 무시한다).
 
 
 def recipients() -> list[str]:
@@ -43,20 +52,22 @@ def recipients() -> list[str]:
     return [a.strip() for a in raw.replace(";", ",").split(",") if a.strip()]
 
 
-# ── 본문 조각들 ──────────────────────────────────────────────
-
-def _color(direction: str) -> str:
-    return {"up": UP, "down": DOWN}.get(direction, FLAT)
-
-
 def _name(row: dict) -> str:
-    """지표 이름만 꺼낸다.
-
-    name_html 은 <span class="term">코스피<span class="tip">…설명…</span></span>
-    꼴이라, 태그만 걷어내면 말풍선 설명까지 이름 뒤에 눌어붙는다.
-    """
+    """name_html 은 <span class="term">코스피<span class="tip">…</span></span> 꼴.
+    태그만 걷어내면 말풍선 설명까지 이름 뒤에 눌어붙으므로 말풍선 앞에서 자른다."""
     raw = row.get("name_html", "").split('<span class="tip"', 1)[0]
     return html.unescape(re.sub(r"<[^>]+>", "", raw)).strip()
+
+
+def _num(text: str) -> float | None:
+    """'-3.26%' → -3.26. 퍼센트가 아니면 None."""
+    t = str(text or "").strip().replace("−", "-")
+    if not t.endswith("%"):
+        return None
+    try:
+        return float(t[:-1].replace(",", "").replace("+", ""))
+    except ValueError:
+        return None
 
 
 def _eok(v: float) -> str:
@@ -64,54 +75,44 @@ def _eok(v: float) -> str:
     return f"{a / 10_000:.1f}조" if a >= 10_000 else f"{a:,.0f}억"
 
 
-def _h2(text: str) -> str:
-    return (f'<div style="font-size:11.5px;font-weight:700;color:#6b7280;'
-            f'letter-spacing:.4px;margin:22px 0 7px">{html.escape(text)}</div>')
+def _title(text: str, first: bool = False) -> str:
+    top = 14 if first else 22
+    return (f'<tr><td style="padding:{top}px 0 8px 0;font-size:12px;font-weight:bold;'
+            f'color:#6b7280">{html.escape(text)}</td></tr>')
 
 
-def _cards(dash: list) -> str:
-    """대표 지표 여섯 개 — 표를 읽기 전에 눈에 먼저 들어오는 층."""
-    pick = [r for i in CARD_IDS for r in dash if r.get("id") == i]
-    if not pick:
+def _bars(items: list[tuple[str, float]]) -> str:
+    """가운데를 0으로 두고 오른쪽(빨강)·왼쪽(파랑)으로 뻗는 막대.
+
+    막대 길이는 이 묶음에서 가장 크게 움직인 값을 100% 로 잡은 상대 길이다.
+    숫자는 옆에 그대로 적으므로 길이만 보고 오해할 일은 없다.
+    """
+    if not items:
         return ""
-    cells = [
-        f'<td style="width:33%;padding:10px 6px;text-align:center;'
-        f'background:#f8f9fb;border-radius:9px">'
-        f'<div style="font-size:11px;color:#6b7280">{html.escape(_name(r))}</div>'
-        f'<div style="font-size:16.5px;font-weight:700;margin:2px 0 1px">'
-        f'{html.escape(str(r.get("close", "")))}</div>'
-        f'<div style="font-size:12.5px;font-weight:700;color:{_color(r.get("dir", ""))}">'
-        f'{html.escape(str(r.get("change", "")))}</div></td>'
-        for r in pick]
-    rows = "".join(f'<tr>{"".join(cells[i:i + 3])}</tr>'
-                   for i in range(0, len(cells), 3))
-    return (f'<table style="width:100%;border-collapse:separate;'
-            f'border-spacing:5px;margin:14px 0 0">{rows}</table>')
-
-
-def _two_col(left_title: str, left: list, right_title: str, right: list) -> str:
-    def col(title: str, items: list) -> str:
-        lis = "".join(f'<div style="font-size:13.5px;padding:2.5px 0">{x}</div>'
-                      for x in items)
-        return (f'<td style="width:50%;vertical-align:top;padding:0 5px">'
-                f'<div style="font-size:11px;font-weight:700;color:#9ca3af;'
-                f'margin-bottom:3px">{html.escape(title)}</div>{lis}</td>')
-    return (f'<table style="width:100%;border-collapse:collapse">'
-            f'<tr>{col(left_title, left)}{col(right_title, right)}</tr></table>')
-
-
-def _pct(name: str, pct: float) -> str:
-    return (f'{html.escape(name)} <b style="color:{UP if pct > 0 else DOWN}">'
-            f'{pct:+.1f}%</b>')
-
-
-def _sectors(kr: dict) -> str:
-    sec = kr.get("sectors") or []
-    if len(sec) < 4:
-        return ""
-    return (_h2("업종 — 어디가 오르고 어디가 내렸나")
-            + _two_col("오른 업종", [_pct(x["name"], x["chg_pct"]) for x in sec[:3]],
-                       "내린 업종", [_pct(x["name"], x["chg_pct"]) for x in sec[-3:][::-1]]))
+    peak = max(abs(v) for _, v in items) or 1.0
+    rows = []
+    for label, v in items:
+        w = max(2, round(abs(v) / peak * 100))            # 0 에 가까워도 점은 보이게
+        color = UP if v > 0 else DOWN if v < 0 else FLAT
+        bar = (f'<table width="{w}%" cellpadding="0" cellspacing="0" border="0" '
+               f'align="{"left" if v >= 0 else "right"}"><tr>'
+               f'<td height="10" bgcolor="{color}" style="background:{color};'
+               f'height:10px;line-height:10px;font-size:1px">&nbsp;</td></tr></table>')
+        left = bar if v < 0 else "&nbsp;"
+        right = bar if v >= 0 else "&nbsp;"
+        rows.append(
+            f'<tr>'
+            f'<td width="92" style="width:92px;padding:5px 6px 5px 0;font-size:13px;'
+            f'color:#1f2328;white-space:nowrap">{html.escape(label)}</td>'
+            f'<td width="40%" bgcolor="{TRACK}" style="background:{TRACK};padding:0">{left}</td>'
+            f'<td width="1" bgcolor="#c9ced4" style="background:#c9ced4;padding:0;'
+            f'font-size:1px">&nbsp;</td>'
+            f'<td width="40%" bgcolor="{TRACK}" style="background:{TRACK};padding:0">{right}</td>'
+            f'<td width="60" align="right" style="padding:5px 0 5px 8px;font-size:13px;'
+            f'font-weight:bold;color:{color};white-space:nowrap">{v:+.2f}%</td>'
+            f'</tr>')
+    return (f'<tr><td><table width="100%" cellpadding="0" cellspacing="0" border="0">'
+            f'{"".join(rows)}</table></td></tr>')
 
 
 def _foreign(kr: dict) -> str:
@@ -119,55 +120,13 @@ def _foreign(kr: dict) -> str:
     if not f.get("buy") or not f.get("sell"):
         return ""
 
-    def fmt(x: dict) -> str:
-        chg = x.get("chg_pct", 0)
-        return (f'{html.escape(x["name"])} <b>{_eok(x["net_eok"])}</b>'
-                f'<span style="color:{UP if chg > 0 else DOWN};font-size:12px">'
-                f' {chg:+.1f}%</span>')
+    def line(tag: str, color: str, xs: list) -> str:
+        names = " · ".join(f'{html.escape(x["name"])} {_eok(x["net_eok"])}' for x in xs[:2])
+        return (f'<tr><td style="padding:3px 0;font-size:13.5px;color:#1f2328">'
+                f'<b style="color:{color}">{tag}</b>&nbsp; {names}</td></tr>')
 
-    return (_h2("외국인이 산 종목 · 판 종목")
-            + _two_col("많이 산 종목", [fmt(x) for x in f["buy"][:3]],
-                       "많이 판 종목", [fmt(x) for x in f["sell"][:3]]))
-
-
-def _movers(kr: dict) -> str:
-    gain, lose = kr.get("gainers") or [], kr.get("losers") or []
-    if not gain and not lose:
-        return ""
-    return (_h2("크게 움직인 종목")
-            + _two_col("많이 오른 종목", [_pct(x["name"], x["chg_pct"]) for x in gain[:3]],
-                       "많이 내린 종목", [_pct(x["name"], x["chg_pct"]) for x in lose[:3]]))
-
-
-def _breadth(kr: dict) -> str:
-    b = kr.get("breadth") or {}
-    parts = [f'<span style="margin-right:16px">{m} '
-             f'<b style="color:{UP}">오름 {b[m]["up"]}</b> · '
-             f'<b style="color:{DOWN}">내림 {b[m]["down"]}</b></span>'
-             for m in ("KOSPI", "KOSDAQ") if b.get(m)]
-    if not parts:
-        return ""
-    return (_h2("오른 종목 수 / 내린 종목 수")
-            + f'<div style="font-size:13.5px">{"".join(parts)}</div>')
-
-
-def _rows(dash: list) -> str:
-    out = []
-    for r in dash:
-        asof = str(r.get("asof", "") or "")
-        badge = (f'<span style="color:#b6bbc2;font-size:11px;margin-left:5px">'
-                 f'{html.escape(asof)}</span>' if asof else "")
-        out.append(
-            f'<tr><td style="padding:6px 8px;border-bottom:1px solid #f1f2f4;'
-            f'font-size:13.5px">{html.escape(_name(r))}{badge}</td>'
-            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f2f4;'
-            f'text-align:right;font-size:13.5px">{html.escape(str(r.get("close", "")))}</td>'
-            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f2f4;text-align:right;'
-            f'font-size:13.5px;font-weight:600;color:{_color(r.get("dir", ""))}">'
-            f'{html.escape(str(r.get("change", "")))}</td></tr>')
-    if not out:
-        return ""
-    return f'<table style="width:100%;border-collapse:collapse">{"".join(out)}</table>'
+    return (_title("외국인이 가장 많이 산 · 판 종목")
+            + line("산 종목", UP, f["buy"]) + line("판 종목", DOWN, f["sell"]))
 
 
 def build_html(message: str, link: str | None, payload: dict | None) -> str:
@@ -175,39 +134,58 @@ def build_html(message: str, link: str | None, payload: dict | None) -> str:
     dash = payload.get("dashboard") or []
     kr = (payload.get("detail") or {}).get("kr") or {}
 
-    lines = [line.strip() for line in message.splitlines() if line.strip()]
+    lines = [x.strip() for x in message.splitlines() if x.strip()]
     title = lines[0] if lines else "경제 브리핑"
-    summary = "".join(
-        f'<div style="font-size:14.5px;padding:3px 0">{html.escape(line)}</div>'
-        for line in lines[1:] if not line.startswith("종목·업종 상세"))
+    # 카톡의 세 줄 요약은 싣지 않는다. 아래 그래프(지수·업종)와 외국인 줄이
+    # 같은 내용을 더 한눈에 보여주므로, 넣으면 같은 숫자를 두 번 읽게 된다.
 
-    btn = (f'<div style="margin:26px 0 0"><a href="{html.escape(link)}" '
-           f'style="display:block;text-align:center;background:#2563eb;color:#fff;'
-           f'text-decoration:none;padding:14px;border-radius:9px;font-weight:700;'
-           f'font-size:15px">전체 브리핑 보기</a></div>'
-           f'<div style="font-size:11.5px;color:#9ca3af;text-align:center;margin-top:7px">'
-           f'시가총액 상위 · 업종 전체 · 공시와 뉴스 · 오늘의 시사상식</div>'
-           if link else "")
+    # 지수·환율 등락 막대
+    idx = []
+    for i in BAR_IDS:
+        for r in dash:
+            v = _num(r.get("change")) if r.get("id") == i else None
+            if v is not None:
+                idx.append((_name(r), v))
+
+    # 업종 — 가장 오른 셋, 가장 내린 셋
+    sec = kr.get("sectors") or []
+    sec_items = ([(s["name"], s["chg_pct"]) for s in sec[:3]]
+                 + [(s["name"], s["chg_pct"]) for s in sec[-3:]]) if len(sec) >= 6 else []
+
+    button = ""
+    if link:
+        button = (
+            f'<tr><td style="padding:24px 0 0 0">'
+            f'<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
+            f'<td align="center" bgcolor="#2563eb" style="background:#2563eb;padding:13px 0">'
+            f'<a href="{html.escape(link)}" target="_blank" style="color:#ffffff;'
+            f'font-size:15px;font-weight:bold;text-decoration:none">전체 브리핑 보기 →</a>'
+            f'</td></tr></table>'
+            f'<div style="padding-top:6px;font-size:11.5px;color:#9ca3af;text-align:center">'
+            f'전체 지표 · 시가총액 상위 · 공시와 뉴스 · 오늘의 시사상식</div></td></tr>')
 
     return (
         '<!DOCTYPE html><html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1"></head>'
-        '<body style="margin:0;background:#f4f5f7;padding:20px 10px;'
-        "font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;"
-        'color:#1a1d21;line-height:1.65">'
-        '<div style="max-width:580px;margin:0 auto;background:#fff;'
-        'border-radius:14px;padding:24px 20px">'
-        f'<div style="font-size:17px;font-weight:800;padding-bottom:11px;'
-        f'border-bottom:2px solid #1a1d21">{html.escape(title)}</div>'
-        f'<div style="margin-top:11px">{summary}</div>'
-        f'{_cards(dash)}{_sectors(kr)}{_foreign(kr)}{_movers(kr)}{_breadth(kr)}'
-        f'{_h2("오늘의 시장 전체")}{_rows(dash)}{btn}'
-        '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #eef0f2;'
-        'font-size:11.5px;color:#9ca3af;line-height:1.6">'
-        '한국거래소 · 미 연준 FRED · 한국은행 ECOS · 금융감독원 DART 의 공식 '
-        '데이터로 자동 작성했습니다. 사람이 쓴 전망이나 추천은 들어 있지 않습니다.<br>'
-        '투자 판단과 그 결과에 대한 책임은 읽는 사람 본인에게 있습니다.'
-        '</div></div></body></html>')
+        '<body style="margin:0;padding:0;background:#f4f5f7">'
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f5f7">'
+        '<tr><td align="center" style="padding:18px 10px">'
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" '
+        'style="max-width:520px;background:#ffffff;font-family:\'Malgun Gothic\','
+        '\'Apple SD Gothic Neo\',sans-serif;line-height:1.6">'
+        '<tr><td style="padding:22px 20px 20px 20px">'
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0">'
+        f'<tr><td style="padding-bottom:10px;border-bottom:2px solid #1f2328;font-size:17px;'
+        f'font-weight:bold;color:#1f2328">{html.escape(title)}</td></tr>'
+        + (_title("지수 · 환율 등락", first=True) + _bars(idx) if idx else "")
+        + (_title("업종 — 가장 오른 셋 · 가장 내린 셋") + _bars(sec_items) if sec_items else "")
+        + _foreign(kr)
+        + button
+        + '<tr><td style="padding-top:18px;font-size:11px;color:#9ca3af;line-height:1.55">'
+          '한국거래소 · 미 연준 FRED · 한국은행 ECOS 공식 데이터로 자동 작성했습니다. '
+          '전망이나 추천은 없으며, 투자 판단의 책임은 본인에게 있습니다.</td></tr>'
+        '</table></td></tr></table>'
+        '</td></tr></table></body></html>')
 
 
 def send(message: str, link: str | None = None, payload: dict | None = None,
