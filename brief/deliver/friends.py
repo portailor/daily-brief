@@ -81,12 +81,20 @@ def connect(code: str) -> str:
             "코드는 10분이면 만료되고 한 번만 쓸 수 있습니다. "
             "초대 페이지를 다시 열어 새 코드를 받으세요.")
 
-    me = requests.get("https://kapi.kakao.com/v2/user/me",
-                      headers={"Authorization": f"Bearer {res.json()['access_token']}"},
-                      timeout=20)
+    tok = res.json()
+    auth = {"Authorization": f"Bearer {tok['access_token']}"}
+    me = requests.get("https://kapi.kakao.com/v2/user/me", headers=auth, timeout=20)
     nick = ""
     if me.status_code == 200:
         nick = (me.json().get("properties") or {}).get("nickname", "")
+
+    # 친구 목록에 안 나타날 때 원인을 바로 보기 위해, 실제로 동의한 항목을 확인한다
+    sc = requests.get("https://kapi.kakao.com/v2/user/scopes", headers=auth, timeout=20)
+    if sc.status_code == 200:
+        agreed = {x["id"]: x.get("agreed") for x in sc.json().get("scopes", [])}
+        print(f"  토큰 scope: {tok.get('scope', '')}")
+        for key in ("friends", "talk_message"):
+            print(f"  {key:<13} 동의: {'예' if agreed.get(key) else '아니오'}")
     return nick
 
 
