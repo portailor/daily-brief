@@ -178,20 +178,6 @@
   .verdict-row .detail{display:block; font-size:12.5px; color:var(--dim);
                        font-family:var(--mono); margin-top:2px}
 
-  /* 지표별 성적. 전체 숫자 하나로는 어느 지표가 끌어내리는지 안 보인다. */
-  .bd{margin-top:14px; padding-top:12px; border-top:1px solid var(--line)}
-  .bd summary{font-size:13px; color:var(--dim); cursor:pointer}
-  .bd-row{display:grid; grid-template-columns:minmax(84px,auto) 1fr 64px;
-          gap:10px; align-items:center; padding:7px 0; font-size:13.5px}
-  .bd-row + .bd-row{border-top:1px solid var(--line)}
-  .bd-bar{height:6px; background:var(--line); border-radius:4px;
-          overflow:hidden; position:relative}
-  .bd-fill{height:100%; border-radius:4px; background:var(--accent)}
-  .bd-fill.weak{background:var(--flat)}
-  .bd-ci{position:absolute; top:0; height:100%; background:var(--accent); opacity:.22}
-  .bd-n{font-family:var(--mono); font-size:12.5px; color:var(--dim);
-        text-align:right; white-space:nowrap}
-
   /* ── 트리거 ───────────────────────────── */
   .trig{padding:12px 0}
   .trig + .trig{border-top:1px solid var(--line)}
@@ -316,55 +302,6 @@
 </section>
 
 {% include 'calendar.html.j2' %}
-{% endif %}
-
-{% if score.total or score.resolved or track.total %}
-<section>
-  <h2>어제 예측 채점</h2>
-  <div class="card">
-    <div class="score-head">
-      <span class="score-big">{{ score.hit }}/{{ score.total_today }}</span>
-      <span class="score-note">
-        {% if track.total %}
-          누적 {{ track.hit }}/{{ track.total }} · 적중률 {{ '%.0f'|format(track.accuracy*100) }}%
-          (최근 {{ track.window_days }}일)
-        {% else %}
-          누적 기록은 며칠 쌓인 뒤부터 표시됩니다
-        {% endif %}
-      </span>
-    </div>
-    {% for r in score.resolved %}
-    <div class="verdict-row">
-      <span class="mark {{ 'hit' if r.result=='hit' else 'miss' }}">{{ 'O' if r.result=='hit' else 'X' }}</span>
-      <span>{{ r.claim }}
-        <span class="detail">실제 {{ '%.3f'|format(r.actual) }} · 기준 {{ r.op }} {{ '%.3f'|format(r.threshold) }}</span>
-      </span>
-    </div>
-    {% endfor %}
-
-    {% if breakdown %}
-    <details class="bd">
-      <summary>지표별로 갈라 보기 ({{ breakdown|length }}개)</summary>
-      {% for b in breakdown %}
-      <div class="bd-row">
-        <span>{{ b.name }}</span>
-        <span class="bd-bar">
-          <span class="bd-ci" style="left:{{ b.ci_lo }}%; width:{{ b.ci_w }}%"></span>
-          <span class="bd-fill {{ 'weak' if b.uncertain }}"
-                style="width:{{ 0 if b.uncertain else b.pct }}%"></span>
-        </span>
-        <span class="bd-n">{{ b.hit }}/{{ b.total }}</span>
-      </div>
-      {% endfor %}
-      <p class="hint" style="margin-top:10px">
-        적중률이 낮은 순입니다. 연한 띠는 95% 구간 — 표본이 적어 폭이 넓으면
-        그만큼 단정할 수 없다는 뜻이고, 그럴 때는 진한 막대를 그리지 않습니다.
-        3번 이상 채점된 지표만 나옵니다.
-      </p>
-    </details>
-    {% endif %}
-  </div>
-</section>
 {% endif %}
 
 <section>
