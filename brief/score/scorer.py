@@ -66,22 +66,41 @@ ALLOWED_FIELDS = {"close", "chg", "chg_pct", "chg_bp", "sigma", "pct_52w",
                   "vs_ma20", "vs_ma200", "streak"}
 
 
-def score_pending() -> ScoreCard:
-    """아직 채점 안 된 예측 중 기한이 도래한 것을 전부 처리한다."""
+def score_pending(db_path: Path | str | None = None,
+                  config_path: Path | str | None = None) -> ScoreCard:
+    """아직 채점 안 된 예측 중 기한이 도래한 것을 전부 처리한다.
+
+    경로 인자는 테스트에서 임시 DB·설정을 넣기 위한 것이다. 평소에는 비워 둔다.
+    """
     card = ScoreCard(resolved=[])
 
-    # 정책금리처럼 예측 대상에서 뺀 지표(settings.yaml 의 predict: false)는
-    # 과거에 만들어져 채점까지 끝난 기록도 무효로 돌린다. 적중률을 오염시키기 때문이다.
-    from brief.collect.market import load_instruments
-    excluded = [i.id for i in load_instruments() if not i.can_claim]
+    from brief.collect.market import CONFIG, load_instruments
+    instruments = load_instruments(Path(config_path) if config_path else CONFIG)
+    tracked = sorted({i.id for i in instruments})                      # 지금 settings 에 있는 전부
+    excluded = sorted({i.id for i in instruments if not i.can_claim})  # 있지만 문장 근거로 못 쓰는 것
 
-    with db.session() as conn:
+    with db.session(db_path or db.DB_PATH) as conn:
+        # ① 정책금리(predict: false)나 선물(futures: true)처럼 예측 대상에서 뺀 지표는
+        #    과거에 만들어져 채점까지 끝난 기록도 무효로 돌린다. 적중률을 오염시키기 때문이다.
         if excluded:
             ph = ",".join("?" * len(excluded))
             conn.execute(
                 f"UPDATE predictions SET result='void' "
                 f"WHERE instrument IN ({ph}) AND (result IS NULL OR result != 'void')",
                 excluded)
+
+        # ② settings 에서 통째로 사라진 지표. ①은 목록에 있는 것만 훑으므로 여기는 못 잡는다.
+        #    관측치가 더 쌓이지 않아 trading_days_after 가 영영 None 을 돌려주고,
+        #    그대로 두면 '미채점'으로 영원히 남아 아래 채점 루프를 매일 헛돌게 한다.
+        #    (US03M·US30Y 예측이 지표를 뺀 뒤 일주일 넘게 이렇게 묶여 있었다.)
+        #    ①과 달리 이미 채점된 기록은 건드리지 않는다 — 당시에는 정상으로 추적하던
+        #    지표였고, 그때 받은 O/X 는 정직하게 얻은 성적이기 때문이다.
+        if tracked:
+            ph = ",".join("?" * len(tracked))
+            cur = conn.execute(
+                f"UPDATE predictions SET result='void' "
+                f"WHERE instrument NOT IN ({ph}) AND result IS NULL", tracked)
+            card.void += cur.rowcount
 
         pending = conn.execute(
             "SELECT * FROM predictions WHERE result IS NULL ORDER BY made_on, id"
@@ -140,6 +159,42 @@ def record(conn, made_on: str, claim: str, instrument: str, field: str,
            (made_on, claim, instrument, field, op, threshold, horizon_days, probability)
            VALUES (?,?,?,?,?,?,?,?)""",
         (made_on, claim, instrument, field, op, threshold, horizon_days, probability))
+
+
+def by_instrument(conn, days: int = 90, min_n: int = 3) -> list[dict]:
+    """지표별 성적. 적중률을 하나로 뭉쳐 놓으면 어느 지표가 끌어내리는지 안 보인다.
+
+    실제로 KTB3Y 가 7번 중 6번 빗나가며 전체 적중률을 혼자 끌어내리고 있었는데,
+    최상단의 누적 숫자 하나만 봐서는 그것이 드러나지 않았다.
+
+    표본이 min_n 미만인 지표는 내보내지 않는다. 2전 2패를 '적중률 0%'로
+    적어 두면 모르는 것을 아는 것처럼 보여 주는 셈이 된다.
+    신뢰구간은 호출하는 쪽에서 rules.wilson 으로 붙인다.
+    """
+    rows = conn.execute(
+        """SELECT instrument,
+                  SUM(result='hit')  AS hit,
+                  SUM(result='miss') AS miss
+           FROM predictions
+           WHERE result IN ('hit','miss')
+             AND made_on >= date('now', ?)
+           GROUP BY instrument
+           HAVING hit + miss >= ?
+           ORDER BY (1.0 * hit) / (hit + miss) ASC, hit + miss DESC""",
+        (f"-{days} days", min_n)).fetchall()
+
+    out = []
+    for r in rows:
+        hit, miss = r["hit"] or 0, r["miss"] or 0
+        n = hit + miss
+        out.append({
+            "instrument": r["instrument"],
+            "hit": hit,
+            "miss": miss,
+            "total": n,
+            "accuracy": hit / n,     # HAVING 이 n >= min_n >= 1 을 보장한다
+        })
+    return out
 
 
 def track_record(conn, days: int = 90) -> dict:
