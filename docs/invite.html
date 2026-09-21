@@ -51,6 +51,7 @@
     <div class="code" id="code"></div>
     <button class="copy" id="copy">코드 복사하기</button>
     <p class="note">10분 안에 전달해 주세요. 시간이 지나면 이 페이지를 다시 열어 새로 받으면 됩니다.</p>
+    <p class="note"><a href="./invite.html" style="color:var(--accent)">처음부터 다시 하기</a></p>
   </div>
 </div>
 
@@ -69,6 +70,11 @@
   var code = p.get("code"), err = p.get("error_description") || p.get("error");
 
   function show(id){ document.getElementById(id).style.display = "block"; }
+
+  // 코드는 한 번만 쓸 수 있다. 주소창에 남겨 두면 나중에 같은 탭·방문기록으로
+  // 다시 열었을 때 이미 쓴 코드가 그대로 떠서, 새로 동의할 방법이 없어 보인다.
+  // 읽자마자 주소에서 지운다 — 다시 열면 처음 화면이 나온다.
+  if (code || err) { history.replaceState(null, "", location.pathname); }
 
   if (code) {
     document.getElementById("start").style.display = "none";
