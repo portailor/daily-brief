@@ -299,6 +299,20 @@ def render(trade_date: str | None = None,
                               t.field, t.op, t.threshold, t.horizon, t.probability)
 
         track = scorer.track_record(conn)
+        # 전체 적중률 하나만 보여 주면 어느 지표가 끌어내리는지 드러나지 않는다.
+        # 실제로 국고채 3년물이 7번 중 6번 빗나가며 혼자 평균을 깎고 있었다.
+        breakdown = []
+        for b in scorer.by_instrument(conn, days=track["window_days"]):
+            lo, hi = rules.wilson(b["hit"], b["total"])
+            wide = (hi - lo) > 0.5          # 표본이 적어 구간이 넓으면 단정하지 않는다
+            breakdown.append({
+                "name": insts[b["instrument"]].name if b["instrument"] in insts
+                        else b["instrument"],
+                "hit": b["hit"], "total": b["total"],
+                "pct": round(b["accuracy"] * 100),
+                "uncertain": wide,
+                "ci_lo": round(lo * 100), "ci_w": round((hi - lo) * 100),
+            })
 
         week = (weekly_mod.summarize(conn, clock.today_kst(), insts)
                 if mode == "weekly" else None)
@@ -365,6 +379,7 @@ def render(trade_date: str | None = None,
                "total_today": card.hit + card.miss,
                "total": card.total, "resolved": card.resolved},
         track=track,
+        breakdown=breakdown,
         dashboard=dashboard,
         notable=notable,
         flows=flow_rows,
@@ -397,6 +412,7 @@ def render(trade_date: str | None = None,
 
     payload = {
         "verdict": verdict, "score": card, "track": track,
+        "breakdown": breakdown,
         "notable_rows": notable_rows, "flow_stats": flow_stats,
         "triggers": trigs, "trade_date": trade_date,
         "brief_date": brief_date.isoformat(),

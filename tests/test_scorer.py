@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-import sqlite3
+from datetime import date
 
 import pytest
 
@@ -236,3 +236,68 @@ def test_같은_날_같은_조건은_중복_저장되지_않는다(repo):
 
     with db.connect(dbp) as c:
         assert c.execute("SELECT COUNT(*) AS n FROM predictions").fetchone()["n"] == 1
+
+
+# ── 지표별 성적 ─────────────────────────────────────────────
+def graded(conn, instrument: str, hits: int, misses: int,
+           made_on: str | None = None) -> None:
+    """채점이 끝난 예측을 심는다. by_instrument 는 최근 N일만 세므로
+    기본값은 오늘이다 — 고정 날짜를 박으면 시간이 지나 테스트가 조용히 썩는다."""
+    made_on = made_on or date.today().isoformat()
+    # threshold 까지 같으면 UNIQUE 제약에 걸린다 — 행마다 다른 값을 준다.
+    for i in range(hits + misses):
+        conn.execute(
+            "INSERT INTO predictions (made_on, claim, instrument, field, op,"
+            " threshold, horizon_days, result) VALUES (?,?,?,'close','<',?,1,?)",
+            (made_on, f"{instrument}-{i}", instrument, 1.0 + i,
+             "hit" if i < hits else "miss"))
+
+
+def test_지표별로_적중률이_낮은_순으로_나온다(repo):
+    """전체 숫자 하나로는 어느 지표가 평균을 끌어내리는지 보이지 않는다."""
+    dbp, _ = repo
+    with db.session(dbp) as c:
+        graded(c, "KTB3Y", hits=1, misses=6)
+        graded(c, "USDKRW", hits=1, misses=2)
+        graded(c, "DXY", hits=3, misses=0)
+
+        got = scorer.by_instrument(c)
+
+    assert [r["instrument"] for r in got] == ["KTB3Y", "USDKRW", "DXY"]
+    assert got[0]["accuracy"] == pytest.approx(1 / 7)
+    assert got[0]["total"] == 7
+
+
+def test_표본이_모자란_지표는_내보내지_않는다(repo):
+    """2전 2패를 '적중률 0%'로 적으면 모르는 것을 아는 것처럼 보여 주는 셈이다."""
+    dbp, _ = repo
+    with db.session(dbp) as c:
+        graded(c, "KOSPI", hits=0, misses=2)
+        graded(c, "DXY", hits=2, misses=1)
+
+        got = scorer.by_instrument(c, min_n=3)
+
+    assert [r["instrument"] for r in got] == ["DXY"]
+
+
+def test_무효는_성적에_들어가지_않는다(repo):
+    """채점하지 못한 것은 맞힌 것도 틀린 것도 아니다."""
+    dbp, _ = repo
+    with db.session(dbp) as c:
+        graded(c, "KOSPI", hits=2, misses=1)
+        c.execute("INSERT INTO predictions (made_on, claim, instrument, field, op,"
+                  " threshold, horizon_days, result) VALUES"
+                  " (?,'무효','KOSPI','close','<',99.0,1,'void')",
+                  (date.today().isoformat(),))
+
+        got = scorer.by_instrument(c)
+
+    assert got[0]["total"] == 3          # void 는 빠진다
+    assert got[0]["hit"] == 2
+
+
+def test_기간_밖의_예측은_세지_않는다(repo):
+    dbp, _ = repo
+    with db.session(dbp) as c:
+        graded(c, "KOSPI", hits=3, misses=0, made_on="2020-01-02")   # 아주 예전
+        assert scorer.by_instrument(c, days=90) == []
