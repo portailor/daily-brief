@@ -297,6 +297,10 @@ def generate(args) -> int:
     _write_json(OUTBOX, {"message": message, "link": link,
                          "build_id": payload["build_id"],
                          "brief_date": today.isoformat(), "is_new": is_new,
+                         # 수집 없이(--no-fetch) 만든 것은 옛 데이터일 수 있는 미리보기다.
+                         # 9/21, 로컬 미리보기를 오늘 것으로 알고 친구에게 보냈다가 숫자가
+                         # 전부 틀렸다(코스피 주간 -3.26% → 실제 -0.23%). 보내지 못하게 막는다.
+                         "fetched": not args.no_fetch,
                          # 메일은 200자 제한이 없어 표와 상세도 함께 보낸다
                          "dashboard": payload.get("dashboard", []),
                          "detail": payload.get("detail", {})})
@@ -318,6 +322,10 @@ def send() -> int:
         return 0
     if not box.get("message"):
         log("✗ 보낼 메시지가 없습니다. 먼저 생성 단계를 실행하세요.")
+        return 1
+    if box.get("fetched") is False:
+        log("✗ 이 메시지는 데이터를 새로 받지 않고(--no-fetch) 만든 미리보기라 보내지 않습니다. "
+            "옛 숫자일 수 있습니다. 수집부터 다시 돌리세요.")
         return 1
 
     link = box.get("link")
