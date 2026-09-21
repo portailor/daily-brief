@@ -1,0 +1,56 @@
+name: 검사
+
+# 매일 아침 무인으로 도는 시스템이라, 깨진 것을 다음날 카톡이 안 와야 알게 된다.
+# 그 전에 여기서 걸러 낸다.
+on:
+  push:
+    branches: ['**']
+    paths-ignore:            # 봇이 매일 올리는 리포트·기록은 검사할 것이 없다
+      - 'docs/**'
+      - 'data/**'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:                 # 같은 브랜치에 연달아 푸시하면 앞 실행은 버린다
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # 테스트는 네트워크를 쓰지 않는다. yfinance·pykrx 같은 수집 계열은
+      # 받지 않아도 되므로, 실제로 import 되는 것만 설치해 실행을 짧게 둔다.
+      - name: 의존성 설치
+        run: pip install pandas numpy PyYAML Jinja2 pytest
+
+      - name: 테스트
+        run: python -m pytest tests/ -q
+
+      # 브리핑 본체는 아침에 무인으로 돈다. 문법 오류 하나로 그날이 통째로
+      # 날아가므로, 테스트가 닿지 않는 파일까지 적어도 파싱은 해 본다.
+      - name: 전체 모듈 문법 검사
+        run: python -m compileall -q brief run.py scripts
+
+      - name: 워크플로우 셸 스크립트 문법 검사
+        run: bash -n scripts/rebase_onto_main.sh
+
+      # 공개 저장소다. 키가 한 번 올라가면 지워도 기록에 남는다.
+      - name: 비밀 파일이 올라갔는지 확인
+        run: |
+          leaked=$(git ls-files | grep -E '(^|/)\.env|kakao_token|friends\.json' || true)
+          if [ -n "$leaked" ]; then
+            echo "::error::비밀 파일이 커밋돼 있습니다:"
+            echo "$leaked"
+            exit 1
+          fi
+          echo "✓ 비밀 파일 없음"

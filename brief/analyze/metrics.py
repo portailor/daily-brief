@@ -74,6 +74,13 @@ def compute(frame: pd.DataFrame, inst: Instrument, cfg: dict) -> pd.DataFrame:
     for w in cfg["ma_windows"]:
         out[f"ma{w}"] = close.rolling(w, min_periods=max(5, w // 4)).mean()
 
+    # metrics 테이블의 칼럼과 리포트는 20·60·200일선이 있다고 보고 짜여 있다.
+    # settings.yaml 의 ma_windows 에서 하나만 빼도 예전에는 KeyError 로 수집이
+    # 통째로 멈췄다. 없는 값은 '모름'(NULL)으로 남기고 나머지는 그대로 돌린다.
+    for w in (20, 60, 200):
+        if f"ma{w}" not in out.columns:
+            out[f"ma{w}"] = np.nan
+
     out["vs_ma20"] = (close / out["ma20"] - 1) * 100
     out["vs_ma200"] = (close / out["ma200"] - 1) * 100
     out["streak"] = _streak(out["chg"])

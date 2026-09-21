@@ -165,10 +165,10 @@ jobs:
             echo "변경 없음 — 커밋 생략"
           else
             git commit -m "브리핑 $(TZ=Asia/Seoul date +%Y-%m-%d)"
-            # 실행이 발송 시각까지 몇 시간 기다리는 동안 다른 커밋이 올라올 수 있다.
+            # 발송 시각까지 기다리는 동안 다른 커밋이 올라올 수 있다.
             # (9/17 아침, 실행 도중 코드를 올려 push 가 거절되고 발송이 멈췄다.)
-            # 방금 만든 리포트가 우선이므로 충돌 시 이 실행의 결과를 취한다.
-            git pull --rebase -X theirs -q origin main
+            # 충돌은 파일마다 나눠서 푼다 — 예측 기록은 고르지 않고 합친다.
+            bash scripts/rebase_onto_main.sh
             git push
           fi
 
@@ -191,7 +191,7 @@ jobs:
             echo "변경 없음"
           else
             git commit -m "발송 기록 $(TZ=Asia/Seoul date +%Y-%m-%d)"
-            git pull --rebase -X theirs -q origin main && git push
+            bash scripts/rebase_onto_main.sh && git push
           fi
 
       # ── 카카오 토큰 자동 교체 ───────────────────────────────

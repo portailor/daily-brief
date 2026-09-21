@@ -36,8 +36,17 @@ op          <          threshold  6900.0
 horizon     1일
 ```
 
-다음날 자동으로 대조되어 O/X가 찍히고 누적 적중률에 반영된다.
+다음날 자동으로 대조되어 O/X가 기록된다(data/predictions.csv).
 사람이 채점하지 않으므로 좋게 봐줄 여지가 없다.
+
+**적중률은 리포트에 싣지 않는다.** 두 가지 이유다.
+
+- 사용자 결정(2026-09-15): 채점 섹션은 해석뿐이라 쓸모없다며 지웠다.
+- 'O/X 비율'은 이 예측들의 성적이 아니다. 조건마다 "그럴 확률 13%"처럼
+  확률을 붙여 적으므로, 13%라고 한 일이 안 일어나는 건 예고대로 된 것이다.
+  실제 기록(2026-09-21, 29건)은 적어둔 확률 평균 40%, 실제로 일어난 비율 38% —
+  잘 맞고 있다. 이걸 '적중률 38%'로 적으면 62% 틀린다는 뜻으로 읽힌다.
+  성적을 보여줄 거라면 적중률이 아니라 '적어둔 확률 대비 실제 비율'로 보여야 한다.
 
 ### 3. 확률은 과거 빈도에서 센다
 
@@ -76,16 +85,20 @@ horizon     1일
 run.py                  진입점
 brief/
   db.py                 SQLite + 예측 기록 CSV 입출력
+  clock.py              거래일·마감 판정 (주말과 장중 값을 걸러낸다)
   retry.py              일시적 네트워크 오류 재시도
   collect/
     market.py           yfinance — 지수·환율·원자재·미국 금리
     macro.py            FRED(연준) + ECOS(한국은행) — 공식 확정치
     flows.py            KRX — 외국인·기관·개인 수급, 코스피·코스닥 공식 종가
     detail.py           KRX·yfinance — 종목·업종 상세 (data/detail.json)
+    news.py             DART 공시 + 네이버 뉴스 헤드라인 (원인은 단정하지 않는다)
     events.py           일정 — FRED 발표일·Finnhub 실적·FOMC·금통위
   analyze/metrics.py    σ · 52주 밴드 · 이동평균 · 연속일
-  score/scorer.py       예측 자동 채점, 누적 적중률
-  interpret/rules.py    트리거 생성, 경험적 확률, 지갑 단위 환산
+  score/scorer.py       예측 자동 채점, 누적 기록
+  interpret/
+    rules.py            트리거 생성, 경험적 확률, 지갑 단위 환산
+    weekly.py           월요일 주간 정리 (일·월 아침은 새 거래가 없다)
   render/
     report.py           HTML 리포트
     terms.py            용어 말풍선
@@ -93,11 +106,21 @@ brief/
   deliver/
     kakao_auth.py       최초 인증 (한 번만)
     kakao.py            발송 + 토큰 자동 갱신
+    friends.py          카카오 친구에게 발송 (친구 목록 조회 포함)
+    mailer.py           이메일 발송 — 카카오 친구가 아닌 사람용
 config/
   settings.yaml         추적 지표, 분석 파라미터, 관심 종목
   terms.json            용어 사전
+  cases.json            '오늘의 시사상식' 사례집 30개 — 하루 하나씩 순환
+  friends.json          친구 uuid·닉네임 (git 제외)
   .env                  API 키 (git 제외)
+scripts/
+  wait_until_kst.py     발송 시각까지 대기 (러너 시간대에 기대지 않는다)
+  rebase_onto_main.sh   발송 대기 중 올라온 커밋 위로 다시 올리기
+  merge_predictions.py  충돌한 예측 기록 합치기 (한쪽을 고르지 않는다)
+tests/                  채점·날짜·지표 계산 — 네트워크를 쓰지 않는다
 docs/index.html         발행되는 리포트
+docs/invite.html        친구 등록용 카카오 인증 페이지
 data/predictions.csv    예측 기록 (유일하게 커밋되는 데이터)
 ```
 
@@ -124,15 +147,31 @@ PC는 꺼져 있어도 된다. 예약 실행은 GitHub 사정으로 1시간 넘�
 
 수동 실행: 저장소 Actions 탭 → 매일 경제 브리핑 → Run workflow
 
+### 테스트
+
+```bash
+pip install pytest
+python -m pytest tests/ -q
+```
+
+채점·날짜 판정·지표 계산처럼 **입력이 같으면 답이 같아야 하는** 부분만 본다.
+네트워크는 쓰지 않는다 — 시장이 움직이면 결과가 바뀌는 검사는 검사가 아니다.
+푸시할 때마다 GitHub Actions 에서도 같은 것이 돈다.
+
 ---
 
 ## 손이 가는 일
 
-**카카오 토큰은 2개월마다 갱신해야 한다.** GitHub Actions는 자기 Secret을
-고칠 수 없어서 자동화가 불가능하다. 만료가 가까워지면 실행 로그에 새 토큰이
-크게 출력되므로, 그것을 Secrets의 `KAKAO_REFRESH_TOKEN`에 넣으면 된다.
+**거의 없다.** 카카오 토큰은 예전에 2개월마다 직접 갈아 끼워야 했지만
+지금은 자동이다. 카카오는 refresh_token 잔여 기간이 1개월 아래로 내려가면
+새 토큰(60일)을 함께 내주는데, 이 시스템은 매일 돌기 때문에 그때마다
+`gh secret set` 으로 Secret 을 교체한다. 그래서 토큰은 사실상 만료되지 않는다.
 
-완전히 만료됐다면 PC에서 다시 인증한다.
+여기에는 `SECRETS_PAT` Secret 이 필요하다 — 기본 `GITHUB_TOKEN` 은
+Secret 을 쓸 권한이 없다. 이것이 없으면 교체를 건너뛰고 실행 로그에
+경고를 남기므로, 그때는 아래 재인증을 하면 된다.
+
+토큰이 완전히 만료됐다면 PC에서 다시 인증한다.
 
 ```bash
 python brief/deliver/kakao_auth.py <REST_API_KEY> <CLIENT_SECRET>
@@ -150,6 +189,9 @@ python brief/deliver/kakao_auth.py <REST_API_KEY> <CLIENT_SECRET>
 | "오늘 볼 것" 민감도 | `settings.yaml` 의 `sigma_notable` (기본 1.5) |
 | 발송 시각 | `.github/workflows/daily-brief.yml` 의 cron (UTC 기준) |
 | 카톡 문구·순서 | `brief/render/kakao_text.py` |
+| 메일 문구·순서 | `brief/deliver/mailer.py` |
+| 시사상식 사례 추가 | `config/cases.json` 의 `cases` |
+| 같이 받을 사람 | `MAIL_TO` Secret (쉼표로 여러 명) |
 
 ---
 
@@ -163,6 +205,9 @@ python brief/deliver/kakao_auth.py <REST_API_KEY> <CLIENT_SECRET>
 | 미국 금리·거시 | FRED (연준) | 확정치, 1~2일 지연 |
 | 국내 금리 | ECOS (한국은행) | 공식 고시 |
 | 투자자 수급 | KRX | 로그인 필요 |
+| 공시 | DART (금감원) | 원문 링크 |
+| 뉴스 헤드라인 | 네이버 API HUB 뉴스 검색 | 제목·링크만. 원인으로 쓰지 않는다 |
+| 실적 일정 | Finnhub | |
 
 같은 지표를 두 곳에서 받는 경우(미 10년물) 과거는 FRED 확정치로 덮고
 최근 이틀은 yfinance 속보치를 쓴다.
