@@ -5,6 +5,8 @@
 """
 from __future__ import annotations
 
+from dataclasses import asdict
+
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +24,7 @@ from brief import clock                                         # noqa: E402
 from brief.interpret import rules, weekly as weekly_mod          # noqa: E402
 from brief.collect import events as events_mod                  # noqa: E402
 from brief.collect import detail as detail_mod                  # noqa: E402
+from brief.collect import results as results_mod                # noqa: E402
 from brief.render.terms import Glossary                         # noqa: E402
 from brief.score import scorer                                  # noqa: E402
 
@@ -318,6 +321,12 @@ def render(trade_date: str | None = None,
     except Exception:                                          # noqa: BLE001
         upcoming, calendar_missing = [], ["일정 전체"]
 
+    # 지난 일정의 결과 — 실적·지표·금리 결정. 실패해도 리포트는 만든다.
+    try:
+        past_results, results_missing = results_mod.recent(today)
+    except Exception:                                          # noqa: BLE001
+        past_results, results_missing = [], ["지난 일정 결과"]
+
     trig_view = []
     for t in trigs:
         item = {"claim_html": gloss.annotate(t.claim, seen),
@@ -358,6 +367,8 @@ def render(trade_date: str | None = None,
                    "region": e.region, "importance": e.importance} for e in upcoming],
         calendar_title=calendar_title,
         calendar_missing=calendar_missing,
+        results=past_results,
+        results_missing=results_missing,
         basis=basis,
         trade_date=trade_date,
         verdict=verdict,
@@ -411,6 +422,7 @@ def render(trade_date: str | None = None,
         "dashboard": dashboard,   # 메일 본문 표에 쓴다
         "detail": detail,
         "events": upcoming,
+        "results": [asdict(r) for r in past_results],
         # 새 거래일 데이터가 들어왔는지 판단하는 열쇠 — 한국·미국 대표 지수의 기준일
         "market_key": f"KOSPI:{kr_date}|SPX:{us_date}",
         "kr_date": kr_date,

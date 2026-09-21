@@ -1,0 +1,36 @@
+{% if results %}
+<section>
+  <h2>지난 일정, 결과는</h2>
+  <div class="card">
+    {% for r in results %}
+    <div class="ev res">
+      <span class="ev-when">{{ r.announced }}</span>
+      <span>
+        <span class="ev-title"><span class="ev-flag">{{ '한국' if r.region == 'KR' else '미국' }}</span>{{ r.title }}{% if r.period %}<span class="res-period">{{ r.period }}</span>{% endif %}</span>
+        {% if r.pending %}
+        <span class="ev-note">발표는 됐지만 아직 수치가 집계되지 않았습니다. 들어오는 대로 다음 브리핑에 싣습니다.</span>
+        {% else %}
+        {% for line in r.lines %}<span class="res-line">{{ line }}</span>{% endfor %}
+        <span class="res-src">{{ r.source }}</span>
+        {% endif %}
+      </span>
+    </div>
+    {% endfor %}
+    {% if results_missing %}
+    <div class="pocket nodata">가져오지 못한 결과: {{ results_missing|join(', ') }}</div>
+    {% endif %}
+  </div>
+  <details>
+    <summary>숫자를 읽는 법</summary>
+    <div class="deep">
+      공식 발표·집계 수치를 그대로 옮겼습니다. 좋다·나쁘다는 판단은 붙이지 않았습니다.<br><br>
+      <b>실적</b>의 '예상'은 발표 전 애널리스트들이 낸 전망의 평균(Finnhub 집계)입니다.
+      주당순이익(EPS)은 회사마다 일회성 항목을 빼는 방식이 달라, 회사가 직접 발표한
+      숫자와 조금 다를 수 있습니다.<br><br>
+      <b>물가</b>의 '1년 전보다'는 계절조정 전 지수, '전월보다'는 계절조정 지수로 계산합니다.
+      미국 노동통계국이 발표할 때 쓰는 방식과 같습니다.<br><br>
+      <b>금리 결정</b>은 결정 전날과 다음 날의 공식 금리를 비교해 동결·인상·인하를 적습니다.
+    </div>
+  </details>
+</section>
+{% endif %}

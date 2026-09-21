@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from brief import clock, db                             # noqa: E402
+from brief.collect import results as results_mod  # noqa: E402
 from brief.analyze import metrics                       # noqa: E402
 from brief.collect import detail, flows, macro, market  # noqa: E402
 from brief.render import kakao_text, report             # noqa: E402
@@ -276,13 +277,15 @@ def generate(args) -> int:
         # 주간 정리는 새 거래가 없어도 보낸다 — 원래 그런 날을 위한 메시지다
         is_new = True
         message = kakao_text.build_weekly(payload)
-        _write_json(STATE, {"market_key": payload["market_key"],
-                            "brief_date": today.isoformat()})
+        _write_json(STATE, results_mod.mark_shown(
+            {**state, "market_key": payload["market_key"], "brief_date": today.isoformat()},
+            payload.get("results", []), today))
         log(f"  주간 정리: {payload['week'].period if payload['week'] else '-'}")
     elif is_new:
         message = kakao_text.build(payload)
-        _write_json(STATE, {"market_key": payload["market_key"],
-                            "brief_date": today.isoformat()})
+        _write_json(STATE, results_mod.mark_shown(
+            {**state, "market_key": payload["market_key"], "brief_date": today.isoformat()},
+            payload.get("results", []), today))
         log(f"  결론: {payload['verdict']['headline']}")
     else:
         message = kakao_text.build_no_new_data(payload, today.weekday())
