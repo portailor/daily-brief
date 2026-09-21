@@ -161,42 +161,6 @@ def record(conn, made_on: str, claim: str, instrument: str, field: str,
         (made_on, claim, instrument, field, op, threshold, horizon_days, probability))
 
 
-def by_instrument(conn, days: int = 90, min_n: int = 3) -> list[dict]:
-    """지표별 성적. 적중률을 하나로 뭉쳐 놓으면 어느 지표가 끌어내리는지 안 보인다.
-
-    실제로 KTB3Y 가 7번 중 6번 빗나가며 전체 적중률을 혼자 끌어내리고 있었는데,
-    최상단의 누적 숫자 하나만 봐서는 그것이 드러나지 않았다.
-
-    표본이 min_n 미만인 지표는 내보내지 않는다. 2전 2패를 '적중률 0%'로
-    적어 두면 모르는 것을 아는 것처럼 보여 주는 셈이 된다.
-    신뢰구간은 호출하는 쪽에서 rules.wilson 으로 붙인다.
-    """
-    rows = conn.execute(
-        """SELECT instrument,
-                  SUM(result='hit')  AS hit,
-                  SUM(result='miss') AS miss
-           FROM predictions
-           WHERE result IN ('hit','miss')
-             AND made_on >= date('now', ?)
-           GROUP BY instrument
-           HAVING hit + miss >= ?
-           ORDER BY (1.0 * hit) / (hit + miss) ASC, hit + miss DESC""",
-        (f"-{days} days", min_n)).fetchall()
-
-    out = []
-    for r in rows:
-        hit, miss = r["hit"] or 0, r["miss"] or 0
-        n = hit + miss
-        out.append({
-            "instrument": r["instrument"],
-            "hit": hit,
-            "miss": miss,
-            "total": n,
-            "accuracy": hit / n,     # HAVING 이 n >= min_n >= 1 을 보장한다
-        })
-    return out
-
-
 def track_record(conn, days: int = 90) -> dict:
     """누적 성적. 브리핑 최상단에 박아서 스스로를 감시하게 만든다."""
     row = conn.execute(
