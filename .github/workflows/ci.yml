@@ -31,7 +31,7 @@ jobs:
       # 테스트는 네트워크를 쓰지 않는다. yfinance·pykrx 같은 수집 계열은
       # 받지 않아도 되므로, 실제로 import 되는 것만 설치해 실행을 짧게 둔다.
       - name: 의존성 설치
-        run: pip install pandas numpy PyYAML Jinja2 pytest
+        run: pip install pandas numpy requests PyYAML Jinja2 pytest
 
       - name: 테스트
         run: python -m pytest tests/ -q
