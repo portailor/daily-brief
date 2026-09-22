@@ -15,6 +15,9 @@ on:
     - cron: '30 18 * * 0-5'     # 한국시간 03:30
     - cron: '45 20 * * 0-5'     # 한국시간 05:45 (예비)
   workflow_dispatch:            # 수동 실행은 기다리지 않고 바로 만들고 보낸다
+    # 주의: 예약 실행에는 inputs 가 비어 있다. GitHub 식에서는 빈 값(null)이 false 와
+    # '같다'로 비교되므로 'inputs.send != false' 로 쓰면 매일 아침 발송이 조용히 꺼진다.
+    # 그래서 수동 실행일 때만 inputs.send 를 본다.
     inputs:
       send:
         description: '카카오톡·메일도 보낼까요? (false = 페이지만 새로 만들기)'
@@ -184,14 +187,14 @@ jobs:
         run: python3 scripts/wait_until_kst.py 07:25
 
       - name: 카카오톡 발송
-        if: steps.guard.outputs.skip != 'true' && inputs.send != false
+        if: steps.guard.outputs.skip != 'true' && (github.event_name != 'workflow_dispatch' || inputs.send)
         env:
           PYTHONUTF8: '1'
           TZ: Asia/Seoul
         run: python run.py --send-only
 
       - name: 발송 기록 올리기
-        if: steps.guard.outputs.skip != 'true' && inputs.send != false
+        if: steps.guard.outputs.skip != 'true' && (github.event_name != 'workflow_dispatch' || inputs.send)
         run: |
           git add data/state.json
           if git diff --cached --quiet; then
