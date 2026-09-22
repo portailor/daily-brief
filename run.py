@@ -37,7 +37,7 @@ sys.path.insert(0, str(ROOT))
 from brief import clock, db                             # noqa: E402
 from brief.collect import results as results_mod  # noqa: E402
 from brief.analyze import metrics                       # noqa: E402
-from brief.collect import detail, flows, macro, market  # noqa: E402
+from brief.collect import detail, flows, macro, market, realestate  # noqa: E402
 from brief.render import kakao_text, report             # noqa: E402
 
 LOG_PATH = ROOT / "data" / "run.log"
@@ -236,6 +236,15 @@ def generate(args) -> int:
             failures.append(err)
         else:
             log(f"✓ 지표 계산: {n} rows")
+
+        re_data, err = step("부동산", realestate.collect)
+        if err:
+            failures.append(err)
+        elif re_data:
+            if re_data.get("missing"):
+                log(f"△ 부동산 일부: {', '.join(re_data['missing'])}")
+            else:
+                log("✓ 부동산: 주간·월간·미국")
 
         d, err = step("종목·업종 상세", detail.collect)
         if err:

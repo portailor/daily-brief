@@ -1,0 +1,112 @@
+{# 부동산 탭. 주간·월간 통계라 매일 바뀌지 않는다 — 모든 값에 기준 시점을 붙인다. #}
+{% set re = realestate or {} %}
+{% set kw = re.kr_weekly or {} %}
+{% set sale = kw.sale %}
+{% set jeonse = kw.jeonse %}
+
+<section>
+  <h2>한국 아파트값 · 한 주 사이</h2>
+  {% if sale %}
+  <p class="hint-plain">{{ re_terms.weekly|safe }} · <b>{{ sale.date[5:].replace('-', '/') }} 기준</b>
+    · 매주 목요일 공표. 전주 대비 변동률입니다.</p>
+  <div class="card">
+    <div class="re-row re-head">
+      <span>지역</span><span>매매</span>{% if jeonse %}<span>{{ re_terms.jeonse|safe }}</span>{% endif %}
+    </div>
+    {% for r in sale.regions %}
+    {% set j = (jeonse.regions | selectattr('name', 'equalto', r.name) | first) if jeonse else none %}
+    <div class="re-row">
+      <span class="re-name">{{ r.name }}</span>
+      <span class="num {{ 'up' if r.chg > 0 else 'down' if r.chg < 0 else '' }}">
+        {{ '%+.2f'|format(r.chg) }}%{% if r.streak >= 2 %}<span class="re-streak">{{ r.streak }}주째 {{ '상승' if r.chg > 0 else '하락' }}</span>{% endif %}
+      </span>
+      {% if jeonse %}
+      <span class="num {{ 'up' if j and j.chg > 0 else 'down' if j and j.chg < 0 else '' }}">
+        {{ ('%+.2f'|format(j.chg) ~ '%') if j else '—' }}
+      </span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if sale.gu_top and sale.gu_bottom %}
+  <div class="re-two">
+    <div class="card">
+      <div class="re-sub">서울에서 많이 오른 구</div>
+      {% for r in sale.gu_top %}<div class="re-pair"><span>{{ r.name }}</span><span class="num {{ 'up' if r.chg > 0 else 'down' if r.chg < 0 else '' }}">{{ '%+.2f'|format(r.chg) }}%</span></div>{% endfor %}
+    </div>
+    <div class="card">
+      <div class="re-sub">서울에서 덜 오르거나 내린 구</div>
+      {% for r in sale.gu_bottom %}<div class="re-pair"><span>{{ r.name }}</span><span class="num {{ 'up' if r.chg > 0 else 'down' if r.chg < 0 else '' }}">{{ '%+.2f'|format(r.chg) }}%</span></div>{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="card"><div class="pocket nodata">
+    한국부동산원 주간 아파트 가격은 인증키를 연결하면 표시됩니다.
+  </div></div>
+  {% endif %}
+</section>
+
+{% if re.kr_monthly %}
+<section>
+  <h2>대출 금리 · 미분양 · 실거래 (월간)</h2>
+  <p class="hint-plain">달마다 나오는 통계라 기준 달이 항목마다 다릅니다.</p>
+  <div class="card">
+    {% for i in re.kr_monthly %}
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name">{{ i.name_html|safe }}</span>
+        <span class="asof">{{ i.asof }}</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">{{ i.value }}</span>
+        <span class="num {{ i.dir }}">{{ i.change }}</span>
+        <span class="re-note">전월 대비{% if i.note and '전월 대비' not in i.note %} · {{ i.note }}{% endif %}</span>
+      </div>
+      <div class="re-src">{{ i.source }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if re.us %}
+<section>
+  <h2>미국 주택시장</h2>
+  <div class="card">
+    {% for i in re.us %}
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name">{{ i.name_html|safe }}</span>
+        <span class="asof">{{ i.asof }}</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">{{ i.value }}</span>
+        <span class="num {{ i.dir }}">{{ i.change }}</span>
+        <span class="re-note">{{ i.note or ('전주 대비' if 'MORTGAGE' in i.id else '') }}</span>
+      </div>
+      <div class="re-src">{{ i.source }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if re.missing %}
+<div class="pocket nodata" style="margin-top:14px">가져오지 못한 항목: {{ re.missing|join(', ') }}</div>
+{% endif %}
+
+<section>
+  <details>
+    <summary>숫자를 읽는 법</summary>
+    <div class="deep">
+      모든 값은 공공기관·공식 집계 기관이 발표한 숫자를 그대로 옮기거나, 발표된 지수로
+      변동률만 계산한 것입니다. 오를지 내릴지에 대한 전망은 넣지 않았습니다.<br><br>
+      <b>주간 아파트값</b>은 한국부동산원이 표본 아파트를 매주 조사한 지수에서 전주 대비
+      변동률을 계산한 것입니다. 기사에서 보는 "서울 아파트값 0.○○% 상승"과 같은 통계입니다.<br><br>
+      <b>월간 통계</b>는 발표까지 시간이 걸립니다. 특히 실거래가격지수는 거래 신고를 모아
+      계산해 두세 달 늦게 나옵니다. 그래서 항목마다 기준 달을 따로 적었습니다.
+    </div>
+  </details>
+</section>

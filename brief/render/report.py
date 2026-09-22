@@ -25,6 +25,7 @@ from brief.interpret import rules, weekly as weekly_mod          # noqa: E402
 from brief.collect import events as events_mod                  # noqa: E402
 from brief.collect import detail as detail_mod                  # noqa: E402
 from brief.collect import results as results_mod                # noqa: E402
+from brief.collect import realestate as realestate_mod          # noqa: E402
 from brief.render.terms import Glossary                         # noqa: E402
 from brief.score import scorer                                  # noqa: E402
 
@@ -327,6 +328,16 @@ def render(trade_date: str | None = None,
     except Exception:                                          # noqa: BLE001
         past_results, results_missing = [], ["지난 일정 결과"]
 
+    # 부동산 탭 — 수집 단계에서 만든 data/realestate.json 을 읽는다.
+    # 탭이 따로라 말풍선 중복 방지(seen)도 따로 둔다. 같은 용어라도 탭마다 한 번씩 뜬다.
+    realestate = realestate_mod.load()
+    seen_re: set = set()
+    re_terms = {"weekly": gloss.annotate("주간 아파트 가격동향", seen_re),
+                "jeonse": gloss.annotate("전세", seen_re)}
+    for sec in ("kr_monthly", "us"):
+        for it in realestate.get(sec, []) or []:
+            it["name_html"] = gloss.annotate(it["name"], seen_re)
+
     trig_view = []
     for t in trigs:
         item = {"claim_html": gloss.annotate(t.claim, seen),
@@ -359,6 +370,8 @@ def render(trade_date: str | None = None,
         is_weekly=(mode == "weekly"),
         tiles=tiles,
         detail=detail,
+        realestate=realestate,
+        re_terms=re_terms,
         case=case, case_no=case_no, case_total=case_total,
         kr_label=clock.label(detail["kr"]["date"]) if detail.get("kr", {}).get("date") else "",
         us_label=clock.label(detail["us"]["date"]) if detail.get("us", {}).get("date") else "",
@@ -382,7 +395,7 @@ def render(trade_date: str | None = None,
         flow_lines=flow_lines,
         pockets=pockets,
         triggers=trig_view,
-        sources="한국거래소·yfinance(시세), 미 연준 FRED(거시지표), 한국은행 ECOS(국내금리)",
+        sources="한국거래소·yfinance(시세), 미 연준 FRED(거시지표·미국 주택), 한국은행 ECOS(국내금리·주택담보대출·미분양), 한국부동산원(아파트 가격)",
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
         build_id=build_id,
         stale="",
