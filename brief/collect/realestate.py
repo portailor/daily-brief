@@ -61,9 +61,17 @@ def _ym(s: str) -> str:
 
 # ── 한국 주간 (R-ONE) ───────────────────────────────────────
 
+REB_PAUSE = 0.6      # 호출 사이 간격(초)
+
+
 def _reb(ep: str, key: str, **p) -> list[dict]:
+    # 9/22 오후 클라우드 실행에서 ConnectionError 로 주간 통계 전체가 빠졌다.
+    # 같은 시각 미국 서버에서 단건 호출은 정상(200)이었으므로 해외 차단이 아니라
+    # 짧은 시간에 60번 가까이 부른 탓으로 본다. 간격을 두고, 끊기면 더 길게 기다린다.
+    time.sleep(REB_PAUSE)
     res = with_retry(lambda: requests.get(REB + ep, params={"KEY": key, "Type": "json", **p},
-                                          timeout=30), attempts=2, label=f"R-ONE {ep}")
+                                          timeout=40),
+                     attempts=4, base_delay=5.0, label=f"R-ONE {ep}")
     res.raise_for_status()
     body = res.json()
     blocks = next(iter(body.values()), [])
@@ -127,11 +135,18 @@ def streak_of(chgs: list[float]) -> tuple[float, int]:
 def _weekly_block(key: str, statbl: str) -> dict | None:
     regions = _regions(key, statbl)
 
+    failed: list[str] = []
+
     def one(fullname: str, label: str) -> dict | None:
         info = regions.get(fullname)
         if not info:
             return None
-        pts = _series(key, statbl, info["id"])
+        # 지역 하나가 끝내 실패해도 나머지는 싣는다. 빠진 지역은 이름을 남긴다.
+        try:
+            pts = _series(key, statbl, info["id"])
+        except Exception:                                         # noqa: BLE001
+            failed.append(label)
+            return None
         if len(pts) < 2:
             return None
         chgs = [(pts[i][1] / pts[i - 1][1] - 1) * 100 for i in range(1, len(pts))]
@@ -154,10 +169,13 @@ def _weekly_block(key: str, statbl: str) -> dict | None:
             r = one(full, parts[-1])
             if r:
                 gu.append(r)
-            time.sleep(0.15)
     gu.sort(key=lambda r: -r["chg"])
+    # 구가 일부만 들어왔으면 '상·하위 3곳'이 틀릴 수 있어 싣지 않는다.
+    gu_ok = len(gu) >= 20
     return {"date": out[0]["date"], "regions": out,
-            "gu_top": gu[:3], "gu_bottom": gu[-3:][::-1] if len(gu) >= 6 else []}
+            "gu_top": gu[:3] if gu_ok else [],
+            "gu_bottom": gu[-3:][::-1] if gu_ok else [],
+            "failed": failed}
 
 
 def kr_weekly(key: str) -> dict:
