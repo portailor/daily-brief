@@ -37,7 +37,7 @@ sys.path.insert(0, str(ROOT))
 from brief import clock, db                             # noqa: E402
 from brief.collect import results as results_mod  # noqa: E402
 from brief.analyze import metrics                       # noqa: E402
-from brief.collect import detail, flows, macro, market, realestate  # noqa: E402
+from brief.collect import crypto, detail, flows, macro, market, realestate  # noqa: E402
 from brief.render import kakao_text, report             # noqa: E402
 
 LOG_PATH = ROOT / "data" / "run.log"
@@ -245,6 +245,15 @@ def generate(args) -> int:
                 log(f"△ 부동산 일부: {', '.join(re_data['missing'])}")
             else:
                 log("✓ 부동산: 주간·월간·미국")
+
+        cx, err = step("코인", crypto.collect)
+        if err:
+            failures.append(err)
+        elif cx:
+            if cx.get("missing"):
+                log(f"△ 코인 일부: {', '.join(cx['missing'])}")
+            else:
+                log(f"✓ 코인: {cx['asof']} 기준")
 
         d, err = step("종목·업종 상세", detail.collect)
         if err:

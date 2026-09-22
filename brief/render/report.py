@@ -26,6 +26,7 @@ from brief.collect import events as events_mod                  # noqa: E402
 from brief.collect import detail as detail_mod                  # noqa: E402
 from brief.collect import results as results_mod                # noqa: E402
 from brief.collect import realestate as realestate_mod          # noqa: E402
+from brief.collect import crypto as crypto_mod                  # noqa: E402
 from brief.render.terms import Glossary                         # noqa: E402
 from brief.score import scorer                                  # noqa: E402
 
@@ -338,6 +339,13 @@ def render(trade_date: str | None = None,
         for it in realestate.get(sec, []) or []:
             it["name_html"] = gloss.annotate(it["name"], seen_re)
 
+    # 코인 탭 — 말풍선 중복 방지(seen)는 탭마다 따로.
+    crypto = crypto_mod.load()
+    seen_cx: set = set()
+    cx_terms = {k: gloss.annotate(v, seen_cx) for k, v in
+                (("premium", "김치 프리미엄"), ("dominance", "비트코인 도미넌스"),
+                 ("fng", "공포·탐욕 지수"), ("stable", "스테이블코인"))}
+
     trig_view = []
     for t in trigs:
         item = {"claim_html": gloss.annotate(t.claim, seen),
@@ -372,6 +380,8 @@ def render(trade_date: str | None = None,
         detail=detail,
         realestate=realestate,
         re_terms=re_terms,
+        crypto=crypto,
+        cx_terms=cx_terms,
         case=case, case_no=case_no, case_total=case_total,
         kr_label=clock.label(detail["kr"]["date"]) if detail.get("kr", {}).get("date") else "",
         us_label=clock.label(detail["us"]["date"]) if detail.get("us", {}).get("date") else "",
@@ -395,7 +405,7 @@ def render(trade_date: str | None = None,
         flow_lines=flow_lines,
         pockets=pockets,
         triggers=trig_view,
-        sources="한국거래소·yfinance(시세), 미 연준 FRED(거시지표·미국 주택), 한국은행 ECOS(국내금리·주택담보대출·미분양), 한국부동산원(아파트 가격)",
+        sources="한국거래소·yfinance(시세), 미 연준 FRED(거시지표·미국 주택), 한국은행 ECOS(국내금리·주택담보대출·미분양), 한국부동산원(아파트 가격), CoinGecko·업비트(코인)",
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
         build_id=build_id,
         stale="",
