@@ -27,6 +27,7 @@ from brief.collect import detail as detail_mod                  # noqa: E402
 from brief.collect import results as results_mod                # noqa: E402
 from brief.collect import realestate as realestate_mod          # noqa: E402
 from brief.collect import crypto as crypto_mod                  # noqa: E402
+from brief.collect import housing as housing_mod                # noqa: E402
 from brief.render.terms import Glossary                         # noqa: E402
 from brief.score import scorer                                  # noqa: E402
 
@@ -384,6 +385,7 @@ def render(trade_date: str | None = None,
         re_terms=re_terms,
         crypto=crypto,
         cx_terms=cx_terms,
+        housing=housing_mod.load(),
         case=case, case_no=case_no, case_total=case_total,
         kr_label=clock.label(detail["kr"]["date"]) if detail.get("kr", {}).get("date") else "",
         us_label=clock.label(detail["us"]["date"]) if detail.get("us", {}).get("date") else "",
@@ -407,7 +409,7 @@ def render(trade_date: str | None = None,
         flow_lines=flow_lines,
         pockets=pockets,
         triggers=trig_view,
-        sources="한국거래소·yfinance(시세), 미 연준 FRED(거시지표·미국 주택), 한국은행 ECOS(국내금리·주택담보대출·미분양), 한국부동산원(아파트 가격), CoinGecko·업비트(코인)",
+        sources="한국거래소·yfinance(시세), 미 연준 FRED(거시지표·미국 주택), 한국은행 ECOS(국내금리·주택담보대출·미분양), 한국부동산원(아파트 가격·청약), 국토교통부(실거래), CoinGecko·업비트(코인)",
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
         build_id=build_id,
         stale="",

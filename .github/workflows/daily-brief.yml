@@ -94,6 +94,7 @@ jobs:
           MAIL_TO: ${{ secrets.MAIL_TO }}
           REB_API_KEY: ${{ secrets.REB_API_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: |
           mkdir -p config data
 
@@ -102,7 +103,7 @@ jobs:
           echo "── Secrets 등록 상태 ──"
           for name in KAKAO_REST_API_KEY KAKAO_CLIENT_SECRET KAKAO_REFRESH_TOKEN \
                       FRED_API_KEY ECOS_API_KEY DART_API_KEY FINNHUB_API_KEY \
-                      KRX_ID KRX_PW REPORT_BASE_URL NAVER_CLIENT_ID NAVER_CLIENT_SECRET \n                      KAKAO_FRIENDS SMTP_USER SMTP_PASS MAIL_TO REB_API_KEY \n                      COINGECKO_API_KEY; do
+                      KRX_ID KRX_PW REPORT_BASE_URL NAVER_CLIENT_ID NAVER_CLIENT_SECRET \n                      KAKAO_FRIENDS SMTP_USER SMTP_PASS MAIL_TO REB_API_KEY \n                      COINGECKO_API_KEY DATA_GO_KR_KEY; do
             if [ -n "${!name}" ]; then
               echo "  OK      $name (${#name} chars name, value set)"
             else
@@ -139,6 +140,7 @@ jobs:
           MAIL_TO=$MAIL_TO
           REB_API_KEY=$REB_API_KEY
           COINGECKO_API_KEY=$COINGECKO_API_KEY
+          DATA_GO_KR_KEY=$DATA_GO_KR_KEY
           EOF
 
           # 함께 받을 사람 목록. 없으면 본인에게만 간다.
