@@ -128,7 +128,8 @@ def publish(message: str) -> bool:
         return False
 
 
-    git("add", "docs", "data/predictions.csv", "data/state.json", "data/seoul_highs.json")
+    git("add", "docs", "data/predictions.csv", "data/state.json",
+        *(["data/seoul_highs.json"] if (ROOT / "data" / "seoul_highs.json").exists() else []))
     if not git("diff", "--cached", "--quiet").returncode:
         log("  리포트 변경 없음 — 발행 생략")
         return True

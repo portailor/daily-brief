@@ -174,7 +174,10 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs data/predictions.csv data/state.json data/seoul_highs.json
+          git add docs data/predictions.csv data/state.json
+          # 신고가 기록은 첫 채우기가 끝나 커밋된 뒤에만 있다. 없는 파일을 git add 하면
+          # 단계 전체가 실패해 발송까지 건너뛰므로, 있을 때만 더한다.
+          if [ -f data/seoul_highs.json ]; then git add data/seoul_highs.json; fi
           if git diff --cached --quiet; then
             echo "변경 없음 — 커밋 생략"
           else
