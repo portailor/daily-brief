@@ -41,6 +41,12 @@ REB_JEONSE = "T247713133046872"   # (주) 전세가격지수 — SttsApiTbl 목�
 
 KR_REGIONS = ("전국", "수도권", "서울", "지방권", "5대광역시")
 
+# (주) 매매·전세 수급동향 — 중개업소 설문과 매물 등으로 수요·공급 비중을 0~200 으로
+# 나타낸 지수. 100 보다 크면 사려는(구하려는) 사람이 더 많다. 부동산원 값을 그대로 쓴다.
+REB_SALE_SD = "T248163133074619"
+REB_JEONSE_SD = "T245423133086632"
+SD_REGIONS = ("전국", "수도권", "서울", "지방권")
+
 
 # ── 공통 ────────────────────────────────────────────────────
 
@@ -178,8 +184,29 @@ def _weekly_block(key: str, statbl: str) -> dict | None:
             "failed": failed}
 
 
+def _supply_block(key: str, statbl: str) -> list[dict]:
+    """지역별 수급지수 — 이번 주 값과 지난주 값. 계산 없이 발표값을 소수 첫째 자리로."""
+    regions = _regions(key, statbl)
+    out = []
+    for name in SD_REGIONS:
+        info = regions.get(name)
+        if not info:
+            continue
+        try:
+            pts = _series(key, statbl, info["id"], weeks=6)
+        except Exception:                                         # noqa: BLE001
+            continue
+        if len(pts) < 2:
+            continue
+        (d, v), (_, prev) = pts[-1], pts[-2]
+        out.append({"name": name, "value": round(v, 1), "chg": round(v - prev, 1), "date": d})
+    return out
+
+
 def kr_weekly(key: str) -> dict:
     out = {"sale": _weekly_block(key, REB_SALE)}
+    out["sale_sd"] = _supply_block(key, REB_SALE_SD)
+    out["jeonse_sd"] = _supply_block(key, REB_JEONSE_SD)
     if REB_JEONSE:
         out["jeonse"] = _weekly_block(key, REB_JEONSE)
     return out

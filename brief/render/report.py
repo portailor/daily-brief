@@ -334,7 +334,8 @@ def render(trade_date: str | None = None,
     realestate = realestate_mod.load()
     seen_re: set = set()
     re_terms = {"weekly": gloss.annotate("주간 아파트 가격동향", seen_re),
-                "jeonse": gloss.annotate("전세", seen_re)}
+                "jeonse": gloss.annotate("전세", seen_re),
+                "sd": gloss.annotate("매매수급지수", seen_re)}
     for sec in ("kr_monthly", "us"):
         for it in realestate.get(sec, []) or []:
             it["name_html"] = gloss.annotate(it["name"], seen_re)

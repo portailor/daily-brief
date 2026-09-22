@@ -41,6 +41,26 @@
     </div>
   </div>
   {% endif %}
+
+  {% if kw.sale_sd %}
+  <div class="card" style="margin-top:8px">
+    <div class="re-sub">{{ re_terms.sd|safe }} · 100보다 크면 사려는 사람이 더 많음</div>
+    <div class="re-row re-head"><span>지역</span><span>매매</span>{% if kw.jeonse_sd %}<span>전세</span>{% endif %}</div>
+    {% for r in kw.sale_sd %}
+    {% set j = (kw.jeonse_sd | selectattr('name', 'equalto', r.name) | first) if kw.jeonse_sd else none %}
+    <div class="re-row">
+      <span class="re-name">{{ r.name }}</span>
+      <span class="num {{ 'up' if r.value > 100 else 'down' if r.value < 100 else '' }}">{{ '%.1f'|format(r.value) }}
+        <span class="re-streak">지난주 {{ '%+.1f'|format(r.chg) if r.chg else '같음' }}</span></span>
+      {% if kw.jeonse_sd %}
+      <span class="num {{ 'up' if j and j.value > 100 else 'down' if j and j.value < 100 else '' }}">{{ ('%.1f'|format(j.value)) if j else '—' }}
+        {% if j %}<span class="re-streak">지난주 {{ '%+.1f'|format(j.chg) if j.chg else '같음' }}</span>{% endif %}</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <div class="re-src" style="margin-top:6px">한국부동산원 · 0~200, 100 = 사려는 사람과 팔려는 사람이 비슷</div>
+  </div>
+  {% endif %}
   {% else %}
   <div class="card"><div class="pocket nodata">
     한국부동산원 주간 아파트 가격은 인증키를 연결하면 표시됩니다.
