@@ -44,7 +44,7 @@ def _load_env() -> dict[str, str]:
               "FINNHUB_API_KEY", "KRX_ID", "KRX_PW",
               "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET",
               "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "MAIL_TO",
-              "REB_API_KEY"):
+              "REB_API_KEY", "COINGECKO_API_KEY"):
         if os.getenv(k):
             env[k] = os.environ[k]
     return env

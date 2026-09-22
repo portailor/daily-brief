@@ -1,6 +1,7 @@
 """코인 탭 — 공개 시세만 모은다. 키가 필요 없다.
 
   해외 시세   CoinGecko — 가격(달러), 24시간·7일 변동, 시가총액, 전체 시장
+              (무료 데모 키 COINGECKO_API_KEY 가 있으면 붙인다. 없어도 동작)
               (2026-09-22 대조: 코인베이스·크라켄 체결가와 0.04% 이내)
   국내 시세   업비트 — 원화 가격, 24시간 거래대금
   심리 지표   alternative.me 공포·탐욕 지수 (0~100)
@@ -48,8 +49,15 @@ FNG_KO = {"Extreme Fear": "극단적 공포", "Fear": "공포", "Neutral": "중�
 
 
 def _get(url: str, **params):
-    res = with_retry(lambda: requests.get(url, params=params, timeout=25,
-                                          headers={"accept": "application/json"}),
+    headers = {"accept": "application/json"}
+    # CoinGecko 무료 데모 키. 없으면 키 없는 공개 호출로 간다 — 여러 사람이 함께 쓰는
+    # GitHub 서버에서는 공개 호출이 한도에 걸릴 수 있어 키를 붙인다.
+    if url.startswith(CG):
+        from brief.collect.macro import _load_env
+        key = _load_env().get("COINGECKO_API_KEY", "")
+        if key:
+            headers["x-cg-demo-api-key"] = key
+    res = with_retry(lambda: requests.get(url, params=params, timeout=25, headers=headers),
                      attempts=3, label=url.split("/")[2])
     res.raise_for_status()
     return res.json()
