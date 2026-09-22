@@ -176,6 +176,7 @@ class Trigger:
     kind: str                  # round_level / band_edge / ma_cross / streak / sigma
     priority: float            # 정렬용. 클수록 위
     situation: str = ""        # 지금이 어떤 상황인지 한 줄. 조건문과 분리해 읽기 쉽게.
+    prob_name: str = "확률"    # 확률 앞에 붙는 말. 조건문의 동사를 그대로 쓴다 ("내릴 확률").
 
     def interval(self) -> tuple[float, float] | None:
         if self.probability is None or not self.samples:
@@ -261,7 +262,8 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
                 br[0] if br else None, br[1] if br else None,
                 "round_level", 2.0 - dist_up,
                 situation=f"지금 {_fmt(close, inst)} — 하루 만에 {up_txt.replace(' 필요', '')} "
-                          f"오르면 넘어섭니다"))
+                          f"오르면 넘어섭니다",
+                prob_name="넘어설 확률"))
 
         if dist_dn <= 1.2:
             br = move_probability(conn, iid, -need_dn, "down", 1, unit)
@@ -272,7 +274,8 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
                 br[0] if br else None, br[1] if br else None,
                 "round_level", 2.0 - dist_dn,
                 situation=f"지금 {_fmt(close, inst)} — 하루 만에 {dn_txt.replace(' 필요', '')} "
-                          f"내리면 밑돕니다"))
+                          f"내리면 밑돕니다",
+                prob_name="밑돌 확률"))
 
         # ── 2. 52주 밴드 극단 ────────────────────────────────
         # 극단에 '머무는가'를 묻지 않는다 — 자기상관 때문에 거의 항상 맞아서
@@ -293,7 +296,8 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
                 br[0] if br else None, br[1] if br else None,
                 "band_edge", 3.0,
                 situation=f"지금 값이 최근 1년 사이 "
-                          f"{'가장 낮았던 값 근처' if at_low else '가장 높았던 값 근처'}입니다"))
+                          f"{'가장 낮았던 값 근처' if at_low else '가장 높았던 값 근처'}입니다",
+                prob_name="올라설 확률" if at_low else "내려올 확률"))
 
         # ── 3. 20일선 근접 (추세 전환 분기점) ────────────────
         if vs20 is not None and abs(vs20) <= 0.8:
@@ -314,7 +318,8 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
                 br[0] if br else None, br[1] if br else None,
                 "ma_cross", 2.5,
                 situation=f"지금 최근 20일 평균값({_fmt(ma20, inst)}) "
-                          f"{'바로 위' if above_ma else '바로 아래'}에 붙어 있습니다"))
+                          f"{'바로 위' if above_ma else '바로 아래'}에 붙어 있습니다",
+                prob_name="위를 지킬 확률" if above_ma else "아래에 머물 확률"))
 
         # ── 4. 연속 흐름 ─────────────────────────────────────
         if abs(streak) >= 4:
@@ -329,7 +334,8 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
                 "chg", op, 0.0, 1,
                 br[0] if br else None, br[1] if br else None,
                 "streak", 1.5 + abs(streak) * 0.1,
-                situation=f"{abs(streak)}거래일 연속 {direction}했습니다"))
+                situation=f"{abs(streak)}거래일 연속 {direction}했습니다",
+                prob_name=f"하루 더 {'오를' if streak > 0 else '내릴'} 확률"))
 
         # ── 5. 이례적 변동 뒤 되돌림 ─────────────────────────
         if sigma is not None and abs(sigma) >= cfg["sigma_notable"]:
@@ -345,7 +351,8 @@ def build_triggers(conn, rows, instruments: dict[str, Instrument],
                 br[0] if br else None, br[1] if br else None,
                 "sigma", 4.0 + abs(sigma),
                 situation=f"직전 거래일에 평소보다 크게 {'올랐습니다' if sigma > 0 else '내렸습니다'}"
-                          f" (평소 하루 변동폭의 {abs(sigma):.1f}배)"))
+                          f" (평소 하루 변동폭의 {abs(sigma):.1f}배)",
+                prob_name="반대로 내릴 확률" if sigma > 0 else "반대로 오를 확률"))
 
     out.sort(key=lambda t: -t.priority)
     return out

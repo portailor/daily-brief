@@ -7,6 +7,12 @@
 timezone: Asia/Seoul
 send_at: "07:00"
 
+# 받는 사람. 친구 목록은 config/friends.json(비공개)·메일은 MAIL_TO 에 따로 있다.
+delivery:
+  # 나에게 보내기. 동화님이 친구들에게 보낸 메시지를 자기 카톡에서 보게 되어
+  # 같은 브리핑이 두 번 오는 셈이라 2026-09-22 에 껐다. 다시 받으려면 true.
+  send_to_me: false
+
 # ── 추적 지표 ────────────────────────────────────────────────
 instruments:
 

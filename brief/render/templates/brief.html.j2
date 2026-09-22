@@ -94,7 +94,8 @@
   .res-line{display:block; font-size:14px; margin-top:3px; font-variant-numeric:tabular-nums}
   .res-src{display:block; font-size:11.5px; color:var(--dim); margin-top:3px}
   .situ{font-size:13px; color:var(--dim); margin-top:3px; line-height:1.55}
-  .plab{flex:0 0 auto; font-size:11.5px; font-weight:700; color:var(--dim)}
+  .pline{margin-top:8px; font-size:14px; font-weight:700}
+  .pline .pct{font-size:15px; color:var(--accent)}
   .issue + .issue{margin-top:8px}
   .card.issue{padding:11px 13px}
   .issue-head{display:flex; align-items:baseline; gap:6px; font-size:14.5px; margin-bottom:4px}
@@ -218,7 +219,7 @@
   .trig + .trig{border-top:1px solid var(--line)}
   .trig .claim{font-weight:640; font-size:15px; line-height:1.6}
   .trig .basis{font-size:13px; color:var(--dim); margin-top:5px}
-  .pbar{display:flex; align-items:center; gap:9px; margin-top:7px}
+  .pbar{display:flex; align-items:center; gap:9px; margin-top:4px}
   .pbar .track{flex:1; height:6px; background:var(--line);
                border-radius:4px; overflow:hidden; position:relative}
   .pbar .fill{height:100%; background:var(--accent); border-radius:4px}
@@ -482,13 +483,12 @@
       <div class="claim">{{ t.claim_html|safe }}</div>
       {% if t.situation %}<div class="situ">{{ t.situation|safe }}</div>{% endif %}
       {% if t.probability is not none %}
+      <div class="pline"><span class="pname">{{ t.prob_name }}</span> <span class="pct">{{ t.label }}</span></div>
       <div class="pbar">
-        <span class="plab">그럴 확률</span>
         <span class="track">
           <span class="ci" style="left:{{ t.ci_lo }}%; width:{{ t.ci_w }}%"></span>
           <span class="fill" style="width:{{ t.pct }}%"></span>
         </span>
-        <span class="pct">{{ t.label }}</span>
       </div>
       {% endif %}
       <div class="basis {{ 'nodata' if t.probability is none }}">{{ t.basis }}</div>
@@ -500,12 +500,12 @@
     <div class="deep">
       전부 <b>과거에 실제로 몇 번 그랬는지를 센 숫자</b>입니다.
       누군가의 전망이나 인공지능의 추측이 아닙니다.<br><br>
-      읽는 법을 예로 들면, "국고채 3년물이 고점에서 내려온다 · 그럴 확률 13%"는
+      읽는 법을 예로 들면, "국고채 3년물이 고점에서 내려온다 · 내려올 확률 13%"는
       <b>과거에 국고채 3년물이 지금처럼 1년 최고 수준에 있던 날이 100번 있었는데,
       그중 다음 날 내려간 날이 13번이었다</b>는 뜻입니다.
       나머지 87번은 내려가지 않았습니다. 그래서 13%입니다.<br><br>
       조건 문장 안에 들어간 숫자(가격, 평균선 값, 1년 범위에서의 위치)는 <b>확률이 아니라
-      지금 상태</b>입니다. 확률은 오른쪽에 "그럴 확률"이라고 적힌 하나뿐입니다.<br><br>
+      지금 상태</b>입니다. 확률은 막대 위에 "○○할 확률"로 적힌 하나뿐입니다.<br><br>
       괄호 안 95% 구간은 센 횟수가 적을 때 생기는 불확실성입니다.
       "0~19%"처럼 넓게 나오면 그만큼 확신할 수 없다는 뜻이고,
       이 브리핑은 그럴 때 점 하나로 단정하지 않습니다.<br><br>

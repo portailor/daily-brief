@@ -350,6 +350,7 @@ def render(trade_date: str | None = None,
     for t in trigs:
         item = {"claim_html": gloss.annotate(t.claim, seen),
                 "situation": gloss.annotate(t.situation, seen) if t.situation else "",
+                "prob_name": t.prob_name,
                 "basis": t.prob_text(), "probability": t.probability}
         if t.probability is not None and t.samples:
             hits = round(t.probability * t.samples)

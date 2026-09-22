@@ -172,6 +172,22 @@ def wait_until_live(url: str, build_id: str, timeout_s: int = 300) -> bool:
 #  생성
 # ─────────────────────────────────────────────────────────────
 
+def _git(*a):
+    import subprocess
+    return subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+
+
+def _published_today(page_name: str) -> bool:
+    """오늘 날짜 페이지가 이미 커밋돼 있는가 (= 앞서 게시됐는가)."""
+    return _git("cat-file", "-e", f"HEAD:docs/{page_name}").returncode == 0
+
+
+def restore_published(page_name: str) -> None:
+    """방금 만든 페이지를 버리고 커밋돼 있던 오늘 페이지로 되돌린다."""
+    _git("checkout", "HEAD", "--", f"docs/{page_name}", "docs/index.html")
+
+
 def generate(args) -> int:
     log("=" * 52)
     today = clock.today_kst()
@@ -273,6 +289,15 @@ def generate(args) -> int:
         return 1
 
     path, payload = result
+
+    # 오늘 페이지가 이미 게시돼 있는데 이번 실행에서 핵심 수집이 실패했다면,
+    # 더 빈약한 페이지로 덮어쓰지 않는다. (9/22 오후 수동 실행에서 KRX 응답이 비어
+    # 종목·업종·외국인 매매 칸이 빠진 페이지가 아침 페이지를 덮었다.)
+    # 오늘 첫 실행이라 비교할 페이지가 없으면, 빠진 게 있어도 그대로 게시한다.
+    critical = [f for f in failures if any(k in f for k in ("한국 지수", "수급", "상세", "시세"))]
+    if critical and _published_today(payload["page_name"]):
+        restore_published(payload["page_name"])
+        log(f"△ 핵심 수집 실패({', '.join(critical)}) — 이미 게시된 오늘 페이지를 그대로 둡니다")
     log(f"✓ 리포트: {path.parent / payload['page_name']}")
     log(f"  {payload['basis']}")
 
@@ -356,22 +381,40 @@ def send() -> int:
         # 폰 브라우저가 예전에 연 페이지를 캐시해 둔 경우를 피한다
         link = f"{link}?v={box.get('build_id', '')}"
 
-    from brief.deliver import kakao                       # noqa: PLC0415
-    try:
-        kakao.send_text(box["message"], link_url=link, button_title="전체 브리핑 보기")
-        log("✓ 카카오톡 1건 발송 (나에게)")
-        # 오늘 보냈다는 기록. 예약 실행을 두 번 걸어 두었기 때문에(정시 보장이 안 돼서)
-        # 앞의 실행이 이미 보냈으면 뒤의 실행은 이 값을 보고 아무것도 하지 않는다.
-        _write_json(STATE, {**_read_json(STATE), "sent_date": box.get("brief_date", "")})
-    except Exception as exc:                              # noqa: BLE001
-        log(f"✗ 카카오 발송 실패: {exc}")
-        return 1
+    # 누구에게 보내나. '나에게 보내기'는 끌 수 있다 — 동화님이 친구들에게 보낸 메시지를
+    # 자기 카톡에서 그대로 보게 되어, 같은 브리핑이 두 번 오는 셈이라 9/22 에 껐다.
+    import yaml                                           # noqa: PLC0415
+    cfg = yaml.safe_load((ROOT / "config" / "settings.yaml").read_text(encoding="utf-8"))
+    to_me = (cfg.get("delivery") or {}).get("send_to_me", True)
 
-    # 친구 발송은 본인 발송과 분리한다. 친구 쪽이 막혀도 내 브리핑은 이미 갔고,
-    # 실패를 이유로 전체를 실패로 만들면 매일 아침 워크플로가 빨갛게 뜬다.
-    # 이메일 — 카카오톡 친구 발송은 받는 사람이 카카오디벨로퍼스 계정을 만들고
-    # 팀원 초대를 수락해야만 가능해서, 함께 받을 사람에게는 메일로 보낸다.
-    from brief.deliver import mailer                      # noqa: PLC0415
+    from brief.deliver import friends, kakao, mailer      # noqa: PLC0415
+    delivered = 0      # 한 곳이라도 가면 '오늘 보냄'으로 기록한다
+
+    if to_me:
+        try:
+            kakao.send_text(box["message"], link_url=link, button_title="전체 브리핑 보기")
+            log("✓ 카카오톡 1건 발송 (나에게)")
+            delivered += 1
+        except Exception as exc:                          # noqa: BLE001
+            log(f"✗ 카카오 발송 실패 (나에게): {exc}")
+    else:
+        log("  나에게 보내기 꺼짐 (settings.yaml delivery.send_to_me)")
+
+    # 친구·메일은 서로 떼어 둔다. 한쪽이 막혀도 다른 쪽은 간다.
+    if friends.load_recipients():
+        try:
+            sent, problems = friends.send_to_friends(
+                box["message"], link_url=link, button_title="전체 브리핑 보기")
+            if sent:
+                log(f"✓ 카카오톡 {len(sent)}건 발송 (친구: {', '.join(sent)})")
+                delivered += len(sent)
+            for why in problems:
+                log(f"△ 친구 발송 실패 — {why}")
+        except Exception as exc:                          # noqa: BLE001
+            log(f"✗ 친구 발송 실패: {exc}")
+
+    # 이메일 — 카카오 친구 발송은 받는 사람이 카카오디벨로퍼스 가입과 팀원 수락을
+    # 해야 해서, 그게 어려운 사람에게는 메일로 보낸다.
     if mailer.recipients():
         sent, problem = mailer.send(box["message"], link=link,
                                     payload={"dashboard": box.get("dashboard", []),
@@ -379,20 +422,17 @@ def send() -> int:
                                     subject=f"경제 브리핑 {box.get('brief_date', '')}")
         if sent:
             log(f"✓ 이메일 발송: {', '.join(sent)}")
+            delivered += len(sent)
         if problem:
             log(f"△ 이메일 발송 실패 — {problem}")
 
-    from brief.deliver import friends                     # noqa: PLC0415
-    if friends.load_recipients():
-        try:
-            sent, problems = friends.send_to_friends(
-                box["message"], link_url=link, button_title="전체 브리핑 보기")
-            if sent:
-                log(f"✓ 카카오톡 {len(sent)}건 발송 (친구: {', '.join(sent)})")
-            for why in problems:
-                log(f"△ 친구 발송 실패 — {why}")
-        except Exception as exc:                          # noqa: BLE001
-            log(f"△ 친구 발송 건너뜀: {exc}")
+    if not delivered:
+        log("✗ 아무에게도 보내지 못했습니다")
+        return 1
+
+    # 오늘 보냈다는 기록. 예약 실행을 두 번 걸어 두었기 때문에(정시 보장이 안 돼서)
+    # 앞의 실행이 이미 보냈으면 뒤의 실행은 이 값을 보고 아무것도 하지 않는다.
+    _write_json(STATE, {**_read_json(STATE), "sent_date": box.get("brief_date", "")})
 
     log("완료")
     return 0
