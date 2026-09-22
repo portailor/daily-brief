@@ -7,7 +7,7 @@
 <section>
   <h2>한국 아파트값 · 한 주 사이</h2>
   {% if sale %}
-  <p class="hint-plain">{{ re_terms.weekly|safe }} · <b>{{ sale.date[5:].replace('-', '/') }} 기준</b>
+  <p class="hint-plain">{{ re_terms.weekly|safe }} · <b>{{ sale.date[5:7]|int }}/{{ sale.date[8:10]|int }} 기준</b>
     · 매주 목요일 공표. 전주 대비 변동률입니다.</p>
   <div class="card">
     <div class="re-row re-head">
@@ -18,11 +18,11 @@
     <div class="re-row">
       <span class="re-name">{{ r.name }}</span>
       <span class="num {{ 'up' if r.chg > 0 else 'down' if r.chg < 0 else '' }}">
-        {{ '%+.2f'|format(r.chg) }}%{% if r.streak >= 2 %}<span class="re-streak">{{ r.streak }}주째 {{ '상승' if r.chg > 0 else '하락' }}</span>{% endif %}
+        {{ ('%+.2f'|format(r.chg) ~ '%') if r.chg else '보합' }}{% if r.streak >= 2 %}<span class="re-streak">{{ r.streak }}주{{ ' 이상' if r.streak_capped else '째' }} {{ '상승' if r.chg > 0 else '하락' }}</span>{% endif %}
       </span>
       {% if jeonse %}
       <span class="num {{ 'up' if j and j.chg > 0 else 'down' if j and j.chg < 0 else '' }}">
-        {{ ('%+.2f'|format(j.chg) ~ '%') if j else '—' }}
+        {{ (('%+.2f'|format(j.chg) ~ '%') if j.chg else '보합') if j else '—' }}
       </span>
       {% endif %}
     </div>
@@ -33,11 +33,11 @@
   <div class="re-two">
     <div class="card">
       <div class="re-sub">서울에서 많이 오른 구</div>
-      {% for r in sale.gu_top %}<div class="re-pair"><span>{{ r.name }}</span><span class="num {{ 'up' if r.chg > 0 else 'down' if r.chg < 0 else '' }}">{{ '%+.2f'|format(r.chg) }}%</span></div>{% endfor %}
+      {% for r in sale.gu_top %}<div class="re-pair"><span>{{ r.name }}{% if r.streak >= 2 %}<span class="re-streak">{{ r.streak }}주{{ ' 이상' if r.streak_capped else '째' }} {{ '상승' if r.chg > 0 else '하락' }}</span>{% endif %}</span><span class="num {{ 'up' if r.chg > 0 else 'down' if r.chg < 0 else '' }}">{{ '%+.2f'|format(r.chg) }}%</span></div>{% endfor %}
     </div>
     <div class="card">
       <div class="re-sub">서울에서 덜 오르거나 내린 구</div>
-      {% for r in sale.gu_bottom %}<div class="re-pair"><span>{{ r.name }}</span><span class="num {{ 'up' if r.chg > 0 else 'down' if r.chg < 0 else '' }}">{{ '%+.2f'|format(r.chg) }}%</span></div>{% endfor %}
+      {% for r in sale.gu_bottom %}<div class="re-pair"><span>{{ r.name }}{% if r.streak >= 2 %}<span class="re-streak">{{ r.streak }}주{{ ' 이상' if r.streak_capped else '째' }} {{ '상승' if r.chg > 0 else '하락' }}</span>{% endif %}</span><span class="num {{ 'up' if r.chg > 0 else 'down' if r.chg < 0 else '' }}">{{ '%+.2f'|format(r.chg) }}%</span></div>{% endfor %}
     </div>
   </div>
   {% endif %}
@@ -105,6 +105,10 @@
       변동률만 계산한 것입니다. 오를지 내릴지에 대한 전망은 넣지 않았습니다.<br><br>
       <b>주간 아파트값</b>은 한국부동산원이 표본 아파트를 매주 조사한 지수에서 전주 대비
       변동률을 계산한 것입니다. 기사에서 보는 "서울 아파트값 0.○○% 상승"과 같은 통계입니다.<br><br>
+      <b>기사마다 숫자가 다른 이유</b> — 주간 아파트값은 한국부동산원 말고도 KB부동산,
+      부동산114 등이 따로 조사합니다. 표본과 조사 방식이 달라 같은 주에도 수치가 다릅니다
+      (예: 9/14 주 서울을 한국부동산원은 +0.16%, 부동산114는 +0.03%로 발표).
+      이 탭은 정부 승인 통계인 한국부동산원 수치만 씁니다.<br><br>
       <b>월간 통계</b>는 발표까지 시간이 걸립니다. 특히 실거래가격지수는 거래 신고를 모아
       계산해 두세 달 늦게 나옵니다. 그래서 항목마다 기준 달을 따로 적었습니다.
     </div>

@@ -36,8 +36,8 @@ ITEMS_CACHE = ROOT / "data" / "reb_items.json"
 REB = "https://www.reb.or.kr/r-one/openapi/"
 # (주) 매매가격지수 — 아파트. SttsApiTbl 로 이름·주기(WK)·기관(한국부동산원) 확인함.
 REB_SALE = "T244183132827305"
-# (주) 전세가격지수 — 키를 받은 뒤 SttsApiTbl 목록에서 이름으로 찾아 채운다.
-REB_JEONSE = ""
+# 둘 다 주기 WK, 기준시점 2026.07.06=100 (인증키로 SttsApiTbl 전체 목록 조회해 확인)
+REB_JEONSE = "T247713133046872"   # (주) 전세가격지수 — SttsApiTbl 목록에서 확인
 
 KR_REGIONS = ("전국", "수도권", "서울", "지방권", "5대광역시")
 
@@ -89,18 +89,39 @@ def _regions(key: str, statbl: str) -> dict[str, dict]:
     return items
 
 
-def _series(key: str, statbl: str, cls_id: int, weeks: int = 12) -> list[tuple[str, float]]:
+def _series(key: str, statbl: str, cls_id: int, weeks: int = 260) -> list[tuple[str, float]]:
     """최근 몇 주 지수. (공표 기준일, 지수) 오래된 것부터.
 
     기간은 주차(YYYYWW) 형식으로 넘겨야 한다. 날짜 형식을 넣으면 엉뚱한 주가 온다.
+    5년치를 받는 이유: 'N주 연속'을 정확히 세려면 끊긴 지점까지 거슬러 가야 한다.
+    2026-09-14 기준 서울 매매는 84주 연속 상승(2025-01-20 보합 이후)으로, 60주만
+    받으면 58주로 잘못 셌다. 84주는 같은 주 언론 보도(부동산원 발표 인용)와 일치.
     """
     start = date.today() - timedelta(weeks=weeks)
     y, w, _ = start.isocalendar()
     rows = _reb("SttsApiTblData.do", key, STATBL_ID=statbl, DTACYCLE_CD="WK",
-                CLS_ID=cls_id, START_WRTTIME=f"{y}{w:02d}", pSize=100)
+                CLS_ID=cls_id, START_WRTTIME=f"{y}{w:02d}", pSize=1000)
     pts = sorted({(r["WRTTIME_DESC"], float(r["DTA_VAL"])) for r in rows
                   if r.get("DTA_VAL") is not None})
     return pts
+
+
+def streak_of(chgs: list[float]) -> tuple[float, int]:
+    """(이번 주 변동률, 같은 방향으로 몇 주째인가).
+
+    부동산원 발표처럼 소수 둘째 자리로 반올림해 판단하고, 0.00% 는 보합이라
+    연속을 끊는다. 이번 주가 보합이면 0주다.
+    """
+    last = round(chgs[-1], 2)
+    if last == 0:
+        return 0.0, 0
+    streak = 0
+    for c in reversed(chgs):
+        c = round(c, 2)
+        if c == 0 or (c > 0) != (last > 0):
+            break
+        streak += 1
+    return last, streak
 
 
 def _weekly_block(key: str, statbl: str) -> dict | None:
@@ -114,15 +135,11 @@ def _weekly_block(key: str, statbl: str) -> dict | None:
         if len(pts) < 2:
             return None
         chgs = [(pts[i][1] / pts[i - 1][1] - 1) * 100 for i in range(1, len(pts))]
-        last = round(chgs[-1], 2)
-        # 같은 방향이 몇 주째인가 (0.00% 는 보합으로 끊는다)
-        streak = 0
-        for c in reversed(chgs):
-            c = round(c, 2)
-            if c == 0 or (c > 0) != (last > 0):
-                break
-            streak += 1
-        return {"name": label, "chg": last, "streak": streak if last else 0,
+        last, streak = streak_of(chgs)
+        # 받아온 기간 전체가 같은 방향이면 그보다 길 수 있다 — '이상'으로 표시한다.
+        # (처음엔 12주만 받아 '11주째'가 받아온 길이의 한계였는데 그대로 적을 뻔했다.)
+        return {"name": label, "chg": last, "streak": streak,
+                "streak_capped": bool(last) and streak == len(chgs),
                 "date": pts[-1][0]}
 
     out = [r for r in (one(n, n) for n in KR_REGIONS) if r]
