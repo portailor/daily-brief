@@ -39,13 +39,24 @@ REB_SALE = "T244183132827305"
 # 둘 다 주기 WK, 기준시점 2026.07.06=100 (인증키로 SttsApiTbl 전체 목록 조회해 확인)
 REB_JEONSE = "T247713133046872"   # (주) 전세가격지수 — SttsApiTbl 목록에서 확인
 
-KR_REGIONS = ("전국", "수도권", "서울", "지방권", "5대광역시", "부산", "울산")
+# 표에 싣는 지역. (통계표 속 이름, 화면 이름, 묶음)
+#   권역  — 전국·수도권·서울·지방
+#   광역시 — 인천·부산·대구·광주·대전·울산 + 세종(특별자치시)
+# 부산원의 '5대광역시' 합계는 도시를 따로 싣게 되면서 뺐다(인천 제외 묶음이라 헷갈림).
+# 광주는 통계표에 '전남광주>광주'로 들어 있다.
+KR_REGIONS = (
+    ("전국", "전국", "main"), ("수도권", "수도권", "main"),
+    ("서울", "서울", "main"), ("지방권", "지방", "main"),
+    ("인천", "인천", "metro"), ("부산", "부산", "metro"), ("대구", "대구", "metro"),
+    ("전남광주>광주", "광주", "metro"), ("대전", "대전", "metro"),
+    ("울산", "울산", "metro"), ("세종", "세종", "metro"),
+)
 
 # (주) 매매·전세 수급동향 — 중개업소 설문과 매물 등으로 수요·공급 비중을 0~200 으로
 # 나타낸 지수. 100 보다 크면 사려는(구하려는) 사람이 더 많다. 부동산원 값을 그대로 쓴다.
 REB_SALE_SD = "T248163133074619"
 REB_JEONSE_SD = "T245423133086632"
-SD_REGIONS = ("전국", "수도권", "서울", "지방권", "부산", "울산")
+SD_REGIONS = KR_REGIONS
 
 
 # ── 공통 ────────────────────────────────────────────────────
@@ -163,7 +174,11 @@ def _weekly_block(key: str, statbl: str) -> dict | None:
                 "streak_capped": bool(last) and streak == len(chgs),
                 "date": pts[-1][0]}
 
-    out = [r for r in (one(n, n) for n in KR_REGIONS) if r]
+    out = []
+    for full, label, group in KR_REGIONS:
+        r = one(full, label)
+        if r:
+            out.append({**r, "group": group})
     if not out:
         return None
 
@@ -188,8 +203,8 @@ def _supply_block(key: str, statbl: str) -> list[dict]:
     """지역별 수급지수 — 이번 주 값과 지난주 값. 계산 없이 발표값을 소수 첫째 자리로."""
     regions = _regions(key, statbl)
     out = []
-    for name in SD_REGIONS:
-        info = regions.get(name)
+    for full, name, group in SD_REGIONS:
+        info = regions.get(full)
         if not info:
             continue
         try:
@@ -199,7 +214,8 @@ def _supply_block(key: str, statbl: str) -> list[dict]:
         if len(pts) < 2:
             continue
         (d, v), (_, prev) = pts[-1], pts[-2]
-        out.append({"name": name, "value": round(v, 1), "chg": round(v - prev, 1), "date": d})
+        out.append({"name": name, "group": group, "value": round(v, 1),
+                    "chg": round(v - prev, 1) + 0.0, "date": d})
     return out
 
 
