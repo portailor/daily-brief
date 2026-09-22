@@ -178,7 +178,17 @@ if __name__ == "__main__":
             for f in friends]}, ensure_ascii=False, indent=2))
 
     elif cmd == "test":
+        # test <이름> 이면 그 사람에게만 보낸다. 새로 연결한 친구만 확인할 때,
+        # 이미 받고 있는 사람들에게 테스트가 또 가지 않게 한다.
+        only = sys.argv[2] if len(sys.argv) > 2 else None
+        everyone = load_recipients
+        if only:
+            load_recipients = lambda: [r for r in everyone() if r.get("name") == only]  # noqa: E731
         people = load_recipients()
+        if only and not people:
+            print(f"'{only}' 은(는) 받는 사람 목록에 없습니다. list 로 이름을 확인하세요.",
+                  file=sys.stderr)
+            sys.exit(1)
         if not people:
             print("config/friends.json 에 받을 사람이 없습니다.", file=sys.stderr)
             sys.exit(1)
@@ -204,6 +214,6 @@ if __name__ == "__main__":
         print("  이제 `python brief/deliver/friends.py list` 로 uuid 를 확인하세요.")
 
     else:
-        print("사용법: python brief/deliver/friends.py [list|connect <코드>|test]",
+        print("사용법: python brief/deliver/friends.py [list|connect <코드>|test [이름]]",
               file=sys.stderr)
         sys.exit(2)
