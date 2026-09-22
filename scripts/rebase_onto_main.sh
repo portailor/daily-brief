@@ -25,7 +25,7 @@ for _ in $(seq 10); do
 
   for f in $conflicts; do
     case "$f" in
-      docs/*|data/state.json)
+      docs/*|data/state.json|data/seoul_highs.json)
         # 매 실행이 새로 만드는 값이다. 방금 만든 쪽이 최신이다.
         git checkout --theirs -- "$f"
         ;;

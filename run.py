@@ -89,7 +89,7 @@ def sync_before_publish() -> bool:
 
     if run_git("rev-parse", "--git-dir").returncode != 0:
         return True
-    tracked = ["docs", "data/predictions.csv", "data/state.json"]
+    tracked = ["docs", "data/predictions.csv", "data/state.json", "data/seoul_highs.json"]
     if run_git("status", "--porcelain", "--", *tracked).stdout.strip():
         # 이전 로컬 실행이 남긴 결과물 — 어차피 이번 실행에서 다시 만든다
         run_git("checkout", "--", *tracked)
@@ -128,7 +128,7 @@ def publish(message: str) -> bool:
         return False
 
 
-    git("add", "docs", "data/predictions.csv", "data/state.json")
+    git("add", "docs", "data/predictions.csv", "data/state.json", "data/seoul_highs.json")
     if not git("diff", "--cached", "--quiet").returncode:
         log("  리포트 변경 없음 — 발행 생략")
         return True

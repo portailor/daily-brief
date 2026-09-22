@@ -19,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 from brief import db                                  # noqa: E402
+from brief.retry import with_retry  # noqa: E402
 from brief.clock import is_finished_session           # noqa: E402
 from brief.collect.flows import _ensure_credentials   # noqa: E402
 
@@ -74,7 +75,9 @@ def collect_kr(kr_date: str) -> dict:
     frames = {}
     for market in ("KOSPI", "KOSDAQ"):
         try:
-            df = stock.get_market_ohlcv(d, market=market)
+            # 한국거래소 응답이 가끔 끊긴다(9/22 오후 두 번). 끊겨도 몇 번 더 받아 본다.
+            df = with_retry(lambda m=market: stock.get_market_ohlcv(d, market=m),
+                            attempts=4, base_delay=5.0, label=f"KRX {market} 시세")
             df = df[df["거래량"] > 0]
             frames[market] = df
         except Exception as exc:                        # noqa: BLE001

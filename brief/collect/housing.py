@@ -12,8 +12,8 @@
   중인 달을 비교하면 거래가 줄어든 것처럼 잘못 보인다.
   해제된 거래(cdealType='O')는 거래량·금액 어디에도 넣지 않는다.
 
-'신고가'는 싣지 않는다. 같은 단지·같은 면적의 과거 최고가를 쌓아 둬야 판정할 수
-있는데, 아직 그 기록이 없다.
+신고가는 brief/collect/records.py — 과거 최고가 기록(data/seoul_highs.json, 커밋)과
+비교한다. 처음 한 번 36개월을 채우고, 이후엔 달이 넘어갈 때마다 한 달씩 더한다.
 """
 from __future__ import annotations
 
@@ -134,7 +134,8 @@ def _trades(key: str, lawd: str, ym: str) -> list[dict]:
     while True:
         res = with_retry(lambda: requests.get(RTMS, params={
             "serviceKey": key, "LAWD_CD": lawd, "DEAL_YMD": ym,
-            "numOfRows": 1000, "pageNo": page}, timeout=40), attempts=3, label=f"실거래 {lawd}")
+            "numOfRows": 1000, "pageNo": page}, timeout=40),
+            attempts=5, base_delay=4.0, label=f"실거래 {lawd}")
         res.raise_for_status()
         root = ET.fromstring(res.text)
         code = root.findtext(".//resultCode")
@@ -171,6 +172,7 @@ def seoul(key: str, today: date) -> dict:
 
     counts = {full: 0, prev: 0, year_ago: 0}
     recent: list[dict] = []
+    two_months: list[tuple[str, dict]] = []      # 신고가 판정용 — 지난달·이번 달 전부
     since = today - timedelta(days=7)
 
     for code, gu in SEOUL_GU.items():
@@ -180,6 +182,7 @@ def seoul(key: str, today: date) -> dict:
             time.sleep(0.15)
         for m in {this_m, last_m}:
             for r in _trades(key, code, _ym(m)):
+                two_months.append((code, r))
                 if r.get("cdealType") == "O" or r.get("dealingGbn") != "중개거래":
                     continue
                 d = date(int(r["dealYear"]), int(r["dealMonth"]), int(r["dealDay"]))
@@ -190,13 +193,29 @@ def seoul(key: str, today: date) -> dict:
                                "man": int(r["dealAmount"].replace(",", "")), "date": d.isoformat()})
             time.sleep(0.15)
 
+    # 신고가 — 확정 기록은 지지난달까지. 달이 넘어갔으면 그 달을 채운 뒤 판정한다.
+    from brief.collect import records                     # noqa: PLC0415
+    store = records.load()
+    upto = (last_m - timedelta(days=1)).replace(day=1)
+    # 첫 채우기(36개월)가 끝난 기록이 있을 때만 이어 쓰고 판정한다. 없으면 건너뛴다 —
+    # 여기서 36개월을 채우면 아침 실행이 발송 시각을 넘기고, 반쯤 찬 기록으로 판정하면
+    # 신고가가 아닌 것을 신고가라고 하게 된다.
+    ready = bool(store.get("since")) and store.get("complete", False)
+    if ready:
+        records.fold(store, lambda c, ym: _trades(key, c, ym), SEOUL_GU, upto, max_months=1)
+    highs = records.detect(store, two_months, since) if ready else []
+    for h in highs:
+        h["gu"] = SEOUL_GU.get(h["sgg"], h["sgg"])
+
     recent.sort(key=lambda r: -r["man"])
     lab = lambda d: f"{d.year}년 {d.month}월"                       # noqa: E731
+    since_lab = (f"{store['since'][:4]}년 {int(store['since'][5:7])}월" if ready else "")
     return {"month": lab(full), "count": counts[full],
             "prev_month": lab(prev), "prev": counts[prev],
             "year_ago_month": lab(year_ago), "year_ago": counts[year_ago],
             "recent_since": since.isoformat(), "recent_top": recent[:5],
-            "recent_n": len(recent)}
+            "recent_n": len(recent),
+            "highs": highs[:6], "highs_n": len(highs), "highs_from": since_lab}
 
 
 # ── 묶기 ────────────────────────────────────────────────────

@@ -9,12 +9,15 @@
   {% if sale %}
   <p class="hint-plain">{{ re_terms.weekly|safe }} · <b>{{ sale.date[5:7]|int }}/{{ sale.date[8:10]|int }} 기준</b>
     · 매주 목요일 공표. 전주 대비 변동률입니다.</p>
-  {% for grp, title in [('main', '권역'), ('metro', '광역시')] %}
+  {% set groups = [('main', '권역', '전국 · 수도권 · 서울 · 지방'),
+                   ('metro', '광역시', '인천 · 부산 · 대구 · 광주 · 대전 · 울산 · 세종')] %}
+  {% for grp, title, sub in groups %}
   {% set rows = sale.regions | selectattr('group', 'equalto', grp) | list %}
   {% if rows %}
-  <div class="card"{% if not loop.first %} style="margin-top:8px"{% endif %}>
+  <div class="card re-group g-{{ grp }}">
+    <div class="re-group-h"><span class="re-tag t-{{ grp }}">{{ title }}</span><span class="re-group-sub">{{ sub }}</span></div>
     <div class="re-row re-head">
-      <span>{{ title }}</span><span>매매</span>{% if jeonse %}<span>{{ re_terms.jeonse|safe if loop.first else '전세' }}</span>{% endif %}
+      <span>지역</span><span>매매</span>{% if jeonse %}<span>{{ re_terms.jeonse|safe if loop.first else '전세' }}</span>{% endif %}
     </div>
     {% for r in rows %}
     {% set j = (jeonse.regions | selectattr('name', 'equalto', r.name) | first) if jeonse else none %}
@@ -35,6 +38,7 @@
   {% endfor %}
 
   {% if sale.gu_top and sale.gu_bottom %}
+  <h3 class="re-h3">서울 구별 <span class="re-group-sub">한 주 사이 많이 오른 곳 · 덜 오르거나 내린 곳</span></h3>
   <div class="re-two">
     <div class="card">
       <div class="re-sub">서울에서 많이 오른 구</div>
@@ -48,12 +52,13 @@
   {% endif %}
 
   {% if kw.sale_sd %}
-  <div class="card" style="margin-top:8px">
-    <div class="re-sub">{{ re_terms.sd|safe }} · 100보다 크면 사려는 사람이 더 많음</div>
-    {% for grp, title in [('main', '권역'), ('metro', '광역시')] %}
-    {% set rows = kw.sale_sd | selectattr('group', 'equalto', grp) | list %}
-    {% if rows %}
-    <div class="re-row re-head"{% if not loop.first %} style="padding-top:14px"{% endif %}><span>{{ title }}</span><span>매매</span>{% if kw.jeonse_sd %}<span>전세</span>{% endif %}</div>
+  <h3 class="re-h3">{{ re_terms.sd|safe }} <span class="re-group-sub">100보다 크면 사려는 사람이 더 많음</span></h3>
+  {% for grp, title, sub in groups %}
+  {% set rows = kw.sale_sd | selectattr('group', 'equalto', grp) | list %}
+  {% if rows %}
+  <div class="card re-group g-{{ grp }}">
+    <div class="re-group-h"><span class="re-tag t-{{ grp }}">{{ title }}</span></div>
+    <div class="re-row re-head"><span>지역</span><span>매매</span>{% if kw.jeonse_sd %}<span>전세</span>{% endif %}</div>
     {% for r in rows %}
     {% set j = (kw.jeonse_sd | selectattr('name', 'equalto', r.name) | first) if kw.jeonse_sd else none %}
     <div class="re-row">
@@ -66,10 +71,10 @@
       {% endif %}
     </div>
     {% endfor %}
-    {% endif %}
-    {% endfor %}
-    <div class="re-src" style="margin-top:6px">한국부동산원 · 0~200, 100 = 사려는 사람과 팔려는 사람이 비슷</div>
   </div>
+  {% endif %}
+  {% endfor %}
+  <div class="re-src" style="margin-top:6px">한국부동산원 · 0~200, 100 = 사려는 사람과 팔려는 사람이 비슷</div>
   {% endif %}
   {% else %}
   <div class="card"><div class="pocket nodata">
@@ -143,6 +148,23 @@
       <span class="num">{{ '%.2f'|format(r.man / 10000) }}억</span>
     </div>
     {% endfor %}
+    {% endif %}
+    {% if s.highs_from %}
+    <div class="re-sub" style="margin-top:12px">신고가 · 최근 7일 계약 {{ s.highs_n }}건</div>
+    {% for r in s.highs %}
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name">{{ r.apt }}</span>
+        <span class="num up">{{ '%.2f'|format(r.man / 10000) }}억</span>
+      </div>
+      <div class="re-note">{{ r.gu }} {{ r.dong }} · {{ '%.0f'|format(r.area) }}㎡ · {{ r.floor }}층 · {{ md(r.date) }}
+        · 직전 최고 {{ '%.2f'|format(r.prev_man / 10000) }}억{% if r.prev_date %}({{ r.prev_date[:7].replace('-', '.') }}){% endif %}
+        보다 {{ '%+.1f'|format((r.man - r.prev_man) / r.prev_man * 100) }}%</div>
+    </div>
+    {% else %}
+    <div class="re-note">최근 7일 계약된 거래 중 신고가는 없습니다.</div>
+    {% endfor %}
+    <div class="re-src">{{ s.highs_from }} 이후 같은 단지·같은 전용면적의 최고가를 넘은 거래 (중개거래만)</div>
     {% endif %}
     <div class="re-src" style="margin-top:6px">국토교통부 실거래 신고 기준 · 해제된 거래 제외.
       서울시·부동산원 공표 통계와 수십 건 차이가 날 수 있습니다 (예: 2026년 7월 신고 기준 5,850건, 공표 5,838건).</div>

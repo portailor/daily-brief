@@ -84,6 +84,16 @@
   .re-note{font-size:12px; color:var(--dim)}
   .re-src{font-size:11.5px; color:var(--dim); margin-top:2px}
   @media (max-width:420px){ .re-two{grid-template-columns:1fr} }
+  /* 권역·광역시를 한눈에 갈라 보이게 — 묶음마다 색 띠와 이름표 */
+  .re-group{margin-top:14px; border-left:4px solid var(--accent)}
+  .re-group.g-metro{border-left-color:#0f8a7e}
+  .re-group-h{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;
+              margin:0 0 8px; padding-bottom:8px; border-bottom:1px solid var(--line)}
+  .re-tag{display:inline-block; padding:3px 11px; border-radius:999px; font-size:12.5px;
+          font-weight:800; color:#fff; background:var(--accent)}
+  .re-tag.t-metro{background:#0f8a7e}
+  .re-group-sub{font-size:12px; color:var(--dim); font-weight:500}
+  .re-h3{font-size:14px; margin:24px 0 0; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap}
   /* ── 코인 ───────────────────────────────────────── */
   .cx-row{display:grid; grid-template-columns:1.2fr 1.2fr .8fr .8fr; gap:6px; padding:8px 0;
           font-size:14px; align-items:baseline}

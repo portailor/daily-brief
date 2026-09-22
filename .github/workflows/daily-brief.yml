@@ -174,7 +174,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs data/predictions.csv data/state.json
+          git add docs data/predictions.csv data/state.json data/seoul_highs.json
           if git diff --cached --quiet; then
             echo "변경 없음 — 커밋 생략"
           else
