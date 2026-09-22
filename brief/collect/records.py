@@ -9,7 +9,7 @@
              있어서 기록에 박아 두지 않는다. 해제되면 다음 날 자연히 빠진다.
 
 판정 규칙
-  - 같은 구·같은 동·같은 단지 이름·같은 전용면적(소수 첫째 자리)을 한 종류로 본다.
+  - 같은 구·같은 동·같은 지번(단지)에서 전용면적이 ±1㎡ 안이면 한 평형으로 본다.
   - 해제된 거래와 직거래는 기록에도, 판정에도 넣지 않는다. 직거래는 가족 간 거래처럼
     시세와 동떨어진 값이 섞일 수 있다.
   - 확정 기록에 그 종류가 없으면(처음 보는 거래) 신고가로 치지 않는다.
@@ -37,8 +37,16 @@ BACKFILL_MONTHS = 36
 HISTORY_START = date(2006, 1, 1)
 
 
+AREA_TOL = 1.0     # 같은 단지에서 이 차이 안의 전용면적은 한 평형으로 본다 (㎡)
+
+
+def complex_key(r: dict, sgg: str) -> str:
+    """단지 = 구 + 법정동 + 지번. 단지 이름은 20년 사이 바뀌기도 해서 지번으로 묶는다."""
+    return f"{sgg}|{r.get('umdNm', '')}|{r.get('jibun') or r['aptNm']}"
+
+
 def kind_key(r: dict, sgg: str) -> str:
-    return f"{sgg}|{r.get('umdNm', '')}|{r['aptNm']}|{float(r['excluUseAr']):.1f}"
+    return f"{complex_key(r, sgg)}|{float(r['excluUseAr']):.1f}"
 
 
 def usable(r: dict) -> bool:
@@ -92,7 +100,7 @@ def fold(store: dict, fetch, codes: dict[str, str], upto: date, log=print,
     if store["through"]:
         start = _month_add(date.fromisoformat(store["through"] + "-01"), 1)
     else:
-        start = _month_add(upto, -(BACKFILL_MONTHS - 1))
+        start = HISTORY_START
         store["since"] = start.strftime("%Y-%m")
     months = []
     m = start
@@ -161,19 +169,39 @@ def fill_back(store: dict, fetch, codes: dict[str, str], start: date, log=print,
     save(store)
 
 
+def _index(store: dict) -> dict[str, list[tuple[float, int, str]]]:
+    """단지 → [(전용면적, 최고가, 그 날짜)]"""
+    idx: dict[str, list] = {}
+    for k, (v, d) in store["max"].items():
+        cx, area = k.rsplit("|", 1)
+        idx.setdefault(cx, []).append((float(area), v, d))
+    return idx
+
+
 def detect(store: dict, recent: list[tuple[str, dict]], since: date) -> list[dict]:
-    """최근 두 달 거래 [(구코드, 거래)] 중 since 이후 계약된 신고가."""
+    """최근 두 달 거래 [(구코드, 거래)] 중 since 이후 계약된 신고가.
+
+    같은 단지(지번)에서 전용면적이 ±AREA_TOL 안인 거래를 한 평형으로 보고, 그 전체의
+    최고가를 넘어야 신고가로 친다. (41.2㎡ 가 41.9㎡ 의 기존 최고가와 같은 값에 팔린 것을
+    '+34.5% 신고가'로 잘못 잡은 일이 있어 넣은 규칙. 넓게 묶을수록 신고가가 덜 잡힌다 —
+    틀린 신고가보다는 놓치는 쪽을 택한다.)
+    """
+    idx = _index(store)
     rows = sorted(((code, r) for code, r in recent if usable(r)), key=lambda x: deal_date(x[1]))
-    running: dict[str, int] = {}
+    seen: dict[str, list[tuple[float, int]]] = {}       # 최근 두 달 안에서 먼저 팔린 값
     highs = []
     for code, r in rows:
-        k, v, d = kind_key(r, code), man(r), deal_date(r)
-        hist = store["max"].get(k)
-        before = max(hist[0] if hist else 0, running.get(k, 0))
-        if hist and v > before and d >= since.isoformat():
-            highs.append({"sgg": code, "dong": r.get("umdNm", ""), "apt": r["aptNm"],
-                          "area": float(r["excluUseAr"]), "floor": r.get("floor", ""),
-                          "man": v, "date": d, "prev_man": before,
-                          "prev_date": hist[1] if before == hist[0] else None})
-        running[k] = max(running.get(k, 0), v)
+        cx, a, v, d = complex_key(r, code), float(r["excluUseAr"]), man(r), deal_date(r)
+        near = [(v0, d0) for a0, v0, d0 in idx.get(cx, []) if abs(a0 - a) <= AREA_TOL]
+        recent_before = max((v0 for a0, v0 in seen.get(cx, []) if abs(a0 - a) <= AREA_TOL),
+                            default=0)
+        if near:
+            hist_v, hist_d = max(near)
+            before = max(hist_v, recent_before)
+            if v > before and d >= since.isoformat():
+                highs.append({"sgg": code, "dong": r.get("umdNm", ""), "apt": r["aptNm"],
+                              "area": a, "floor": r.get("floor", ""),
+                              "man": v, "date": d, "prev_man": before,
+                              "prev_date": hist_d if before == hist_v else None})
+        seen.setdefault(cx, []).append((a, v))
     return sorted(highs, key=lambda h: -(h["man"] - h["prev_man"]) / h["prev_man"])
