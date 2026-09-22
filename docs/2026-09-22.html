@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>경제 브리핑 2026년 9월 22일 (화)</title>
-<meta name="brief-build" content="20260922071049">
+<meta name="brief-build" content="20260922171604">
 <style>
   :root{
     --bg:#f7f8fa; --card:#fff; --ink:#14161a; --dim:#5b6270; --line:#e3e6ec;
@@ -58,11 +58,44 @@
   .mini-row .num{font-size:12.5px}
   .mini-chg{min-width:52px; text-align:right}
   .tk{font-size:10.5px; color:var(--dim); font-family:var(--mono)}
+  /* ── 탭 ─────────────────────────────────────────── */
+  .tabs{position:sticky; top:0; z-index:5; display:flex; gap:4px; margin:0 -16px 6px;
+        padding:8px 16px; background:var(--bg); border-bottom:1px solid var(--line)}
+  .tab{padding:8px 15px; border-radius:999px; font-size:14.5px; font-weight:700;
+       color:var(--dim); text-decoration:none}
+  .tab.on{background:var(--ink); color:var(--bg)}
+  .market-head{margin:12px 0 0}
+  /* ── 부동산 ─────────────────────────────────────── */
+  .re-row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; padding:8px 0;
+          font-size:14.5px; align-items:baseline}
+  .re-row + .re-row{border-top:1px solid var(--line)}
+  .re-head{font-size:12px; color:var(--dim); font-weight:700; padding-top:0}
+  .re-row > span:not(:first-child){text-align:right}
+  .re-name{font-weight:650}
+  .re-streak{display:block; font-size:11.5px; color:var(--dim); font-weight:500}
+  .re-two{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px}
+  .re-sub{font-size:12px; font-weight:700; color:var(--dim); margin-bottom:5px}
+  .re-pair{display:flex; justify-content:space-between; font-size:14px; padding:3px 0}
+  .re-item{padding:10px 0}
+  .re-item + .re-item{border-top:1px solid var(--line)}
+  .re-item-top{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+  .re-item-val{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin-top:3px}
+  .re-big{font-size:18px; font-weight:750}
+  .re-note{font-size:12px; color:var(--dim)}
+  .re-src{font-size:11.5px; color:var(--dim); margin-top:2px}
+  @media (max-width:420px){ .re-two{grid-template-columns:1fr} }
+  /* ── 코인 ───────────────────────────────────────── */
+  .cx-row{display:grid; grid-template-columns:1.2fr 1.2fr .8fr .8fr; gap:6px; padding:8px 0;
+          font-size:14px; align-items:baseline}
+  .cx-row + .cx-row{border-top:1px solid var(--line)}
+  .cx-row > span:not(:first-child){text-align:right}
+  .cx-head{font-size:12px; color:var(--dim); font-weight:700; padding-top:0}
   .res-period{font-size:12px; color:var(--dim); font-weight:500; margin-left:6px}
   .res-line{display:block; font-size:14px; margin-top:3px; font-variant-numeric:tabular-nums}
   .res-src{display:block; font-size:11.5px; color:var(--dim); margin-top:3px}
   .situ{font-size:13px; color:var(--dim); margin-top:3px; line-height:1.55}
-  .plab{flex:0 0 auto; font-size:11.5px; font-weight:700; color:var(--dim)}
+  .pline{margin-top:8px; font-size:14px; font-weight:700}
+  .pline .pct{font-size:15px; color:var(--accent)}
   .issue + .issue{margin-top:8px}
   .card.issue{padding:11px 13px}
   .issue-head{display:flex; align-items:baseline; gap:6px; font-size:14.5px; margin-bottom:4px}
@@ -186,7 +219,7 @@
   .trig + .trig{border-top:1px solid var(--line)}
   .trig .claim{font-weight:640; font-size:15px; line-height:1.6}
   .trig .basis{font-size:13px; color:var(--dim); margin-top:5px}
-  .pbar{display:flex; align-items:center; gap:9px; margin-top:7px}
+  .pbar{display:flex; align-items:center; gap:9px; margin-top:4px}
   .pbar .track{flex:1; height:6px; background:var(--line);
                border-radius:4px; overflow:hidden; position:relative}
   .pbar .fill{height:100%; background:var(--accent); border-radius:4px}
@@ -262,6 +295,16 @@
 <header>
   <div class="eyebrow">매일 경제 브리핑</div>
   <h1>2026년 9월 22일 (화)</h1>
+</header>
+
+<nav class="tabs" role="tablist">
+  <a href="#market" role="tab" data-tab="market" class="tab on">주식·경제</a>
+  <a href="#realestate" role="tab" data-tab="realestate" class="tab">부동산</a>
+  <a href="#crypto" role="tab" data-tab="crypto" class="tab">코인</a>
+</nav>
+
+<div class="panel" id="panel-market">
+<div class="market-head">
   <div class="basis-line">한국 9/21(월) · 미국 9/21(월) 마감 기준</div>
   <div class="tiles">
     <div class="tile">
@@ -286,8 +329,8 @@
     </div>
     <div class="tile">
       <div class="tile-name">원/달러</div>
-      <div class="tile-val num">1,374.64</div>
-      <div class="tile-chg num down">-0.35%</div>
+      <div class="tile-val num">1,384.86</div>
+      <div class="tile-chg num up">+0.39%</div>
     </div>
     <div class="tile">
       <div class="tile-name">미 국채 10년</div>
@@ -295,7 +338,7 @@
       <div class="tile-chg num down">-5bp</div>
     </div>
   </div>
-</header>
+</div>
 
 
 <section>
@@ -352,23 +395,23 @@
         </tr>
         <tr class="">
           <td><span class="term" tabindex="0">원/달러 환율<span class="tip"><strong class="tip-head">원/달러 환율 · 1달러를 사는 데 필요한 원화</strong><span class="tip-body">미국 달러 1달러와 교환되는 원화 금액입니다. 숫자가 오르면 원화 가치가 떨어진 것(원화 약세), 내리면 원화 가치가 오른 것(원화 강세)입니다. 이 브리핑의 값은 국제 외환시장 기준 시세라, 서울 외환시장의 오후 3시 30분 종가와는 조금 다를 수 있습니다.</span><em class="tip-pocket">환율 1,345원이면 1,000달러를 사는 데 134만5천원이 듭니다(수수료 제외).</em></span></span></td>
-          <td class="num">1,374.64</td>
-          <td class="num down">-0.35%</td>
-          <td class="num flat">-0.59</td>
+          <td class="num">1,384.86</td>
+          <td class="num up">+0.39%</td>
+          <td class="num flat">+0.65</td>
           <td class="num">
-            <span class="band"><i style="left:16%"></i></span>16%
+            <span class="band"><i style="left:21%"></i></span>21%
           </td>
-          <td class="num down">-6.1%</td>
+          <td class="num down">-5.4%</td>
         </tr>
         <tr class="">
           <td><span class="term" tabindex="0">달러인덱스<span class="tip"><strong class="tip-head">달러인덱스 · 주요 6개 통화 대비 달러 가치</strong><span class="tip-body">유로·엔·파운드·캐나다달러·스웨덴크로나·스위스프랑 6개 통화 대비 미국 달러의 가치를 지수로 나타낸 것입니다. 원/달러 환율과 함께 보면 원화 쪽 요인인지 달러 쪽 요인인지 가늠하는 데 참고가 됩니다.</span></span></span></td>
-          <td class="num">100.40</td>
-          <td class="num up">+0.18%</td>
-          <td class="num flat">+0.61</td>
+          <td class="num">100.43</td>
+          <td class="num up">+0.21%</td>
+          <td class="num flat">+0.72</td>
           <td class="num">
-            <span class="band"><i style="left:77%"></i></span>77%
+            <span class="band"><i style="left:78%"></i></span>78%
           </td>
-          <td class="num up">+1.2%</td>
+          <td class="num up">+1.3%</td>
         </tr>
         <tr class="notable">
           <td><span class="term" tabindex="0">S&amp;P 500<span class="tip"><strong class="tip-head">S&amp;P 500 · 미국 대형주 약 500개로 만든 지수</strong><span class="tip-body">S&amp;P 다우존스 인덱스가 산출하는 지수로, 미국 증시에 상장된 대표 대형 기업 약 500개로 구성됩니다. 시가총액(시장에서 거래 가능한 주식 기준)이 큰 기업일수록 비중이 큽니다. 미국 주식시장 전체의 흐름을 볼 때 가장 널리 쓰입니다.</span></span></span></td>
@@ -432,43 +475,43 @@
         </tr>
         <tr class="">
           <td><span class="term" tabindex="0">WTI 원유<span class="tip"><strong class="tip-head">WTI · 미국산 원유의 가격 기준</strong><span class="tip-body">West Texas Intermediate. 미국 텍사스 일대에서 생산되는 원유로, 브렌트유·두바이유와 함께 국제 원유 가격의 대표 기준으로 쓰입니다. 이 브리핑의 값은 뉴욕상업거래소(NYMEX)에서 거래되는 최근월 선물 가격입니다.</span><em class="tip-pocket">배럴은 원유 부피 단위로 1배럴은 약 159리터입니다. 배럴당 100달러면 리터당 약 0.63달러입니다.</em></span></span><span class="asof">선물</span></td>
-          <td class="num">91.97</td>
-          <td class="num down">-8.31%</td>
-          <td class="num flat">-2.62</td>
+          <td class="num">95.78</td>
+          <td class="num down">-4.51%</td>
+          <td class="num flat">-1.42</td>
           <td class="num">
-            <span class="band"><i style="left:64%"></i></span>64%
+            <span class="band"><i style="left:70%"></i></span>70%
           </td>
-          <td class="num up">+13.8%</td>
+          <td class="num up">+18.4%</td>
         </tr>
         <tr class="">
           <td><span class="term" tabindex="0">브렌트유<span class="tip"><strong class="tip-head">브렌트유 · 북해산 원유의 가격 기준</strong><span class="tip-body">영국 북해에서 생산되는 원유로, 유럽·아프리카 등에서 거래되는 원유 가격의 기준으로 쓰입니다. 이 브리핑의 값은 뉴욕상업거래소(NYMEX)에 상장된 브렌트유 최근월 선물 가격입니다.</span><em class="tip-pocket">WTI와 브렌트유의 가격 차이는 고정돼 있지 않고 수급과 운송 여건에 따라 달라집니다.</em></span></span><span class="asof">선물</span></td>
-          <td class="num">95.96</td>
-          <td class="num down">-7.62%</td>
-          <td class="num flat">-2.24</td>
+          <td class="num">100.34</td>
+          <td class="num down">-3.40%</td>
+          <td class="num flat">-1.00</td>
           <td class="num">
-            <span class="band"><i style="left:62%"></i></span>62%
+            <span class="band"><i style="left:70%"></i></span>70%
           </td>
-          <td class="num up">+11.8%</td>
+          <td class="num up">+16.8%</td>
         </tr>
         <tr class="">
           <td><span class="term" tabindex="0">국제 금<span class="tip"><strong class="tip-head">국제 금 · 뉴욕 금 선물 가격 (온스당 달러)</strong><span class="tip-body">이 브리핑의 값은 뉴욕 COMEX 거래소의 금 최근월 선물 가격이며, 단위는 트로이온스당 미국 달러입니다. 한국 금거래소나 은행의 원화 금 시세와는 단위와 기준이 다릅니다.</span><em class="tip-pocket">1트로이온스는 약 31.1g입니다. 온스당 4,350달러면 그램당 약 140달러입니다(4,350 ÷ 31.1).</em></span></span><span class="asof">선물</span></td>
-          <td class="num">4,381.00</td>
-          <td class="num down">-0.99%</td>
-          <td class="num flat">-0.73</td>
+          <td class="num">4,383.90</td>
+          <td class="num down">-0.93%</td>
+          <td class="num flat">-0.68</td>
           <td class="num">
             <span class="band"><i style="left:42%"></i></span>42%
           </td>
-          <td class="num down">-3.8%</td>
+          <td class="num down">-3.7%</td>
         </tr>
         <tr class="">
           <td><span class="term" tabindex="0">구리<span class="tip"><strong class="tip-head">구리 · 뉴욕 구리 선물 가격 (파운드당 달러)</strong><span class="tip-body">이 브리핑의 값은 뉴욕 COMEX 거래소의 구리 최근월 선물 가격이며, 단위는 파운드당 미국 달러입니다. 구리는 전선·건설·전자제품 등 산업 전반에 쓰여 경기 흐름과 함께 거론되는 경우가 많습니다.</span><em class="tip-pocket">1파운드는 약 0.454kg입니다. 파운드당 6.5달러면 톤당 약 14,300달러입니다(6.5 × 2,204.6).</em></span></span><span class="asof">선물</span></td>
-          <td class="num">6.7920</td>
-          <td class="num up">+2.68%</td>
-          <td class="num flat">+1.89</td>
+          <td class="num">6.6865</td>
+          <td class="num up">+1.08%</td>
+          <td class="num flat">+0.76</td>
           <td class="num">
-            <span class="band"><i style="left:97%"></i></span>99%
+            <span class="band"><i style="left:95%"></i></span>95%
           </td>
-          <td class="num up">+12.1%</td>
+          <td class="num up">+10.3%</td>
         </tr>
       </tbody>
     </table>
@@ -1039,7 +1082,7 @@
       <div class="mini-h">대형 기술주</div>
       <div class="mini-row">
         <span>메타 <span class="tk">META</span></span>
-        <span class="num">$741.24</span>
+        <span class="num">$741.25</span>
         <span class="num mini-chg up">+11.34%</span>
       </div>
       <div class="mini-row">
@@ -1136,7 +1179,7 @@
 <section>
   <h2>내 지갑 기준으로는</h2>
   <div class="card">
-    <div class="pocket"><span class="term" tabindex="0">원/달러 환율<span class="tip"><strong class="tip-head">원/달러 환율 · 1달러를 사는 데 필요한 원화</strong><span class="tip-body">미국 달러 1달러와 교환되는 원화 금액입니다. 숫자가 오르면 원화 가치가 떨어진 것(원화 약세), 내리면 원화 가치가 오른 것(원화 강세)입니다. 이 브리핑의 값은 국제 외환시장 기준 시세라, 서울 외환시장의 오후 3시 30분 종가와는 조금 다를 수 있습니다.</span><em class="tip-pocket">환율 1,345원이면 1,000달러를 사는 데 134만5천원이 듭니다(수수료 제외).</em></span></span>: 환율이 1,379.53원에서 1,374.64원이 됐습니다. 어제 100만원으로 살 수 있던 725달러를 오늘 사려면 약 3,545원이 덜 듭니다(수수료 제외).</div>
+    <div class="pocket"><span class="term" tabindex="0">원/달러 환율<span class="tip"><strong class="tip-head">원/달러 환율 · 1달러를 사는 데 필요한 원화</strong><span class="tip-body">미국 달러 1달러와 교환되는 원화 금액입니다. 숫자가 오르면 원화 가치가 떨어진 것(원화 약세), 내리면 원화 가치가 오른 것(원화 강세)입니다. 이 브리핑의 값은 국제 외환시장 기준 시세라, 서울 외환시장의 오후 3시 30분 종가와는 조금 다를 수 있습니다.</span><em class="tip-pocket">환율 1,345원이면 1,000달러를 사는 데 134만5천원이 듭니다(수수료 제외).</em></span></span>: 환율이 1,379.53원에서 1,384.86원이 됐습니다. 어제 100만원으로 살 수 있던 725달러를 오늘 사려면 약 3,864원이 더 듭니다(수수료 제외).</div>
     <div class="pocket"><span class="term" tabindex="0">VIX 공포지수<span class="tip"><strong class="tip-head">VIX · S&amp;P500의 예상 변동성 지수</strong><span class="tip-body">시카고옵션거래소(Cboe)가 S&amp;P500 옵션 가격에서 계산하는 지수로, 시장이 예상하는 앞으로 30일간의 변동폭(연율)을 나타냅니다. 투자자들이 하락에 대비해 옵션을 비싸게 살수록 값이 올라가서 &#x27;공포지수&#x27;라고도 부릅니다.</span><em class="tip-pocket">VIX는 연율 기준이라 한 달 기준으로 바꾸려면 √12(약 3.46)로 나눕니다. VIX 17이면 한 달 예상 변동폭은 약 ±4.9%입니다.</em></span></span>: VIX 14.9을 한 달 기준으로 환산하면 약 ±4.3%입니다(14.9 ÷ √12). S&amp;P500 옵션 가격에 반영된 한 달 예상 변동폭입니다.</div>
   </div>
 </section>
@@ -1203,73 +1246,67 @@
   <div class="card">
     <div class="trig">
       <div class="claim">S&amp;P 500이 반대로 내린다</div>
-<div class="situ">직전 거래일에 평소보다 크게 올랐습니다 (평소 하루 변동폭의 2.2배)</div>      <div class="pbar">
-        <span class="plab">그럴 확률</span>
+<div class="situ">직전 거래일에 평소보다 크게 올랐습니다 (평소 하루 변동폭의 2.2배)</div>      <div class="pline"><span class="pname">반대로 내릴 확률</span> <span class="pct">51%</span></div>
+      <div class="pbar">
         <span class="track">
           <span class="ci" style="left:44%; width:14%"></span>
           <span class="fill" style="width:51%"></span>
         </span>
-        <span class="pct">51%</span>
       </div>
       <div class="basis ">지금까지 비슷한 상황이 182번 있었고 그중 93번 그랬습니다(나머지 89번은 아니었습니다). 횟수가 더 늘면 44%~58% 안에서 움직일 값입니다.</div>
     </div>
     <div class="trig">
       <div class="claim">나스닥이 반대로 내린다</div>
-<div class="situ">직전 거래일에 평소보다 크게 올랐습니다 (평소 하루 변동폭의 2.1배)</div>      <div class="pbar">
-        <span class="plab">그럴 확률</span>
+<div class="situ">직전 거래일에 평소보다 크게 올랐습니다 (평소 하루 변동폭의 2.1배)</div>      <div class="pline"><span class="pname">반대로 내릴 확률</span> <span class="pct">47%</span></div>
+      <div class="pbar">
         <span class="track">
           <span class="ci" style="left:40%; width:15%"></span>
           <span class="fill" style="width:47%"></span>
         </span>
-        <span class="pct">47%</span>
       </div>
       <div class="basis ">지금까지 비슷한 상황이 166번 있었고 그중 78번 그랬습니다(나머지 88번은 아니었습니다). 횟수가 더 늘면 40%~55% 안에서 움직일 값입니다.</div>
     </div>
     <div class="trig">
       <div class="claim">국고채 3년물이 고점에서 내려온다</div>
-<div class="situ">지금 값이 최근 1년 사이 가장 높았던 값 근처입니다</div>      <div class="pbar">
-        <span class="plab">그럴 확률</span>
+<div class="situ">지금 값이 최근 1년 사이 가장 높았던 값 근처입니다</div>      <div class="pline"><span class="pname">내려올 확률</span> <span class="pct">12%</span></div>
+      <div class="pbar">
         <span class="track">
           <span class="ci" style="left:7%; width:13%"></span>
           <span class="fill" style="width:12%"></span>
         </span>
-        <span class="pct">12%</span>
       </div>
       <div class="basis ">지금까지 비슷한 상황이 105번 있었고 그중 13번 그랬습니다(나머지 92번은 아니었습니다). 횟수가 더 늘면 7%~20% 안에서 움직일 값입니다.</div>
     </div>
     <div class="trig">
       <div class="claim">나스닥이 고점에서 내려온다</div>
-<div class="situ">지금 값이 최근 1년 사이 가장 높았던 값 근처입니다</div>      <div class="pbar">
-        <span class="plab">그럴 확률</span>
+<div class="situ">지금 값이 최근 1년 사이 가장 높았던 값 근처입니다</div>      <div class="pline"><span class="pname">내려올 확률</span> <span class="pct">8%</span></div>
+      <div class="pbar">
         <span class="track">
           <span class="ci" style="left:7%; width:3%"></span>
           <span class="fill" style="width:8%"></span>
         </span>
-        <span class="pct">8%</span>
       </div>
       <div class="basis ">지금까지 비슷한 상황이 1136번 있었고 그중 92번 그랬습니다(나머지 1044번은 아니었습니다). 횟수가 더 늘면 7%~10% 안에서 움직일 값입니다.</div>
     </div>
     <div class="trig">
       <div class="claim">S&amp;P 500이 고점에서 내려온다</div>
-<div class="situ">지금 값이 최근 1년 사이 가장 높았던 값 근처입니다</div>      <div class="pbar">
-        <span class="plab">그럴 확률</span>
+<div class="situ">지금 값이 최근 1년 사이 가장 높았던 값 근처입니다</div>      <div class="pline"><span class="pname">내려올 확률</span> <span class="pct">7%</span></div>
+      <div class="pbar">
         <span class="track">
           <span class="ci" style="left:5%; width:3%"></span>
           <span class="fill" style="width:7%"></span>
         </span>
-        <span class="pct">7%</span>
       </div>
       <div class="basis ">지금까지 비슷한 상황이 1238번 있었고 그중 81번 그랬습니다(나머지 1157번은 아니었습니다). 횟수가 더 늘면 5%~8% 안에서 움직일 값입니다.</div>
     </div>
     <div class="trig">
       <div class="claim">미 국채 10년물이 고점에서 내려온다</div>
-<div class="situ">지금 값이 최근 1년 사이 가장 높았던 값 근처입니다</div>      <div class="pbar">
-        <span class="plab">그럴 확률</span>
+<div class="situ">지금 값이 최근 1년 사이 가장 높았던 값 근처입니다</div>      <div class="pline"><span class="pname">내려올 확률</span> <span class="pct">18%</span></div>
+      <div class="pbar">
         <span class="track">
           <span class="ci" style="left:15%; width:8%"></span>
           <span class="fill" style="width:18%"></span>
         </span>
-        <span class="pct">18%</span>
       </div>
       <div class="basis ">지금까지 비슷한 상황이 332번 있었고 그중 61번 그랬습니다(나머지 271번은 아니었습니다). 횟수가 더 늘면 15%~23% 안에서 움직일 값입니다.</div>
     </div>
@@ -1279,12 +1316,12 @@
     <div class="deep">
       전부 <b>과거에 실제로 몇 번 그랬는지를 센 숫자</b>입니다.
       누군가의 전망이나 인공지능의 추측이 아닙니다.<br><br>
-      읽는 법을 예로 들면, "국고채 3년물이 고점에서 내려온다 · 그럴 확률 13%"는
+      읽는 법을 예로 들면, "국고채 3년물이 고점에서 내려온다 · 내려올 확률 13%"는
       <b>과거에 국고채 3년물이 지금처럼 1년 최고 수준에 있던 날이 100번 있었는데,
       그중 다음 날 내려간 날이 13번이었다</b>는 뜻입니다.
       나머지 87번은 내려가지 않았습니다. 그래서 13%입니다.<br><br>
       조건 문장 안에 들어간 숫자(가격, 평균선 값, 1년 범위에서의 위치)는 <b>확률이 아니라
-      지금 상태</b>입니다. 확률은 오른쪽에 "그럴 확률"이라고 적힌 하나뿐입니다.<br><br>
+      지금 상태</b>입니다. 확률은 막대 위에 "○○할 확률"로 적힌 하나뿐입니다.<br><br>
       괄호 안 95% 구간은 센 횟수가 적을 때 생기는 불확실성입니다.
       "0~19%"처럼 넓게 나오면 그만큼 확신할 수 없다는 뜻이고,
       이 브리핑은 그럴 때 점 하나로 단정하지 않습니다.<br><br>
@@ -1348,9 +1385,6 @@
     </a>
     <a class="issue-row" href="https://www.cbci.co.kr/news/articleView.html?idxno=608612" target="_blank" rel="noopener">
       <span class="tag news">뉴스</span><span class="issue-title">HBM 관련주 장중 들썩…와이씨 17%·디아이 14% 급등, SK하이닉스·삼성...</span><span class="issue-when">09/21 11:00</span>
-    </a>
-    <a class="issue-row" href="https://www.ggilbo.com/news/articleView.html?idxno=1182894" target="_blank" rel="noopener">
-      <span class="tag news">뉴스</span><span class="issue-title">와이씨 주가, 급등세... 전망은?</span><span class="issue-when">09/21 09:58</span>
     </a>
   </div>
   <div class="card issue">
@@ -1451,9 +1485,375 @@
   </div>
 </section>
 
+</div>
+<div class="panel" id="panel-realestate" hidden>
+
+<section>
+  <h2>한국 아파트값 · 한 주 사이</h2>
+  <p class="hint-plain"><span class="term" tabindex="0">주간 아파트 가격동향<span class="tip"><strong class="tip-head">주간 아파트 가격동향 · 한국부동산원의 주간 아파트값 통계</strong><span class="tip-body">한국부동산원이 전국 표본 아파트의 가격을 매주 조사해 목요일에 발표하는 통계입니다. 기준 시점을 100으로 둔 지수로 나오며, 이 브리핑은 그 지수가 한 주 사이 몇 % 바뀌었는지를 계산해 보여줍니다.</span></span></span> · <b>9/14 기준</b>
+    · 매주 목요일 공표. 전주 대비 변동률입니다.</p>
+  <div class="card">
+    <div class="re-row re-head">
+      <span>지역</span><span>매매</span><span><span class="term" tabindex="0">전세<span class="tip"><strong class="tip-head">전세 · 목돈을 맡기고 월세 없이 사는 임대 방식</strong><span class="tip-body">집주인에게 보증금을 맡기고 정해진 기간 동안 월세 없이 사는 한국의 임대 방식입니다. 계약이 끝나면 보증금을 돌려받습니다. 전세가격 지수는 이 보증금 수준의 변화를 나타냅니다.</span></span></span></span>    </div>
+    <div class="re-row">
+      <span class="re-name">전국</span>
+      <span class="num up">
+        +0.08%<span class="re-streak">53주째 상승</span>      </span>
+      <span class="num up">
+        +0.10%
+      </span>
+    </div>
+    <div class="re-row">
+      <span class="re-name">수도권</span>
+      <span class="num up">
+        +0.15%<span class="re-streak">81주째 상승</span>      </span>
+      <span class="num up">
+        +0.16%
+      </span>
+    </div>
+    <div class="re-row">
+      <span class="re-name">서울</span>
+      <span class="num up">
+        +0.16%<span class="re-streak">84주째 상승</span>      </span>
+      <span class="num up">
+        +0.17%
+      </span>
+    </div>
+    <div class="re-row">
+      <span class="re-name">지방권</span>
+      <span class="num ">
+        보합      </span>
+      <span class="num up">
+        +0.04%
+      </span>
+    </div>
+    <div class="re-row">
+      <span class="re-name">5대광역시</span>
+      <span class="num up">
+        +0.01%<span class="re-streak">3주째 상승</span>      </span>
+      <span class="num up">
+        +0.07%
+      </span>
+    </div>
+  </div>
+
+  <div class="re-two">
+    <div class="card">
+      <div class="re-sub">서울에서 많이 오른 구</div>
+<div class="re-pair"><span>중랑구<span class="re-streak">51주째 상승</span></span><span class="num up">+0.51%</span></div><div class="re-pair"><span>도봉구<span class="re-streak">50주째 상승</span></span><span class="num up">+0.47%</span></div><div class="re-pair"><span>서대문구<span class="re-streak">82주째 상승</span></span><span class="num up">+0.47%</span></div>    </div>
+    <div class="card">
+      <div class="re-sub">서울에서 덜 오르거나 내린 구</div>
+<div class="re-pair"><span>강남구<span class="re-streak">6주째 하락</span></span><span class="num down">-0.36%</span></div><div class="re-pair"><span>서초구<span class="re-streak">6주째 하락</span></span><span class="num down">-0.26%</span></div><div class="re-pair"><span>송파구<span class="re-streak">2주째 하락</span></span><span class="num down">-0.12%</span></div>    </div>
+  </div>
+</section>
+
+<section>
+  <h2>대출 금리 · 미분양 · 실거래 (월간)</h2>
+  <p class="hint-plain">달마다 나오는 통계라 기준 달이 항목마다 다릅니다.</p>
+  <div class="card">
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name"><span class="term" tabindex="0">주택담보대출 금리<span class="tip"><strong class="tip-head">주택담보대출 금리 · 집을 담보로 빌릴 때의 이자율</strong><span class="tip-body">집을 담보로 은행에서 돈을 빌릴 때의 이자율입니다. 여기 적힌 값은 한국은행이 집계한, 그 달 예금은행에서 새로 나간 주택담보대출의 평균 금리(대출 금액으로 가중평균)입니다.</span><em class="tip-pocket">3억원을 빌리면 금리 0.1%p 차이가 1년 이자로 30만원입니다(3억 × 0.001).</em></span></span></span>
+        <span class="asof">2026년 7월</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">4.48%</span>
+        <span class="num up">+12bp</span>
+        <span class="re-note">전월 대비 · 예금은행 신규취급액 가중평균</span>
+      </div>
+      <div class="re-src">한국은행</div>
+    </div>
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name"><span class="term" tabindex="0">미분양 주택<span class="tip"><strong class="tip-head">미분양 주택 · 분양했지만 팔리지 않고 남은 새 집</strong><span class="tip-body">새로 지은(또는 짓고 있는) 주택을 분양했는데 계약자를 찾지 못하고 남은 물량입니다. 정부가 매달 집계해 발표합니다.</span></span></span> · 전국</span>
+        <span class="asof">2026년 7월</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">68,217호</span>
+        <span class="num up">+753호</span>
+        <span class="re-note">전월 대비</span>
+      </div>
+      <div class="re-src">국가데이터처</div>
+    </div>
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name">미분양 주택 · 수도권</span>
+        <span class="asof">2026년 7월</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">19,459호</span>
+        <span class="num up">+689호</span>
+        <span class="re-note">전월 대비</span>
+      </div>
+      <div class="re-src">국가데이터처</div>
+    </div>
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name">아파트 <span class="term" tabindex="0">실거래가격지수<span class="tip"><strong class="tip-head">실거래가격지수 · 실제로 거래된 가격으로 만든 지수</strong><span class="tip-body">조사원이 매기는 시세가 아니라 실제로 신고된 거래 가격으로 만든 한국부동산원의 지수입니다. 부동산 거래는 계약 후 30일 안에 신고하고 이를 모아 계산하기 때문에, 다른 통계보다 늦게 나옵니다.</span></span></span> · 서울</span>
+        <span class="asof">2026년 6월</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">203.5</span>
+        <span class="num up">+2.47%</span>
+        <span class="re-note">전월 대비</span>
+      </div>
+      <div class="re-src">한국부동산원</div>
+    </div>
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name">아파트 실거래가격지수 · 전국</span>
+        <span class="asof">2026년 6월</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">131.7</span>
+        <span class="num up">+1.23%</span>
+        <span class="re-note">전월 대비</span>
+      </div>
+      <div class="re-src">한국부동산원</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>미국 주택시장</h2>
+  <div class="card">
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name"><span class="term" tabindex="0">30년 고정 모기지 금리<span class="tip"><strong class="tip-head">모기지 금리 · 미국 주택담보대출 금리</strong><span class="tip-body">모기지는 미국의 주택담보대출입니다. 여기 적힌 값은 미국 국책 주택금융회사 프레디맥이 매주 목요일 발표하는 30년 만기 고정금리 대출의 평균 금리입니다.</span></span></span></span>
+        <span class="asof">9/17 주</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">6.95%</span>
+        <span class="num up">+19bp</span>
+        <span class="re-note">전주 대비</span>
+      </div>
+      <div class="re-src">프레디맥(FRED)</div>
+    </div>
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name"><span class="term" tabindex="0">주택착공<span class="tip"><strong class="tip-head">주택착공 · 새로 짓기 시작한 주택 수</strong><span class="tip-body">그 달에 공사를 시작한 주택 수로, 미국 인구조사국이 매달 발표합니다. &#x27;연율&#x27;은 그 달의 속도가 1년 내내 이어지면 몇 채가 되는지로 환산한 값이라, 달마다 비교하기 쉽습니다.</span></span></span></span>
+        <span class="asof">2026년 8월</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">연율 127.5만 호</span>
+        <span class="num down">-2.6%</span>
+        <span class="re-note">계절조정 연율 · 전월 대비</span>
+      </div>
+      <div class="re-src">미 인구조사국(FRED)</div>
+    </div>
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name"><span class="term" tabindex="0">기존주택 판매<span class="tip"><strong class="tip-head">기존주택 판매 · 이미 지어진 집이 팔린 건수</strong><span class="tip-body">새 집이 아니라 이미 누군가 살던 집이 팔린 건수로, 전미부동산협회가 매달 발표합니다. 미국 주택 거래의 대부분을 차지합니다. 연율로 환산한 값입니다.</span></span></span></span>
+        <span class="asof">2026년 8월</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">연율 398만 호</span>
+        <span class="num down">-2.0%</span>
+        <span class="re-note">계절조정 연율 · 전월 대비</span>
+      </div>
+      <div class="re-src">전미부동산협회(FRED)</div>
+    </div>
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name"><span class="term" tabindex="0">케이스-실러 주택가격지수<span class="tip"><strong class="tip-head">케이스-실러 주택가격지수 · 같은 집의 재거래 가격으로 만든 미국 집값 지수</strong><span class="tip-body">같은 집이 다시 팔릴 때의 가격 변화를 모아 만든 미국 집값 지수입니다(반복매매 방식). 2000년 1월을 100으로 둡니다. 거래 기록을 모아 계산하느라 몇 달 늦게 나옵니다.</span></span></span></span>
+        <span class="asof">2026년 6월</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big">336.7</span>
+        <span class="num up">+1.5%</span>
+        <span class="re-note">1년 전 대비</span>
+      </div>
+      <div class="re-src">S&P(FRED)</div>
+    </div>
+  </div>
+</section>
+
+
+<section>
+  <details>
+    <summary>숫자를 읽는 법</summary>
+    <div class="deep">
+      모든 값은 공공기관·공식 집계 기관이 발표한 숫자를 그대로 옮기거나, 발표된 지수로
+      변동률만 계산한 것입니다. 오를지 내릴지에 대한 전망은 넣지 않았습니다.<br><br>
+      <b>주간 아파트값</b>은 한국부동산원이 표본 아파트를 매주 조사한 지수에서 전주 대비
+      변동률을 계산한 것입니다. 기사에서 보는 "서울 아파트값 0.○○% 상승"과 같은 통계입니다.<br><br>
+      <b>기사마다 숫자가 다른 이유</b> — 주간 아파트값은 한국부동산원 말고도 KB부동산,
+      부동산114 등이 따로 조사합니다. 표본과 조사 방식이 달라 같은 주에도 수치가 다릅니다
+      (예: 9/14 주 서울을 한국부동산원은 +0.16%, 부동산114는 +0.03%로 발표).
+      이 탭은 정부 승인 통계인 한국부동산원 수치만 씁니다.<br><br>
+      <b>월간 통계</b>는 발표까지 시간이 걸립니다. 특히 실거래가격지수는 거래 신고를 모아
+      계산해 두세 달 늦게 나옵니다. 그래서 항목마다 기준 달을 따로 적었습니다.
+    </div>
+  </details>
+</section></div>
+
+<div class="panel" id="panel-crypto" hidden>
+
+<section>
+  <h2>주요 코인 · 24시간</h2>
+  <p class="hint-plain"><b>9/22 17:11 기준</b>(한국시간) · 24시간 전 대비. 브리핑을 여는 시점엔 이미 바뀌었을 수 있습니다.</p>
+  <div class="card">
+    <div class="cx-row cx-head"><span>코인</span><span>달러 가격</span><span>24시간</span><span>7일</span></div>
+    <div class="cx-row">
+      <span class="re-name">비트코인</span>
+      <span class="num">$85,477</span>
+      <span class="num up">+4.3%</span>
+      <span class="num up">+10.4%</span>
+    </div>
+    <div class="cx-row">
+      <span class="re-name">이더리움</span>
+      <span class="num">$2,732</span>
+      <span class="num up">+2.4%</span>
+      <span class="num up">+9.6%</span>
+    </div>
+    <div class="cx-row">
+      <span class="re-name">리플(XRP)</span>
+      <span class="num">$1.52</span>
+      <span class="num up">+5.3%</span>
+      <span class="num up">+8.5%</span>
+    </div>
+    <div class="cx-row">
+      <span class="re-name">솔라나</span>
+      <span class="num">$116.45</span>
+      <span class="num up">+3.4%</span>
+      <span class="num up">+15.2%</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:8px">
+    <div class="re-sub">업비트 원화 가격 · <span class="term" tabindex="0">김치 프리미엄<span class="tip"><strong class="tip-head">김치 프리미엄 · 국내 거래소 코인 값이 해외보다 비싼 정도</strong><span class="tip-body">같은 코인이 국내 거래소(여기서는 업비트)에서 해외 시세를 원화로 환산한 값보다 몇 % 비싼지를 나타냅니다. 음수면 국내가 더 쌉니다(역프리미엄). 계산에 쓴 원/달러 환율을 함께 적어 두었습니다.</span><em class="tip-pocket">해외 시세가 1억원인 코인이 업비트에서 1억 100만원이면 김치 프리미엄은 +1%입니다.</em></span></span></div>
+    <div class="re-pair">
+      <span>비트코인 <span class="num" style="color:var(--dim)">115,182,000원</span></span>
+      <span class="num down">-1.14%</span>
+    </div>
+    <div class="re-pair">
+      <span>이더리움 <span class="num" style="color:var(--dim)">3,682,000원</span></span>
+      <span class="num down">-1.11%</span>
+    </div>
+    <div class="re-pair">
+      <span>리플(XRP) <span class="num" style="color:var(--dim)">2,052원</span></span>
+      <span class="num down">-1.08%</span>
+    </div>
+    <div class="re-pair">
+      <span>솔라나 <span class="num" style="color:var(--dim)">157,000원</span></span>
+      <span class="num down">-1.08%</span>
+    </div>
+<div class="re-src" style="margin-top:6px">해외 시세를 원/달러 1,363.1원으로 환산해 비교 (CoinGecko 환산)</div>  </div>
+</section>
+
+<section>
+  <h2>코인 시장 전체</h2>
+  <div class="card">
+    <div class="re-item">
+      <div class="re-item-top"><span class="re-name">전체 시가총액</span><span class="asof">9/22 17:11</span></div>
+      <div class="re-item-val">
+        <span class="num re-big">$2.91조</span>
+        <span class="num up">+1.5%</span>
+        <span class="re-note">24시간 전 대비</span>
+      </div>
+    </div>
+    <div class="re-item">
+      <div class="re-item-top"><span class="re-name"><span class="term" tabindex="0">비트코인 도미넌스<span class="tip"><strong class="tip-head">비트코인 도미넌스 · 코인 전체 시가총액 중 비트코인 비중</strong><span class="tip-body">모든 코인의 시가총액을 더한 값에서 비트코인이 차지하는 비율입니다. CoinGecko가 집계한 값입니다.</span></span></span></span><span class="asof">9/22 17:11</span></div>
+      <div class="re-item-val">
+        <span class="num re-big">58.8%</span>
+        <span class="re-note">이더리움 11.4%</span>
+      </div>
+    </div>
+    <div class="re-item">
+      <div class="re-item-top"><span class="re-name"><span class="term" tabindex="0">공포·탐욕 지수<span class="tip"><strong class="tip-head">공포·탐욕 지수 · 코인 시장 심리를 0~100으로 나타낸 지표</strong><span class="tip-body">alternative.me가 가격 변동성, 거래량, 소셜미디어 언급 등을 묶어 매일 발표하는 지수입니다. 0에 가까울수록 &#x27;극단적 공포&#x27;, 100에 가까울수록 &#x27;극단적 탐욕&#x27;으로 분류합니다. 한 민간 사이트가 만든 지표라는 점을 감안해서 보세요.</span></span></span></span><span class="asof">9/22</span></div>
+      <div class="re-item-val">
+        <span class="num re-big">78</span>
+        <span class="re-note" style="font-size:13px;color:var(--ink)">극단적 탐욕</span>
+<span class="re-note">전날 70</span>      </div>
+      <div class="re-src">alternative.me · 0 극단적 공포 ~ 100 극단적 탐욕</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>시가총액 상위 코인</h2>
+  <p class="hint-plain"><span class="term" tabindex="0">스테이블코인<span class="tip"><strong class="tip-head">스테이블코인 · 가격이 1달러에 묶이도록 만든 코인</strong><span class="tip-body">테더(USDT)·USD코인(USDC)처럼 가치가 1달러를 유지하도록 설계된 코인입니다. 가격이 거의 움직이지 않아 이 탭의 시가총액 순위에서는 뺐습니다.</span></span></span>과 토큰화 자산은 뺐습니다 · 24시간 전 대비</p>
+  <div class="card">
+    <div class="re-pair">
+      <span><span class="num" style="color:var(--dim);display:inline-block;width:1.6em">1</span>Bitcoin <span class="tk">BTC</span></span>
+      <span class="num up">+4.3%</span>
+    </div>
+    <div class="re-pair">
+      <span><span class="num" style="color:var(--dim);display:inline-block;width:1.6em">2</span>Ethereum <span class="tk">ETH</span></span>
+      <span class="num up">+2.4%</span>
+    </div>
+    <div class="re-pair">
+      <span><span class="num" style="color:var(--dim);display:inline-block;width:1.6em">3</span>BNB <span class="tk">BNB</span></span>
+      <span class="num up">+2.1%</span>
+    </div>
+    <div class="re-pair">
+      <span><span class="num" style="color:var(--dim);display:inline-block;width:1.6em">4</span>XRP <span class="tk">XRP</span></span>
+      <span class="num up">+5.3%</span>
+    </div>
+    <div class="re-pair">
+      <span><span class="num" style="color:var(--dim);display:inline-block;width:1.6em">5</span>Solana <span class="tk">SOL</span></span>
+      <span class="num up">+3.4%</span>
+    </div>
+    <div class="re-pair">
+      <span><span class="num" style="color:var(--dim);display:inline-block;width:1.6em">6</span>TRON <span class="tk">TRX</span></span>
+      <span class="num up">+1.6%</span>
+    </div>
+    <div class="re-pair">
+      <span><span class="num" style="color:var(--dim);display:inline-block;width:1.6em">7</span>Zcash <span class="tk">ZEC</span></span>
+      <span class="num up">+1.6%</span>
+    </div>
+    <div class="re-pair">
+      <span><span class="num" style="color:var(--dim);display:inline-block;width:1.6em">8</span>Hyperliquid <span class="tk">HYPE</span></span>
+      <span class="num up">+0.5%</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>업비트에서 많이 거래된 코인</h2>
+  <p class="hint-plain">최근 24시간 원화 거래대금 순 · 국내 투자자의 돈이 실제로 몰린 곳</p>
+  <div class="card">
+    <div class="re-pair">
+      <span>엑스알피(리플) <span class="tk">XRP</span></span>
+      <span class="num">5,225억원</span>
+    </div>
+    <div class="re-pair">
+      <span>비트코인 <span class="tk">BTC</span></span>
+      <span class="num">3,287억원</span>
+    </div>
+    <div class="re-pair">
+      <span>이더리움 <span class="tk">ETH</span></span>
+      <span class="num">2,163억원</span>
+    </div>
+    <div class="re-pair">
+      <span>테더 <span class="tk">USDT</span></span>
+      <span class="num">1,490억원</span>
+    </div>
+    <div class="re-pair">
+      <span>제타체인 <span class="tk">ZETA</span></span>
+      <span class="num">1,285억원</span>
+    </div>
+  </div>
+</section>
+
+
+<section>
+  <details>
+    <summary>숫자를 읽는 법</summary>
+    <div class="deep">
+      코인은 주말·밤에도 쉬지 않고 거래되어 '마감 가격'이 없습니다. 그래서 브리핑을 만든
+      시각의 가격을 적고, 변동률은 모두 <b>그 시각 기준 24시간 전 대비</b>로 통일했습니다.<br><br>
+      업비트 앱에 보이는 등락률은 매일 <b>오전 9시 가격 대비</b>라, 같은 순간에도 이 탭의
+      숫자와 다를 수 있습니다. 둘 다 맞는 숫자이고 기준만 다릅니다.<br><br>
+      달러 가격과 시가총액은 CoinGecko 집계이며, 만들 때 코인베이스·크라켄 거래소 체결가와
+      0.04% 이내로 일치하는 것을 확인했습니다. 전망이나 추천은 넣지 않았습니다.
+    </div>
+  </details>
+</section></div>
+
 <footer>
-  데이터 출처: 한국거래소·yfinance(시세), 미 연준 FRED(거시지표), 한국은행 ECOS(국내금리)<br>
-  생성 <code>2026-09-22 07:10</code> · 기준일 <code>2026-09-21</code>
+  데이터 출처: 한국거래소·yfinance(시세), 미 연준 FRED(거시지표·미국 주택), 한국은행 ECOS(국내금리·주택담보대출·미분양), 한국부동산원(아파트 가격), CoinGecko·업비트(코인)<br>
+  생성 <code>2026-09-22 17:16</code> · 기준일 <code>2026-09-21</code>
   <div class="disclaimer">
     이 문서는 공개 데이터를 기계적으로 집계·계산한 개인용 참고 자료이며, 투자 권유나
     개인 맞춤 자문이 아닙니다. 투자자문업으로 등록된 곳에서 만든 것이 아닙니다.
@@ -1544,6 +1944,26 @@
   ['scroll', 'resize'].forEach(function (ev) {
     window.addEventListener(ev, function () { if (open) place(open); }, true);
   });
+})();
+/* 탭 — 주소 끝 #realestate 로 바로 열 수 있게 해시를 쓴다. */
+(function(){
+  var tabs = document.querySelectorAll('.tab');
+  function show(name){
+    if (!document.getElementById('panel-' + name)) name = 'market';
+    tabs.forEach(function(t){ t.classList.toggle('on', t.dataset.tab === name); });
+    document.querySelectorAll('.panel').forEach(function(p){
+      p.hidden = p.id !== 'panel-' + name;
+    });
+  }
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(e){
+      e.preventDefault();
+      history.replaceState(null, '', '#' + t.dataset.tab);
+      show(t.dataset.tab);
+      window.scrollTo(0, 0);
+    });
+  });
+  show((location.hash || '#market').slice(1));
 })();
 </script>
 </body>
