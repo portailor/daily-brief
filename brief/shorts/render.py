@@ -1,14 +1,17 @@
 """쇼츠 영상 만들기 — 1080×1920 세로, 캐릭터가 오른쪽 아래에서 브리핑한다.
 
-  목소리    edge-tts (무료·비공식 — 동화님 결정). 구간마다 따로 만들어 길이를 잰다.
+  목소리    edge-tts (무료·비공식 — 동화님 결정). 귀여운 쪽으로 음 높이·빠르기를 올린다
+            (9/22 "아나운서처럼 또박또박 안 해도 된다, 캐릭터에 어울리게").
+            문장마다 따로 만들어 길이를 재고, 말풍선에는 지금 읽는 문장만 띄운다.
   입 모양   말하는 동안 talk_open(ㅇ)과 talk_closed(ㅡ)를 번갈아 — 소리 크기와 무관.
-            (동화님: "두 개의 이미지가 번갈아 가며 실제로 말하는 것처럼 보이게만")
   대기      다음 이슈로 넘어가며 쉬는 구간은 smile(기본형).
   놀람      놀랄 만한 구간은 처음 SURPRISE_SEC 동안 surprised, 그다음부터 말하기.
   자켓      상승 빨강 / 하락 파랑 (대본의 mood).
+  화면      파스텔 바탕 + 스티커 같은 카드, 둥근 글꼴(주아)과 손글씨 말풍선(개구).
+            웹 리포트와 다른 글꼴로 — "캡처해서 따온 것 같다"(9/22)는 말에 따라.
+  길이      쇼츠 상한(3분) 안에 들도록 MAX_SEC 를 넘으면 덜 중요한 구간부터 뺀다.
 
-프레임은 PIL 로 그려 ffmpeg 에 바로 흘려 넣는다. 구간마다 배경·글자 판을 한 번만 그리고
-프레임마다 캐릭터만 얹어서 빠르다.
+프레임은 (문장, 표정)마다 한 번만 그려 두고 되풀이해 흘려보낸다.
 """
 from __future__ import annotations
 
@@ -18,98 +21,153 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
-from brief.shorts.script import Script  # noqa: E402
+from brief.shorts.script import Script, Segment  # noqa: E402
 
 W, H = 1080, 1920
 FPS = 15                     # 그리기는 15fps, 출력은 30fps 로 늘린다 (입 모양 전환엔 충분)
 MOUTH_EVERY = 2              # 프레임 2장마다 입 모양을 바꾼다 = 약 0.13초
 GAP_SEC = 0.55               # 이슈 사이 대기(웃는 얼굴)
-LEAD_SEC = 0.35              # 영상 시작 전 대기
+SENT_GAP_SEC = 0.12          # 한 이슈 안 문장 사이
+LEAD_SEC = 0.35
+TAIL_SEC = 0.8
 SURPRISE_SEC = 1.1
-VOICE = "ko-KR-SunHiNeural"
-RATE = "+8%"
-CHAR_H = 700                 # 화면 위 캐릭터 높이
-CARD_BOTTOM = 980            # 본문 카드 아래 끝
-CHAR_BOTTOM = 40             # 캐릭터 발 아래 여백
+MAX_SEC = 170                # 쇼츠 상한 180초에 여유를 둔다
+
+VOICE = {"voice": "ko-KR-SunHiNeural", "rate": "+15%", "pitch": "+45Hz"}
+
+CHAR_H = 640
+CHAR_BOTTOM = 30
+CARD_TOP = 340
+BUBBLE_MAX_BOTTOM = 1225     # 말풍선 아래 끝 (캐릭터 머리 위)
+ROW_H = 132                  # 카드 한 줄 높이
 
 CHAR_DIR = ROOT / "assets" / "character"
-UP, DOWN, INK, DIM = (229, 72, 77), (59, 130, 246), (15, 23, 42), (100, 116, 139)
-FONT_CANDIDATES = {
-    "bold": ["C:/Windows/Fonts/malgunbd.ttf",
-             "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-             "/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.ttc"],
-    "regular": ["C:/Windows/Fonts/malgun.ttf",
-                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"],
+FONT_DIR = ROOT / "assets" / "fonts"
+INK = (58, 52, 50)
+SOFT = (125, 116, 112)
+CREAM = (255, 253, 247)
+THEME = {   # 바탕 위·아래, 강조색
+    "up":   {"top": (255, 244, 240), "bottom": (255, 226, 219), "accent": (240, 100, 110)},
+    "down": {"top": (238, 246, 255), "bottom": (218, 234, 255), "accent": (79, 142, 247)},
 }
+UP_C, DOWN_C = (232, 72, 85), (52, 120, 230)
 
 
 def _font(kind: str, size: int) -> ImageFont.FreeTypeFont:
-    for p in FONT_CANDIDATES[kind]:
-        if Path(p).exists():
-            # .ttc 의 0번은 일본어 우선이라 한국어(KR) 번호를 고른다
-            index = 1 if p.endswith(".ttc") else 0
-            return ImageFont.truetype(p, size, index=index)
-    raise FileNotFoundError("한글 글꼴을 찾지 못했습니다 (Linux 는 fonts-noto-cjk 설치 필요)")
+    name = {"round": "Jua-Regular.ttf", "hand": "Gaegu-Bold.ttf"}[kind]
+    return ImageFont.truetype(str(FONT_DIR / name), size)
 
 
-def _ffmpeg() -> str:
-    exe = shutil.which("ffmpeg")
+def _t(text: str) -> str:
+    """주아·개구 글꼴에는 가운뎃점(·)이 없어 네모로 나온다 — 쉼표·빗금으로 바꿔 그린다."""
+    return text.replace(" · ", ", ").replace("·", "/")
+
+
+def _tool(name: str) -> str:
+    exe = shutil.which(name)
     if not exe:
-        raise FileNotFoundError("ffmpeg 이 없습니다")
+        raise FileNotFoundError(f"{name} 이 없습니다")
     return exe
 
 
 def _duration(path: Path) -> float:
-    out = subprocess.run([shutil.which("ffprobe") or "ffprobe", "-v", "error", "-show_entries",
-                          "format=duration", "-of", "csv=p=0", str(path)],
+    out = subprocess.run([_tool("ffprobe"), "-v", "error", "-show_entries", "format=duration",
+                          "-of", "csv=p=0", str(path)],
                          capture_output=True, text=True, check=True).stdout
     return float(out.strip())
 
 
+def sentences(text: str) -> list[str]:
+    return [s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s]
+
+
 # ── 소리 ────────────────────────────────────────────────────
 
-async def _tts_all(texts: list[str], folder: Path) -> list[Path]:
+@dataclass
+class Line:
+    seg: int              # 구간 번호
+    text: str             # 문장
+    clip: Path
+    dur: float = 0.0
+    start: float = 0.0
+
+    @property
+    def end(self) -> float:
+        return self.start + self.dur
+
+
+async def _tts(jobs: list[tuple[str, Path]], voice: dict) -> None:
     import edge_tts
-    paths = []
-    for i, t in enumerate(texts):
-        p = folder / f"seg{i:02d}.mp3"
-        await edge_tts.Communicate(t, VOICE, rate=RATE).save(str(p))
-        paths.append(p)
-    return paths
+    for text, path in jobs:
+        for attempt in range(3):
+            try:
+                await edge_tts.Communicate(text, voice["voice"], rate=voice["rate"],
+                                           pitch=voice["pitch"]).save(str(path))
+                break
+            except Exception:                              # noqa: BLE001
+                if attempt == 2:
+                    raise
+                await asyncio.sleep(3)
 
 
-def _audio(script: Script, folder: Path) -> tuple[Path, list[tuple[float, float]]]:
-    """구간별 목소리를 이어 붙인 소리 파일과, 구간마다 (말 시작, 말 끝) 시각."""
-    clips = asyncio.run(_tts_all([s.speech for s in script.segments], folder))
-    silence = {}
-    for sec in (LEAD_SEC, GAP_SEC):
-        p = folder / f"sil{int(sec * 1000)}.mp3"
-        subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-f", "lavfi", "-i",
-                        "anullsrc=r=24000:cl=mono", "-t", f"{sec}", "-c:a", "libmp3lame",
-                        "-b:a", "48k", str(p)], check=True)
-        silence[sec] = p
-    order, spans, t = [silence[LEAD_SEC]], [], LEAD_SEC
-    for i, c in enumerate(clips):
-        d = _duration(c)
-        spans.append((t, t + d))
-        order.append(c)
-        t += d
-        if i < len(clips) - 1:
-            order.append(silence[GAP_SEC])
-            t += GAP_SEC
-    lst = folder / "list.txt"
-    lst.write_text("".join(f"file '{p.as_posix()}'\n" for p in order), encoding="utf-8")
+def _voice_lines(script: Script, folder: Path, voice: dict) -> list[Line]:
+    lines = [Line(i, text, folder / f"s{i:02d}_{k:02d}.mp3")
+             for i, seg in enumerate(script.segments)
+             for k, text in enumerate(sentences(seg.speech))]
+    asyncio.run(_tts([(ln.text, ln.clip) for ln in lines], voice))
+    for ln in lines:
+        ln.dur = _duration(ln.clip)
+    return lines
+
+
+def _place(lines: list[Line]) -> float:
+    """문장 시작 시각을 정하고 전체 길이를 돌려준다."""
+    t = LEAD_SEC
+    for j, ln in enumerate(lines):
+        if j:
+            t += GAP_SEC if ln.seg != lines[j - 1].seg else SENT_GAP_SEC
+        ln.start = t
+        t += ln.dur
+    return t + TAIL_SEC
+
+
+def _fit(script: Script, lines: list[Line]) -> tuple[list[int], list[Line]]:
+    """MAX_SEC 안에 들 때까지 덜 중요한(priority 큰) 구간을 뒤에서부터 뺀다."""
+    keep = list(range(len(script.segments)))
+    while _place([l for l in lines if l.seg in keep]) > MAX_SEC:
+        cands = [i for i in keep if script.segments[i].priority > 1]
+        if not cands:
+            break
+        keep.remove(max(cands, key=lambda i: (script.segments[i].priority, i)))
+    kept = [l for l in lines if l.seg in keep]
+    _place(kept)
+    return keep, kept
+
+
+def _audio(lines: list[Line], folder: Path) -> Path:
+    """문장 소리를 제 시각에 놓아 한 파일로."""
+    total = lines[-1].end + TAIL_SEC
+    inputs, filters = [], []
+    for j, ln in enumerate(lines):
+        inputs += ["-i", str(ln.clip)]
+        ms = int(ln.start * 1000)
+        filters.append(f"[{j}:a]adelay={ms}|{ms}[a{j}]")
+    mix = "".join(f"[a{j}]" for j in range(len(lines)))
+    graph = ";".join(filters) + f";{mix}amix=inputs={len(lines)}:normalize=0,apad[out]"
+    graph_file = folder / "mix.txt"
+    graph_file.write_text(graph, encoding="utf-8")
     out = folder / "voice.m4a"
-    subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-f", "concat", "-safe", "0",
-                    "-i", str(lst), "-c:a", "aac", "-b:a", "128k", str(out)], check=True)
-    return out, spans
+    subprocess.run([_tool("ffmpeg"), "-y", "-loglevel", "error", *inputs,
+                    "-filter_complex_script", str(graph_file), "-map", "[out]",
+                    "-t", f"{total:.2f}", "-c:a", "aac", "-b:a", "128k", str(out)], check=True)
+    return out
 
 
 # ── 그림 ────────────────────────────────────────────────────
@@ -123,16 +181,24 @@ def _characters(mood: str) -> dict[str, Image.Image]:
     return out
 
 
-def _gradient() -> Image.Image:
-    top, bottom = (15, 23, 42), (30, 41, 59)
+def _background(mood: str) -> Image.Image:
+    th = THEME[mood]
     g = Image.new("RGB", (1, H))
     for y in range(H):
         k = y / (H - 1)
-        g.putpixel((0, y), tuple(round(top[i] + (bottom[i] - top[i]) * k) for i in range(3)))
-    return g.resize((W, H)).convert("RGBA")
+        g.putpixel((0, y), tuple(round(th["top"][i] + (th["bottom"][i] - th["top"][i]) * k)
+                                 for i in range(3)))
+    im = g.resize((W, H)).convert("RGBA")
+    dots = Image.new("RGBA", (W, H), (0, 0, 0, 0))      # 옅은 물방울 무늬
+    d = ImageDraw.Draw(dots)
+    for row, y in enumerate(range(40, H, 150)):
+        for x in range(40 + (75 if row % 2 else 0), W, 150):
+            d.ellipse((x, y, x + 16, y + 16), fill=(*th["accent"], 28))
+    im.alpha_composite(dots)
+    return im
 
 
-def _wrap(draw: ImageDraw.ImageDraw, text: str, font, width: int) -> list[str]:
+def _wrap(draw: ImageDraw.ImageDraw, text: str, font, width: float) -> list[str]:
     lines, cur = [], ""
     for word in text.split(" "):
         test = f"{cur} {word}".strip()
@@ -147,145 +213,247 @@ def _wrap(draw: ImageDraw.ImageDraw, text: str, font, width: int) -> list[str]:
     return lines
 
 
-NUM = re.compile(r"[+\-−]\d[\d,]*(?:\.\d+)?%?")
+def _fit_font(draw, text: str, kind: str, size: int, width: float, min_size: int = 30):
+    while size > min_size and draw.textlength(text, font=_font(kind, size)) > width:
+        size -= 2
+    return _font(kind, size)
 
 
-def _colored_line(draw: ImageDraw.ImageDraw, xy, text: str, font, base=INK):
-    """숫자 부분만 부호에 따라 빨강(+)·파랑(-)으로."""
-    x, y = xy
-    pos = 0
-    for m in NUM.finditer(text):
-        if m.start() > pos:
-            seg = text[pos:m.start()]
-            draw.text((x, y), seg, font=font, fill=base)
-            x += draw.textlength(seg, font=font)
-        num = m.group()
-        draw.text((x, y), num, font=font, fill=UP if num[0] == "+" else DOWN)
-        x += draw.textlength(num, font=font)
-        pos = m.end()
-    if pos < len(text):
-        draw.text((x, y), text[pos:], font=font, fill=base)
+def _value_color(v: str):
+    v = v.strip()
+    if v.startswith("+"):
+        return UP_C
+    if v.startswith(("-", "−")):
+        return DOWN_C
+    return INK
 
 
-def _panel(script: Script, idx: int, base: Image.Image) -> Image.Image:
-    """구간 하나의 배경 판 (캐릭터 빼고 전부)."""
-    im = base.copy()
+def _sticker(im: Image.Image, box, accent, radius=44):
+    """테두리 굵은 크림색 카드 + 비낀 그림자 — 스티커 느낌."""
+    x0, y0, x1, y1 = box
+    shadow = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle((x0 + 12, y0 + 14, x1 + 12, y1 + 14), radius,
+                                             fill=(*accent, 110))
+    im.alpha_composite(shadow)
+    ImageDraw.Draw(im).rounded_rectangle(box, radius, fill=CREAM, outline=INK, width=6)
+
+
+def _header(im: Image.Image, script: Script, idx: int, keep: list[int]):
     d = ImageDraw.Draw(im)
-    accent = UP if script.mood == "up" else DOWN
-    seg = script.segments[idx]
-
-    # 머리
-    d.rounded_rectangle((60, 110, 60 + 330, 110 + 64), 32, fill=accent)
-    d.text((60 + 165, 142), "매일 경제 브리핑", font=_font("bold", 32), fill="white", anchor="mm")
-    d.text((60, 210), f"{script.date_label} {script.title}", font=_font("bold", 76), fill="white")
-
-    # 진행 점
-    body = [i for i, s in enumerate(script.segments) if s.kind not in ("intro", "outro")]
+    accent = THEME[script.mood]["accent"]
+    f = _font("round", 36)
+    label = "매일 경제 브리핑"
+    w = d.textlength(label, font=f)
+    d.rounded_rectangle((60, 100, 60 + w + 56, 164), 32, fill=accent)
+    d.text((60 + 28, 132), label, font=f, fill="white", anchor="lm")
+    d.text((60, 190), f"{script.date_label} {script.title}", font=_font("round", 80), fill=INK)
+    body = [i for i in keep if script.segments[i].kind not in ("intro", "outro")]
     for k, i in enumerate(body):
         on = i == idx
-        cx = 60 + k * 44
-        d.ellipse((cx, 340, cx + (26 if on else 18), 340 + (26 if on else 18)),
-                  fill=accent if on else (71, 85, 105))
+        cx, cy, r = 72 + k * 40, 300, (13 if on else 8)
+        d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=accent if on else (200, 190, 186))
 
-    # 본문 카드 — 카톡 줄 그대로. ' · ' 로 나뉜 항목을 한 줄씩.
-    # 시작·끝 구간은 오늘 다룰 줄(카톡 줄)을 목록으로 보여 준다.
-    d.rounded_rectangle((50, 420, W - 50, CARD_BOTTOM), 40, fill=(248, 250, 252))
+
+def _card(im: Image.Image, script: Script, idx: int, keep: list[int]) -> int:
+    """구간 카드를 그리고 카드 아래 끝 y 를 돌려준다."""
+    seg = script.segments[idx]
+    accent = THEME[script.mood]["accent"]
+    d = ImageDraw.Draw(im)
+    x0, x1 = 50, W - 62
+    inner = x1 - x0 - 100
+
     if seg.kind in ("intro", "outro"):
-        head = "오늘 브리핑" if seg.kind == "intro" else seg.screen
-        d.text((100, 470), head, font=_font("bold", 60), fill=accent)
-        f = _font("bold", 38)
-        y = 575
-        for s in script.segments[1:-1]:
-            for line in _wrap(d, s.screen, f, W - 200)[:2]:
-                _colored_line(d, (100, y), line, f)
-                y += 52
-            y += 22
-    else:
-        items = [p.strip() for p in seg.screen.split("·")] if " · " in seg.screen else [seg.screen]
-        longest = max(len(i) for i in items)
-        size = 78 if longest <= 14 else 64 if longest <= 20 else 54
-        f = _font("bold", size)
-        y = 480
-        for item in items:
-            for line in _wrap(d, item, f, W - 180):
-                _colored_line(d, (100, y), line, f)
-                y += int(size * 1.35)
-            y += int(size * 0.35)
+        head = "오늘 이야기할 것" if seg.kind == "intro" else seg.note
+        chips = [_t(script.segments[i].tag) for i in keep if script.segments[i].tag]
+        f = _font("round", 40)
+        rows, cur, cw = [], [], 0
+        for c in chips:
+            w = d.textlength(c, font=f) + 50
+            if cur and cw + w > inner:
+                rows.append(cur)
+                cur, cw = [], 0
+            cur.append((c, w))
+            cw += w + 16
+        if cur:
+            rows.append(cur)
+        y1 = CARD_TOP + 150 + len(rows) * 76 + 30
+        _sticker(im, (x0, CARD_TOP, x1, y1), accent)
+        d.text((x0 + 50, CARD_TOP + 50), head, font=_fit_font(d, head, "round", 64, inner), fill=INK)
+        y = CARD_TOP + 150
+        for row in rows:
+            x = x0 + 50
+            for c, w in row:
+                d.rounded_rectangle((x, y, x + w, y + 60), 30, fill=accent)
+                d.text((x + w / 2, y + 30), c, font=f, fill="white", anchor="mm")
+                x += w + 16
+            y += 76
+        return y1
 
-    # 자막 — 카드 아래 한 줄 띠, 캐릭터 머리 위
-    sub_f = _font("bold", 40)
-    lines = _wrap(d, seg.speech, sub_f, W - 140)[:3]
-    sy = CARD_BOTTOM + 30
+    if seg.rows:
+        y1 = CARD_TOP + 90 + len(seg.rows) * ROW_H + (84 if seg.note else 20)
+    else:                                              # 오늘 한 줄 — 글만
+        f = _font("round", 62)
+        lines = _wrap(d, _t(seg.note), f, inner)
+        y1 = CARD_TOP + 100 + len(lines) * 86 + 30
+    _sticker(im, (x0, CARD_TOP, x1, y1), accent)
+
+    # 이름표 — 카드 위 가장자리에 붙인 테이프처럼
+    tf = _font("round", 42)
+    tag = _t(seg.tag)
+    tw = d.textlength(tag, font=tf)
+    d.rounded_rectangle((x0 + 40, CARD_TOP - 32, x0 + 40 + tw + 60, CARD_TOP + 40), 24,
+                        fill=accent, outline=INK, width=5)
+    d.text((x0 + 70, CARD_TOP + 4), tag, font=tf, fill="white", anchor="lm")
+
+    if not seg.rows:
+        y = CARD_TOP + 90
+        for line in lines:
+            d.text((x0 + 50, y), line, font=f, fill=INK)
+            y += 86
+        return y1
+
+    y = CARD_TOP + 70
+    for k, (label, value) in enumerate(seg.rows):
+        label, value = _t(label), _t(value)
+        vf = _fit_font(d, value, "round", 88, inner * 0.55)
+        vw = d.textlength(value, font=vf)
+        lf = _fit_font(d, label, "round", 64, inner - vw - 30)
+        d.text((x0 + 50, y + ROW_H / 2), label, font=lf, fill=INK, anchor="lm")
+        d.text((x1 - 50, y + ROW_H / 2), value, font=vf, fill=_value_color(value), anchor="rm")
+        if k < len(seg.rows) - 1:                      # 점선
+            for x in range(x0 + 50, x1 - 60, 26):
+                d.line((x, y + ROW_H, x + 12, y + ROW_H), fill=(210, 200, 196), width=3)
+        y += ROW_H
+    if seg.note:
+        note = _t(seg.note)
+        nf = _fit_font(d, note, "round", 40, inner)
+        d.text((x0 + 50, y + 18), note, font=nf, fill=SOFT)
+    return y1
+
+
+def _bubble(im: Image.Image, text: str, card_bottom: int, tail_x: int):
+    """손글씨 말풍선. 캐릭터 머리 바로 위에 붙이고, 꼬리는 머리 쪽으로."""
+    d = ImageDraw.Draw(im)
+    text = _t(text)
+    x0, x1 = 50, W - 50
+    room = BUBBLE_MAX_BOTTOM - card_bottom - 60        # 카드와 사이 60
+    size = 64
+    while True:
+        f = _font("hand", size)
+        lines = _wrap(d, text, f, x1 - x0 - 80)
+        lh = int(size * 1.15)
+        h = len(lines) * lh + 56
+        if h <= room or size <= 40:
+            break
+        size -= 2
+    y1 = BUBBLE_MAX_BOTTOM
+    top = y1 - h
+    d.rounded_rectangle((x0, top, x1, y1), 40, fill="white", outline=INK, width=5)
+    tail = [(tail_x - 34, y1 - 3), (tail_x + 30, y1 - 3), (tail_x + 16, y1 + 50)]
+    d.polygon(tail, fill="white")
+    d.line((tail[0], tail[2]), fill=INK, width=5)
+    d.line((tail[1], tail[2]), fill=INK, width=5)
+    y = top + 24
     for line in lines:
-        d.text((W // 2, sy), line, font=sub_f, fill="white", anchor="ma")
-        sy += 56
-
-    # 바닥 글
-    d.text((60, H - 70), "공식 데이터 자동 집계", font=_font("regular", 30), fill=DIM)
-    d.text((60, H - 115), "투자 권유 아님", font=_font("regular", 30), fill=DIM)
-    return im
+        d.text((x0 + 40, y), line, font=f, fill=INK)
+        y += lh
 
 
-def _pose(t: float, spans: list[tuple[float, float]], segs, frame: int) -> str:
-    for (a, b), s in zip(spans, segs):
-        if a <= t < b:
-            if s.surprise and t - a < SURPRISE_SEC:
+def _pose(t: float, lines: list[Line], segs: list[Segment], frame: int) -> str:
+    first_start: dict[int, float] = {}
+    for ln in lines:
+        first_start.setdefault(ln.seg, ln.start)
+    for ln in lines:
+        if ln.start <= t < ln.end:
+            if segs[ln.seg].surprise and t - first_start[ln.seg] < SURPRISE_SEC:
                 return "surprised"
             return "talk_open" if (frame // MOUTH_EVERY) % 2 == 0 else "talk_closed"
     return "smile"
 
 
-def render(script: Script, out: Path) -> Path:
+def _line_at(t: float, lines: list[Line]) -> int:
+    """지금 화면에 띄울 문장. 쉬는 동안엔 방금 끝난 문장을 두고,
+    다음 구간 시작 GAP 절반 전부터 다음 문장을 보여 준다."""
+    for j, ln in enumerate(lines):
+        if t < ln.end:
+            if j and t < ln.start - GAP_SEC / 2 and lines[j - 1].seg != ln.seg:
+                return j - 1
+            return j
+    return len(lines) - 1
+
+
+def render(script: Script, out: Path, voice: dict | None = None) -> tuple[Path, list[int]]:
+    """영상을 만들고 (파일, 실제로 넣은 구간 번호)를 돌려준다."""
     out.parent.mkdir(parents=True, exist_ok=True)
+    voice = {**VOICE, **(voice or {})}
     with tempfile.TemporaryDirectory() as tmp:
         folder = Path(tmp)
-        audio, spans = _audio(script, folder)
-        total = spans[-1][1] + 0.8
+        keep, lines = _fit(script, _voice_lines(script, folder, voice))
+        audio = _audio(lines, folder)
+        total = lines[-1].end + TAIL_SEC
         chars = _characters(script.mood)
-        base = _gradient()
-        panels = [_panel(script, i, base) for i in range(len(script.segments))]
+        base = _background(script.mood)
+        cx = W - chars["smile"].width - 10
+        cy = H - CHAR_H - CHAR_BOTTOM
+        tail_x = cx + chars["smile"].width // 2 - 40
 
-        # 구간 경계 — 대기 중에는 다음 구간 판을 미리 보여 준다
-        def panel_at(t: float) -> Image.Image:
-            for i, (a, b) in enumerate(spans):
-                if t < b:
-                    return panels[i]
-            return panels[-1]
+        panels: dict[int, tuple[Image.Image, int]] = {}
+        for i in keep:
+            im = base.copy()
+            _header(im, script, i, keep)
+            panels[i] = (im, _card(im, script, i, keep))
+        cache: dict[tuple[int, str], bytes] = {}
+
+        def frame_bytes(j: int, pose: str) -> bytes:
+            if (j, pose) not in cache:
+                im, bottom = panels[lines[j].seg]
+                im = im.copy()
+                _bubble(im, lines[j].text, bottom, tail_x)
+                im.alpha_composite(chars[pose], (cx, cy))
+                cache[(j, pose)] = im.convert("RGB").tobytes()
+            return cache[(j, pose)]
 
         proc = subprocess.Popen(
-            [_ffmpeg(), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
+            [_tool("ffmpeg"), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
              "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-i", str(audio),
              "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
              "-r", "30", "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart",
              str(out)], stdin=subprocess.PIPE)
-        n = int(total * FPS)
-        for fr in range(n):
+        for fr in range(int(total * FPS)):
             t = fr / FPS
-            frame = panel_at(t).copy()
-            ch = chars[_pose(t, spans, script.segments, fr)]
-            frame.alpha_composite(ch, (W - ch.width - 10, H - ch.height - CHAR_BOTTOM))
-            proc.stdin.write(frame.convert("RGB").tobytes())
+            proc.stdin.write(frame_bytes(_line_at(t, lines), _pose(t, lines, script.segments, fr)))
         proc.stdin.close()
         if proc.wait() != 0:
             raise RuntimeError("ffmpeg 영상 만들기 실패")
-    return out
+    return out, keep
 
 
 SHORTS_DIR = ROOT / "data" / "shorts"
 
 
-def make(payload: dict, message: str, weekly: bool = False, link: str | None = None) -> dict | None:
-    """카톡 메시지로 대본을 만들고 영상까지. 올릴 때 쓸 제목·설명과 함께 돌려준다."""
+def make(payload: dict, message: str = "", weekly: bool = False, link: str | None = None,
+         voice: dict | None = None) -> dict | None:
+    """대본을 만들고 영상까지. 올릴 때 쓸 제목·설명과 함께 돌려준다."""
     from brief.shorts.script import build
     script = build(payload, message, weekly=weekly, link=link or "")
     if script is None:
         return None
-    out = render(script, SHORTS_DIR / f"{payload['brief_date']}.mp4")
-    title = f"{script.date_label} {script.title} — " + script.segments[1].screen
+    if voice is None:
+        try:
+            import yaml
+            cfg = yaml.safe_load((ROOT / "config" / "settings.yaml").read_text(encoding="utf-8"))
+            voice = (cfg.get("shorts") or {}).get("voice") or {}
+        except Exception:                                  # noqa: BLE001
+            voice = {}
+    out, keep = render(script, SHORTS_DIR / f"{payload['brief_date']}.mp4", voice)
+    used = [script.segments[i] for i in keep if script.segments[i].kind not in ("intro", "outro")]
+    headline = next((s.screen for s in used if s.kind in ("kr", "week")),
+                    used[0].screen if used else "")
+    title = f"{script.date_label} {script.title} | {headline}"
     desc = "\n".join([f"{script.date_label} {script.title}", "",
-                      *[s.screen for s in script.segments[1:-1]], "",
+                      *[f"[{s.tag}] {s.screen}" for s in used], "",
                       f"전체 브리핑: {link}" if link else "",
                       "공식 데이터(한국거래소·연준 등)를 자동으로 모아 만든 영상입니다. 투자 권유가 아닙니다.",
                       "#경제 #주식 #코스피 #Shorts"])
     return {"path": str(out), "title": title[:100], "description": desc,
-            "mood": script.mood, "speech": script.text}
+            "mood": script.mood, "speech": " ".join(script.segments[i].speech for i in keep)}

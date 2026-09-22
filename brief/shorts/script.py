@@ -1,43 +1,55 @@
-"""쇼츠 대본 — 그날 카톡으로 보내는 내용을 캐릭터가 브리핑하듯 읽는다.
+"""쇼츠 대본 — 주식 탭 전체 브리핑을 캐릭터가 읽는다.
 
-동화님 결정(2026-09-22): "그날 카톡 보내는 내용 그대로를 브리핑하는 것처럼 대본을 만들어라."
+동화님 결정
+  9/22 23시  "그날 카톡 내용 그대로를 브리핑하듯" → 9/22 23:30 "전체 브리핑 가능하게"로 넓힘.
+             말투는 아나운서처럼 또박또박하지 않아도 된다 — 캐릭터에 어울리게 해요체.
 
-  화면 글자  카톡 메시지의 줄을 그대로 쓴다.
-  읽는 말    같은 줄을 만든 숫자에서 문장을 만든다. 카톡 줄 글자를 다시 해석하지 않고,
-             그 줄을 만든 후보(지수·외국인·업종…)를 찾아 원래 값으로 말을 만든다 —
-             '-0.23%' 같은 글자를 뜯어 읽다 부호나 단위를 잘못 읽는 일을 막는다.
+  화면     구간마다 이름표(한국 증시·환율과 금리…)와 '이름 — 값' 줄 몇 개.
+  읽는 말  같은 숫자에서 만든 문장. 새 사실을 지어내지 않는다 — 모든 값은 그날 payload
+           (리포트 페이지와 같은 출처)에서 온다. 값이 없는 구간은 통째로 뺀다.
+  길이     쇼츠는 3분까지. 우선순위(priority, 클수록 덜 중요)가 큰 구간부터 빼서
+           render 가 MAX_SEC 안에 맞춘다.
 
   자켓 색    코스피가 오른 날(주간은 지난주 코스피가 오른 주) 빨강, 내린 날 파랑.
-  놀람 표정  지수 줄에서 코스피·코스닥·S&P·나스닥 중 하나라도 '평소 하루 변동폭의
-             SURPRISE_SIGMA 배' 이상 움직인 날에만. 브리핑의 '이례적 변동'과 같은 잣대다.
-
-새 문장을 지어내지 않는다. 모든 숫자는 카톡에 실린 값과 같은 출처에서 온다.
+  놀람 표정  그 구간 지표가 '평소 하루 변동폭의 SURPRISE_SIGMA 배' 이상 움직였을 때만.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+from datetime import date
 
 from brief.interpret.rules import josa
 from brief.render import kakao_text as kt
 
 SURPRISE_SIGMA = 2.0
 WEEKDAY = "월화수목금토일"
-INDEX_NAME = {"KOSPI": "코스피", "KOSDAQ": "코스닥", "SPX": "S&P 500", "NASDAQ": "나스닥"}
+NAME = {"KOSPI": "코스피", "KOSDAQ": "코스닥", "SPX": "S&P 500", "NASDAQ": "나스닥",
+        "DOW": "다우", "USDKRW": "원/달러 환율", "US10Y": "미국 10년물 금리",
+        "KTB3Y": "국고채 3년물", "WTI": "WTI 유가", "GOLD": "금", "VIX": "VIX 공포지수"}
+SPOKEN = {"원/달러 환율": "원 달러 환율", "VIX 공포지수": "빅스 공포지수"}
 
 
 @dataclass
 class Segment:
-    screen: str                 # 화면 글자 (카톡 줄 그대로)
-    speech: str                 # 읽는 말
+    tag: str                                   # 화면 이름표
+    rows: list[tuple[str, str]]                # (이름, 값) — 값의 +/- 는 빨강/파랑
+    speech: str                                # 읽는 말
     kind: str = ""
+    note: str = ""                             # 줄 아래 작은 글
     surprise: bool = False
+    priority: int = 1                          # 클수록 덜 중요. 길면 큰 것부터 뺀다
+
+    @property
+    def screen(self) -> str:                   # 설명란에 쓰는 한 줄 요약
+        return " · ".join(f"{a} {b}".strip() for a, b in self.rows) or self.note
 
 
 @dataclass
 class Script:
-    date_label: str             # "9/22(화)"
-    title: str                  # "경제 브리핑" / "주간 브리핑"
-    mood: str                   # "up" / "down"
+    date_label: str
+    title: str
+    mood: str
     segments: list[Segment] = field(default_factory=list)
     link: str = ""
 
@@ -46,184 +58,292 @@ class Script:
         return " ".join(s.speech for s in self.segments)
 
 
-# ── 숫자를 말로 ─────────────────────────────────────────────
+# ── 말 다듬기 ───────────────────────────────────────────────
 
-def _pct_word(v: float, digits: int = 2) -> str:
+def _batchim(ch: str) -> bool:
+    return "가" <= ch <= "힣" and (ord(ch) - 0xAC00) % 28 != 0
+
+
+def haeyo(s: str) -> str:
+    """리포트의 합니다체 문장을 해요체로. 모르는 끝은 그대로 둔다."""
+    for a, b in (("했습니다", "했어요"), ("있습니다", "있어요"), ("없습니다", "없어요"),
+                 ("합니다", "해요"), ("됩니다", "돼요"), ("밑돕니다", "밑돌아요"),
+                 ("넘어섭니다", "넘어서요")):
+        s = s.replace(a, b)
+    s = re.sub(r"(.)입니다", lambda m: m.group(1) + ("이에요" if _batchim(m.group(1)) else "예요"), s)
+    s = re.sub(r"(\S)습니다", r"\1어요", s)       # 올랐습니다 → 올랐어요 등 남은 것
+    return s
+
+
+def _ieyo(word: str) -> str:
+    """'삼성전자예요' / '우리금융지주예요' / '광전자예요' — 받침 있으면 '이에요'."""
+    last = word[-1] if word else ""
+    if last.isdigit():
+        return "이에요" if last in "0136780" else "예요"
+    return "이에요" if _batchim(last) else "예요"
+
+
+def _say(text: str) -> str:
+    """화면 글자를 소리 내 읽기 좋게 — 기호를 말로."""
+    for a, b in (("%p", "퍼센트포인트"), ("%", "퍼센트"), ("~", "에서 "), (" · ", ", "), ("·", ", "),
+                 ("−", "마이너스 ")):
+        text = text.replace(a, b)
+    for a, b in SPOKEN.items():
+        text = text.replace(a, b)
+    return text
+
+
+def _pct(v: float, digits: int = 2) -> str:
     return f"{abs(v):.{digits}f}퍼센트"
 
 
-def _move(v: float, up: str = "올랐", down: str = "내렸") -> str:
-    return up if v > 0 else down if v < 0 else "제자리였"
+def _move(v: float) -> str:
+    return "올랐" if v > 0 else "내렸" if v < 0 else "보합이었"
 
 
-def _won(eok: float) -> str:
-    return kt._eok(eok) + " 원"
-
-
-def _num(change: str) -> float | None:
-    t = change.replace("%", "").replace("−", "-").replace(",", "").strip()
+def _num(change) -> float | None:
+    t = str(change).replace("%", "").replace("bp", "").replace("−", "-").replace(",", "").strip()
     try:
         return float(t)
     except ValueError:
         return None
 
 
-# ── 줄 종류별 읽는 말 ───────────────────────────────────────
+def _won(eok: float) -> str:
+    return kt._eok(eok) + " 원"
 
-def _say_tiles(payload: dict, ids: tuple[str, ...]) -> str:
-    parts = []
-    for t in payload.get("tiles", []):
-        if t["id"] not in ids:
+
+def _dash(payload: dict) -> dict[str, dict]:
+    return {r["id"]: r for r in payload.get("dashboard", [])}
+
+
+def _sigma(payload: dict, iid: str) -> float:
+    r = _dash(payload).get(iid)
+    return abs(_num(r.get("sigma")) or 0) if r else 0.0
+
+
+def _index_phrase(name: str, change: str) -> str | None:
+    """'코스피는 3.26퍼센트 내렸' — 뒤에 '고,' 나 '어요.'를 붙인다. bp 는 퍼센트포인트로."""
+    v = _num(change)
+    if v is None:
+        return None
+    head = f"{SPOKEN.get(name, name)}{josa(name, '은/는')}"
+    if v == 0:
+        return f"{head} 보합이었"
+    amount = f"{abs(v) / 100:.2f}퍼센트포인트" if str(change).endswith("bp") else _pct(v)
+    return f"{head} {amount} {_move(v)}"
+
+
+def _join(phrases: list[str | None]) -> str:
+    """두 개씩 '…고, …어요.'로 잇는다."""
+    ps = [p for p in phrases if p]
+    return " ".join("고, ".join(ps[i:i + 2]) + "어요." for i in range(0, len(ps), 2))
+
+
+# ── 구간 ────────────────────────────────────────────────────
+
+def _market(payload: dict, ids: tuple[str, ...], tag: str, kind: str,
+            extra: tuple[str, str] | None = None, priority: int = 1) -> Segment | None:
+    d = _dash(payload)
+    got = [i for i in ids if i in d and _num(d[i]["change"]) is not None]
+    if not got:
+        return None
+    rows = [(NAME[i], d[i]["change"]) for i in got]
+    speech = _join([_index_phrase(NAME[i], d[i]["change"]) for i in got])
+    note = ""
+    if extra:
+        note, more = extra
+        speech += " " + more
+    surprise = any(_sigma(payload, i) >= SURPRISE_SIGMA for i in got)
+    return Segment(tag, rows, speech, kind, note, surprise, priority)
+
+
+def _breadth(payload: dict) -> tuple[str, str] | None:
+    b = (((payload.get("detail") or {}).get("kr") or {}).get("breadth") or {}).get("KOSPI")
+    if not b:
+        return None
+    return (f"코스피 오른 종목 {b['up']:,}개 · 내린 종목 {b['down']:,}개",
+            f"코스피에서는 {b['up']:,}개 종목이 오르고 {b['down']:,}개가 내렸어요.")
+
+
+def _verdict(payload: dict) -> Segment | None:
+    head = (payload.get("verdict") or {}).get("headline")
+    if not head:
+        return None
+    surprise = any(abs(r.get("sigma") or 0) >= SURPRISE_SIGMA
+                   for r in payload.get("notable_rows", []))
+    return Segment("오늘 한 줄", [], haeyo(head), "verdict", head, surprise)
+
+
+def _flows(payload: dict) -> Segment | None:
+    stats = {s.investor: s for s in payload.get("flow_stats", []) if s.market == "KOSPI"}
+    rows, parts = [], []
+    for inv, label in (("외국인합계", "외국인"), ("기관합계", "기관")):
+        s = stats.get(inv)
+        if not s:
             continue
-        v = _num(t["change"])
-        if v is None:
-            continue
-        name = INDEX_NAME[t["id"]]
-        head = f"{name}{josa(name, '은/는')}"
-        parts.append(f"{head} 보합이었" if v == 0 else f"{head} {_pct_word(v)} {_move(v)}")
-    # 한국 둘, 미국 둘씩 한 문장으로: "코스피는 … 내렸고, 코스닥은 … 올랐습니다."
-    return " ".join("고, ".join(parts[i:i + 2]) + "습니다." for i in range(0, len(parts), 2))
-
-
-def _say_foreign(payload: dict) -> str:
+        rows.append((f"{label} 코스피", f"{'+' if s.eok > 0 else '-'}{kt._eok(s.eok)}"))
+        run = f" {abs(s.streak)}거래일 연속" if abs(s.streak) >= 2 else ""
+        verb = "순매수했" if s.eok > 0 else "순매도했"
+        parts.append(f"{label}{josa(label, '은/는')}{run} {_won(s.eok)}어치 {verb}")
+    if not rows:
+        return None
+    speech = "코스피에서 " + _join(parts)
+    note = ""
     f = ((payload.get("detail") or {}).get("kr") or {}).get("foreign") or {}
-    b, s = f["buy"][0], f["sell"][0]
-    return (f"외국인은 {b['name']}{josa(b['name'], '을/를')} {_won(b['net_eok'])}어치 가장 많이 샀고, "
-            f"{s['name']}{josa(s['name'], '을/를')} {_won(s['net_eok'])}어치 가장 많이 팔았습니다.")
+    if f.get("buy") and f.get("sell"):
+        b, s = f["buy"][0], f["sell"][0]
+        note = f"외국인 순매수 1위 {b['name']} · 순매도 1위 {s['name']}"
+        speech += f" 외국인이 가장 많이 산 종목은 {b['name']}, 가장 많이 판 종목은 {s['name']}{_ieyo(s['name'])}."
+    return Segment("누가 사고 팔았나", rows, speech, "flows", note, priority=2)
 
 
-def _say_foreign_total(payload: dict) -> str:
-    for s in payload.get("flow_stats", []):
-        if s.investor == "외국인합계" and s.market == "KOSPI":
-            verb = "순매수했습니다" if s.net_buy > 0 else "순매도했습니다"
-            run = f" {abs(s.streak)}거래일 연속입니다." if abs(s.streak) >= 2 else ""
-            return f"외국인은 코스피에서 {_won(s.eok)}을 {verb}.{run}"
-    return ""
-
-
-def _say_sector(payload: dict) -> str:
+def _sectors(payload: dict) -> Segment | None:
     sec = ((payload.get("detail") or {}).get("kr") or {}).get("sectors") or []
+    if len(sec) < 2:
+        return None
     hi, lo = sec[0], sec[-1]
-    return (f"업종별로는 {hi['name']}{josa(hi['name'], '이/가')} {_pct_word(hi['chg_pct'], 1)} "
-            f"{_move(hi['chg_pct'])}고, {lo['name']}{josa(lo['name'], '은/는')} "
-            f"{_pct_word(lo['chg_pct'], 1)} {_move(lo['chg_pct'])}습니다.")
+    rows = [(f"강세 {hi['name']}", f"{hi['chg_pct']:+.1f}%"),
+            (f"약세 {lo['name']}", f"{lo['chg_pct']:+.1f}%")]
+    speech = _join([
+        f"업종 중에서는 {hi['name']}{josa(hi['name'], '이/가')} {_pct(hi['chg_pct'], 1)} {_move(hi['chg_pct'])}",
+        f"{lo['name']}{josa(lo['name'], '은/는')} {_pct(lo['chg_pct'], 1)} {_move(lo['chg_pct'])}"])
+    return Segment("업종", rows, speech, "sectors", priority=2)
 
 
-def _say_us(payload: dict) -> str:
+def _stocks(payload: dict) -> Segment | None:
+    kr = (payload.get("detail") or {}).get("kr") or {}
+    rows, parts = [], []
+    top = (kr.get("kospi_top") or [None])[0]
+    if top:
+        rows.append((f"시총 1위 {top['name']}", f"{top['chg_pct']:+.2f}%"))
+        parts.append(f"시가총액 1위 {top['name']}{josa(top['name'], '은/는')} "
+                     f"{_pct(top['chg_pct'])} {_move(top['chg_pct'])}")
+    for key, label in (("gainers", "많이 오른"), ("losers", "많이 내린")):
+        xs = kr.get(key) or []
+        if xs:
+            x = xs[0]
+            rows.append((f"가장 {label} {x['name']}", f"{x['chg_pct']:+.1f}%"))
+            parts.append(f"가장 {label} 종목은 {x['name']}{josa(x['name'], '으로/로')} "
+                         f"{_pct(x['chg_pct'], 1)} {_move(x['chg_pct'])}")
+    if not rows:
+        return None
+    note, speech = "", _join(parts)
+    if kr.get("mover_min_eok") and len(rows) > 1:
+        # 급등·급락 종목은 거래대금 하한을 넘은 종목 중에서 고른 것 — 말에서도 밝힌다
+        note = f"급등·급락은 거래대금 {kr['mover_min_eok']:,.0f}억 원 이상 종목 중"
+        speech = speech.replace("가장 많이 오른 종목은",
+                                f"거래대금 {kr['mover_min_eok']:,.0f}억 원 넘는 종목 중 가장 많이 오른 건", 1)
+        speech = speech.replace("가장 많이 내린 종목은", "가장 많이 내린 건", 1)
+    return Segment("눈에 띈 종목", rows, speech, "stocks", note, priority=4)
+
+
+def _us_big(payload: dict) -> Segment | None:
     big = ((payload.get("detail") or {}).get("us") or {}).get("big") or []
+    if len(big) < 2:
+        return None
     hi, lo = big[0], big[-1]
-    return (f"미국 대형주 중에서는 {hi['name']}{josa(hi['name'], '이/가')} {_pct_word(hi['chg_pct'], 1)} "
-            f"{_move(hi['chg_pct'])}고, {lo['name']}{josa(lo['name'], '은/는')} "
-            f"{_pct_word(lo['chg_pct'], 1)} {_move(lo['chg_pct'])}습니다.")
+    rows = [(hi["name"], f"{hi['chg_pct']:+.1f}%"), (lo["name"], f"{lo['chg_pct']:+.1f}%")]
+    speech = _join([
+        f"미국 대형주 중에서는 {hi['name']}{josa(hi['name'], '이/가')} {_pct(hi['chg_pct'], 1)} {_move(hi['chg_pct'])}",
+        f"{lo['name']}{josa(lo['name'], '은/는')} {_pct(lo['chg_pct'], 1)} {_move(lo['chg_pct'])}"])
+    return Segment("미국 대형주", rows, speech, "us_big", priority=4)
 
 
-def _surprise_tiles(payload: dict, ids: tuple[str, ...]) -> bool:
-    for r in payload.get("dashboard", []):
-        if r.get("id") in ids:
-            try:
-                if abs(float(r.get("sigma"))) >= SURPRISE_SIGMA:
-                    return True
-            except (TypeError, ValueError):
-                continue
-    return False
+def _results(payload: dict) -> Segment | None:
+    done = [r for r in payload.get("results", []) if not r.get("pending") and r.get("lines")][:2]
+    if not done:
+        return None
+    rows = [(r["title"] + (f" ({r['period']})" if r.get("period") else ""), r["lines"][0])
+            for r in done]
+    speech = "지난 일정 결과예요. " + " ".join(
+        f"{_say(r['title'])}{(' ' + r['period']) if r.get('period') else ''}, {_say(r['lines'][0])}."
+        for r in done)
+    return Segment("지난 일정 결과", rows, speech, "results", priority=3)
 
 
-def _daily_candidates(payload: dict) -> list[tuple[str, str, callable]]:
-    """카톡 build() 와 같은 순서·같은 글자의 후보. (종류, 화면 글자, 읽는 말 만들기)"""
-    four, three = ("KOSPI", "KOSDAQ", "SPX", "NASDAQ"), ("KOSPI", "KOSDAQ", "SPX")
-    return [
-        ("tiles", kt._tiles(payload, four), lambda: _say_tiles(payload, four)),
-        ("tiles", kt._tiles(payload, three), lambda: _say_tiles(payload, three)),
-        ("foreign", kt._foreign_line(payload), lambda: _say_foreign(payload)),
-        ("sector", kt._sector_line(payload), lambda: _say_sector(payload)),
-        ("foreign_total", kt._foreign_total_line(payload), lambda: _say_foreign_total(payload)),
-        ("us", kt._us_line(payload), lambda: _say_us(payload)),
-        ("basis", payload.get("basis", ""), lambda: f"{payload.get('basis', '')}입니다."),
-    ]
-
-
-def _weekly_candidates(payload: dict) -> list[tuple[str, str, callable]]:
-    """카톡 build_weekly() 의 줄을 다시 만들어 짝지운다."""
-    week = payload.get("week")
-    moves = {m.id: m for m in week.moves} if week else {}
-    out = []
-    kr, kq, us = moves.get("KOSPI"), moves.get("KOSDAQ"), moves.get("SPX")
-    if kr and us:
-        def say(with_kq: bool) -> str:
-            items = [("코스피", kr)] + ([("코스닥", kq)] if with_kq and kq else []) + [("S&P 500", us)]
-            words = []
-            for name, m in items:
-                v = _num(m.change_text)
-                words.append(f"{name}{josa(name, '은/는')} {_pct_word(v)} {_move(v)}" if v is not None
-                             else f"{name}{josa(name, '은/는')} {m.change_text}")
-            return "지난주 " + "고, ".join(words) + "습니다."
-        tail = f" · 코스닥 {kq.change_text}" if kq else ""
-        out.append(("week_moves", f"지난주 코스피 {kr.change_text}{tail} · S&P {us.change_text}",
-                    lambda: say(True)))
-        out.append(("week_moves", f"지난주 코스피 {kr.change_text} · S&P {us.change_text}",
-                    lambda: say(False)))
-
-    key = sorted([e for e in payload.get("events", []) if e.importance >= 2],
+def _events(payload: dict) -> Segment | None:
+    evs = sorted([e for e in payload.get("events", []) if e.importance >= 2],
                  key=lambda e: (-e.importance, e.day))[:2]
-    if key:
-        key.sort(key=lambda e: e.day)
-        line = "이번 주: " + " · ".join(f"{e.when().split(' ')[0]} {kt._short_event(e)}" for e in key)
-        speech = "이번 주에는 " + ", ".join(
-            f"{e.day.month}월 {e.day.day}일 {kt._short_event(e)}" for e in key) + " 일정이 있습니다."
-        out.append(("week_events", line, lambda s=speech: s))
-
-    if week:
-        for f in week.flows[:1]:
-            verb = "순매수" if f["total_eok"] > 0 else "순매도"
-            line = f"외국인 {f['market']} 주간 {kt._eok(f['total_eok'])}원 {verb}"
-            market = "코스피" if f["market"] == "KOSPI" else "코스닥" if f["market"] == "KOSDAQ" else f["market"]
-            speech = f"외국인은 지난주 {market}에서 {_won(f['total_eok'])}을 {verb}했습니다."
-            out.append(("week_flow", line, lambda s=speech: s))
-    out.append(("sector", kt._sector_line(payload), lambda: _say_sector(payload)))
-    out.append(("basis", payload.get("basis", ""), lambda: f"{payload.get('basis', '')}입니다."))
-    return out
-
-
-def build(payload: dict, message: str, weekly: bool = False, link: str = "") -> Script | None:
-    """카톡 메시지와 같은 날 payload 로 대본을 만든다. 새 거래가 없는 날은 None."""
-    lines = [l.split(". ", 1)[1] for l in message.splitlines()
-             if len(l) > 3 and l[0].isdigit() and l[1:3] == ". "]
-    if not lines:
+    if not evs:
         return None
-    cands = _weekly_candidates(payload) if weekly else _daily_candidates(payload)
+    evs.sort(key=lambda e: e.day)
+    rows = [(e.when().split(" ")[0], kt._short_event(e)) for e in evs]
+    last = kt._short_event(evs[-1])
+    speech = "앞으로 볼 일정은 " + ", ".join(
+        f"{e.day.month}월 {e.day.day}일 {_say(kt._short_event(e))}" for e in evs) + \
+        _ieyo(last) + "."
+    return Segment("다가오는 일정", rows, speech, "events", priority=3)
 
-    segs: list[Segment] = []
-    for line in lines:
-        match = next((c for c in cands if c[1] and c[1] == line), None)
-        if match is None:
-            # 짝을 못 찾으면 그 줄은 읽지 않는다 — 글자를 대충 읽다 틀리느니 빼는 게 낫다
-            continue
-        kind, screen, say = match
-        speech = say()
-        if not speech:
-            continue
-        surprise = kind == "tiles" and _surprise_tiles(payload, ("KOSPI", "KOSDAQ", "SPX", "NASDAQ"))
-        segs.append(Segment(screen, speech, kind, surprise))
-    if not segs:
+
+def _triggers(payload: dict) -> Segment | None:
+    ts = [t for t in payload.get("triggers", [])
+          if t.probability is not None and not getattr(t, "is_uncertain", False)][:2]
+    if not ts:
+        return None
+    rows, parts = [], []
+    for t in ts:
+        pct = round(t.probability * 100)
+        rows.append((t.name, f"{t.prob_name} {pct}%"))
+        head = f"{SPOKEN.get(t.name, t.name)}{josa(t.name, '은/는')}"
+        if t.kind == "round_level":
+            v = t.threshold
+            situ = f"{head} {v:,.0f} 가까이에 있어요." if abs(v) >= 100 else f"{head} {v:.2f} 가까이에 있어요."
+        elif t.situation:
+            situ = f"{head} {haeyo(t.situation)}."
+        else:
+            situ = ""
+        parts.append(f"{situ} 비슷했던 과거로 보면 {t.prob_name}{josa(t.prob_name, '은/는')} {pct}퍼센트예요.")
+    title = "이번 주 지켜볼 것" if payload.get("mode") == "weekly" else "내일 지켜볼 것"
+    return Segment(title, rows, " ".join(p.strip() for p in parts), "triggers", priority=2)
+
+
+def _week(payload: dict) -> Segment | None:
+    week = payload.get("week")
+    if not week:
+        return None
+    moves = {m.id: m for m in week.moves}
+    got = [i for i in ("KOSPI", "KOSDAQ", "SPX", "NASDAQ") if i in moves]
+    if not got:
+        return None
+    rows = [(NAME[i], moves[i].change_text) for i in got]
+    speech = "지난주에는 " + _join([_index_phrase(NAME[i], moves[i].change_text) for i in got])
+    return Segment(f"지난주 · {week.period}", rows, speech, "week")
+
+
+def build(payload: dict, message: str = "", weekly: bool = False, link: str = "") -> Script | None:
+    """그날 payload 로 전체 브리핑 대본을 만든다. 시장 숫자가 하나도 없으면 None."""
+    body = [
+        _week(payload) if weekly else None,
+        _verdict(payload),
+        _market(payload, ("KOSPI", "KOSDAQ"), "한국 증시", "kr", _breadth(payload)),
+        _market(payload, ("SPX", "NASDAQ", "DOW"), "미국 증시", "us"),
+        _market(payload, ("USDKRW", "US10Y", "WTI", "GOLD"), "환율 · 금리 · 원자재", "fx",
+                priority=3),
+        _flows(payload),
+        _sectors(payload),
+        _stocks(payload),
+        _us_big(payload),
+        _results(payload),
+        _events(payload),
+        _triggers(payload),
+    ]
+    segs = [s for s in body if s]
+    if not any(s.kind in ("kr", "us", "week") for s in segs):
         return None
 
-    from datetime import date
     d = date.fromisoformat(payload["brief_date"])
     title = "주간 브리핑" if weekly else "경제 브리핑"
-    intro = Segment(f"{payload['date_short']} {title}",
-                    f"{d.month}월 {d.day}일 {WEEKDAY[d.weekday()]}요일 {title}입니다.", "intro")
-    outro = Segment("전체 브리핑은 설명란 링크에서",
-                    "종목과 업종 상세는 설명란 링크에서 확인하세요.", "outro")
+    intro = Segment("", [], f"{d.month}월 {d.day}일 {WEEKDAY[d.weekday()]}요일 {title}이에요!",
+                    "intro", priority=0)
+    outro = Segment("", [], "더 자세한 건 설명란 링크에서 봐 주세요. 다음에 또 만나요!", "outro",
+                    "전체 브리핑은 설명란 링크에서", priority=0)
 
-    # 자켓 색 — 코스피 방향. 주간이면 지난주 코스피, 아니면 오늘 코스피.
-    mood = "up"
     if weekly and payload.get("week"):
         m = next((m for m in payload["week"].moves if m.id == "KOSPI"), None)
-        v = _num(m.change_text) if m else None
-        mood = "down" if v is not None and v < 0 else "up"
+        v = m.change if m else None
     else:
-        t = next((t for t in payload.get("tiles", []) if t["id"] == "KOSPI"), None)
+        t = _dash(payload).get("KOSPI")
         v = _num(t["change"]) if t else None
-        mood = "down" if v is not None and v < 0 else "up"
-
+    mood = "down" if v is not None and v < 0 else "up"
     return Script(payload["date_short"], title, mood, [intro, *segs, outro], link)

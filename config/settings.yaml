@@ -177,3 +177,8 @@ watchlist:
 shorts:
   upload: true
   privacy: public
+  # 목소리 — edge-tts. 음 높이·빠르기를 올려 캐릭터에 맞게 귀엽게 (9/22 동화님)
+  voice:
+    voice: ko-KR-SunHiNeural
+    rate: "+15%"
+    pitch: "+45Hz"
