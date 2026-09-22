@@ -169,3 +169,11 @@ analysis:
 watchlist:
   kr: []                  # 예: ["005930", "000660"]
   us: []                  # 예: ["NVDA", "AAPL"]
+
+# ── 유튜브 쇼츠 ─────────────────────────────────────────────
+# 카톡과 같은 내용을 캐릭터가 읽는 영상(brief/shorts). 영상은 매일 만들고,
+# 올리기는 카톡 발송 직후. 자격증명은 scripts/youtube_auth.py 로 한 번 받는다.
+# 감사 받지 않은 API 프로젝트는 public 으로 올려도 유튜브가 비공개로 잠근다.
+shorts:
+  upload: true
+  privacy: public

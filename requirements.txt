@@ -8,3 +8,5 @@ yfinance>=0.2.40
 pykrx>=1.2.8
 html5lib>=1.1
 tzdata>=2024.1        # Windows 에서 zoneinfo('Asia/Seoul') 를 쓰기 위해
+Pillow>=10.0          # 쇼츠 화면 그리기
+edge-tts>=6.1         # 쇼츠 목소리 (무료·비공식 Microsoft Edge 읽어주기)

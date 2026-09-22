@@ -73,6 +73,13 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         run: pip install -r requirements.txt
 
+      # 쇼츠 영상용 — 영상 인코더와 한글 글꼴 (runner 에는 한글 글꼴이 없다)
+      - name: ffmpeg·한글 글꼴 설치
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-cjk
+
       - name: 자격증명 파일 생성
         if: steps.guard.outputs.skip != 'true'
         env:
@@ -198,6 +205,10 @@ jobs:
         env:
           PYTHONUTF8: '1'
           TZ: Asia/Seoul
+          # 카톡 발송 직후 쇼츠를 올린다. 없으면 올리기만 건너뛴다.
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
         run: python run.py --send-only
 
       - name: 발송 기록 올리기

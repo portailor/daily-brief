@@ -347,6 +347,17 @@ def generate(args) -> int:
     base = macro._load_env().get("REPORT_BASE_URL", "").strip()
     link = (base.rstrip("/") + "/" + payload["page_name"]) if base else None
 
+    # 쇼츠 — 카톡과 같은 내용을 캐릭터가 읽는 영상. 올리기는 발송 단계에서 한다.
+    # 새 거래가 없는 날(안내만 보내는 날)은 만들지 않는다.
+    shorts = None
+    if is_new:
+        shorts, err = step("쇼츠 영상", _make_shorts, payload, message,
+                           weekly=(mode == "weekly"), link=link)
+        if err:
+            failures.append("쇼츠 영상")
+        elif shorts:
+            log(f"✓ 쇼츠 영상: {shorts['path']}")
+
     _write_json(OUTBOX, {"message": message, "link": link,
                          "build_id": payload["build_id"],
                          "brief_date": today.isoformat(), "is_new": is_new,
@@ -356,7 +367,8 @@ def generate(args) -> int:
                          "fetched": not args.no_fetch,
                          # 메일은 200자 제한이 없어 표와 상세도 함께 보낸다
                          "dashboard": payload.get("dashboard", []),
-                         "detail": payload.get("detail", {})})
+                         "detail": payload.get("detail", {}),
+                         "shorts": shorts})
     log(f"✓ 발송 대기 메시지 준비 ({len(message)}자)")
 
     if failures:
@@ -367,6 +379,30 @@ def generate(args) -> int:
 # ─────────────────────────────────────────────────────────────
 #  발송
 # ─────────────────────────────────────────────────────────────
+
+def _make_shorts(payload, message, weekly, link):
+    # 가져오기도 단계 안에서 — 영상 도구가 없어도 브리핑 생성은 멈추지 않게
+    from brief.shorts import render as shorts_render      # noqa: PLC0415
+    return shorts_render.make(payload, message, weekly=weekly, link=link)
+
+
+def upload_shorts(box: dict, cfg: dict) -> None:
+    from brief.deliver import youtube                     # noqa: PLC0415
+    sc = cfg.get("shorts") or {}
+    shorts = box.get("shorts")
+    if not sc.get("upload", False):
+        log("  쇼츠 올리기 꺼짐 (settings.yaml shorts.upload)")
+        return
+    if not shorts or not Path(shorts["path"]).exists():
+        log("  올릴 쇼츠 영상이 없습니다")
+        return
+    if not youtube.configured():
+        log("  유튜브 자격증명 없음 — 쇼츠 올리기 생략 (scripts/youtube_auth.py)")
+        return
+    url, status = youtube.upload(shorts["path"], shorts["title"], shorts["description"],
+                                 privacy=sc.get("privacy", "public"))
+    log(f"✓ 쇼츠 업로드: {url} ({status})")
+
 
 def send() -> int:
     box = _read_json(OUTBOX)
@@ -443,6 +479,9 @@ def send() -> int:
     # 오늘 보냈다는 기록. 예약 실행을 두 번 걸어 두었기 때문에(정시 보장이 안 돼서)
     # 앞의 실행이 이미 보냈으면 뒤의 실행은 이 값을 보고 아무것도 하지 않는다.
     _write_json(STATE, {**_read_json(STATE), "sent_date": box.get("brief_date", "")})
+
+    # 쇼츠 — 카톡이 나간 뒤에 올린다. 실패해도 카톡 발송은 이미 끝났으니 성공으로 친다.
+    step("쇼츠 올리기", upload_shorts, box, cfg)
 
     log("완료")
     return 0
