@@ -257,8 +257,8 @@ if __name__ == "__main__":
         print(f"  {u['start']} {u['area']:<3} {u['name'][:28]:<28} {u['units']}세대 · 발표 {u['announce']}")
     print("\n[청약 결과]")
     for r in d["results"]:
-        best = f" · 최고 {r['best_type']} {r['best']:.2f}대 1" if r["best"] else ""
-        print(f"  {r['end']} {r['area']:<3} {r['name'][:26]:<26} {r['req']:,}건/{r['supply']:,}세대 = {r['avg']:.2f}대 1"
+        best = f" · 최고 {r['best_type']} {r['best']:.2f} : 1" if r["best"] else ""
+        print(f"  {r['end']} {r['area']:<3} {r['name'][:26]:<26} {r['req']:,}건/{r['supply']:,}세대 = {r['avg']:.2f} : 1"
               f"{best} · 미달 {r['short_types']}/{r['types']}형")
     s = d["seoul"]
     if s:

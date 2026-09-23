@@ -86,41 +86,52 @@
 {% macro md(d) %}{{ d[5:7]|int }}/{{ d[8:10]|int }}{% endmacro %}
 {% set hs = housing or {} %}
 {% if hs.upcoming or hs.results %}
+{# 지역별로 묶는다 — 접수일 순으로만 늘어놓으면 충남·울산·충남처럼 섞였다(9/23).
+   순서는 수도권 → 광역시 → 도. 목록에 없는 이름은 뒤에 붙인다. #}
+{% set REG_ORDER = ['서울','인천','경기','부산','대구','광주','대전','울산','세종',
+                    '강원','충북','충남','전북','전남','경북','경남','제주'] %}
+{% macro regions(items) %}{{ (REG_ORDER + (items | map(attribute='area') | reject('in', REG_ORDER) | unique | list)) | join('|') }}{% endmacro %}
 <section>
   <h2>청약 · 이번 주</h2>
   {% if hs.upcoming %}
   <div class="card">
     <div class="re-sub">앞으로 7일 안에 청약 접수를 시작하는 단지</div>
-    {% for u in hs.upcoming %}
+    {% for reg in regions(hs.upcoming).split('|') %}
+    {% set items = hs.upcoming | selectattr('area', 'equalto', reg) | list %}
+    {% if items %}
+    <div class="re-reg">{{ reg or '지역 미상' }}<span class="re-reg-n">{{ items|length }}곳</span></div>
+    {% for u in items %}
     <div class="re-item">
-      <div class="re-item-top">
-        <span class="re-name">{% if u.url %}<a href="{{ u.url }}" target="_blank" rel="noopener" style="color:inherit">{{ u.name }}</a>{% else %}{{ u.name }}{% endif %}</span>
-        <span class="asof">{{ u.area }}</span>
-      </div>
+      <div class="re-name">{% if u.url %}<a href="{{ u.url }}" target="_blank" rel="noopener" style="color:inherit">{{ u.name }}</a>{% else %}{{ u.name }}{% endif %}</div>
       <div class="re-note">접수 {{ md(u.start) }}{% if u.end and u.end != u.start %}~{{ md(u.end) }}{% endif %}{% if u.announce %} · 발표 {{ md(u.announce) }}{% endif %} · {{ '{:,}'.format(u.units) if u.units else '—' }}세대{% if u.kind and u.kind != 'APT' %} · {{ u.kind }}{% endif %}</div>
     </div>
+    {% endfor %}
+    {% endif %}
     {% endfor %}
   </div>
   {% endif %}
   {% if hs.results %}
   <div class="card" style="margin-top:8px">
     <div class="re-sub">최근 7일 안에 접수가 끝난 단지 · 평균 경쟁률</div>
-    {% for r in hs.results %}
+    {% for reg in regions(hs.results).split('|') %}
+    {% set items = hs.results | selectattr('area', 'equalto', reg) | list %}
+    {% if items %}
+    <div class="re-reg">{{ reg or '지역 미상' }}<span class="re-reg-n">{{ items|length }}곳</span></div>
+    {% for r in items %}
     <div class="re-item">
-      <div class="re-item-top">
-        <span class="re-name">{{ r.name }}</span>
-        <span class="asof">{{ r.area }}</span>
-      </div>
+      <div class="re-name">{{ r.name }}</div>
       <div class="re-item-val">
         {% if r.req %}
-        <span class="num re-big {{ 'up' if r.avg >= 1 else 'down' }}">{{ '%.2f'|format(r.avg) }}대 1</span>
+        <span class="num re-big {{ 'up' if r.avg >= 1 else 'down' }}">{{ '%.2f'|format(r.avg) }} : 1</span>
         {% else %}
         <span class="num re-big down">접수 없음</span>
         {% endif %}
         <span class="re-note">{{ '{:,}'.format(r.req) }}건 ÷ {{ '{:,}'.format(r.supply) }}세대{% if r.short_types %} · {{ r.types }}개 주택형 중 {{ r.short_types }}개 미달{% endif %}</span>
       </div>
-      {% if r.best %}<div class="re-src">1순위 해당지역 최고: {{ r.best_type }} {{ '%.2f'|format(r.best) }}대 1</div>{% endif %}
+      {% if r.best %}<div class="re-src">1순위 해당지역 최고: {{ r.best_type }} {{ '%.2f'|format(r.best) }} : 1</div>{% endif %}
     </div>
+    {% endfor %}
+    {% endif %}
     {% endfor %}
     <div class="re-src" style="margin-top:6px">한국부동산원 청약홈 · 평균 경쟁률 = 1·2순위 전체 접수 ÷ 일반공급 세대</div>
   </div>

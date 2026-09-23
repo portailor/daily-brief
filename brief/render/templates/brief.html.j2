@@ -78,6 +78,11 @@
   .re-pair{display:flex; justify-content:space-between; font-size:14px; padding:3px 0}
   .re-item{padding:10px 0}
   .re-item + .re-item{border-top:1px solid var(--line)}
+  /* 청약 지역 이름표 — 단지 이름이 길어 두 줄이 돼도 지역은 따로 한 줄 */
+  .re-reg{margin:12px 0 2px; padding:3px 0 3px 9px; border-left:3px solid var(--accent);
+          font-size:13px; font-weight:750; white-space:nowrap}
+  .re-sub + .re-reg{margin-top:4px}
+  .re-reg-n{margin-left:6px; font-size:11.5px; font-weight:600; color:var(--dim)}
   .re-item-top{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
   .re-item-val{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin-top:3px}
   .re-big{font-size:18px; font-weight:750}
@@ -190,7 +195,7 @@
      background:var(--card); font-weight:600}
   tbody tr + tr td{border-top:1px solid var(--line)}
   td.num{font-variant-numeric:tabular-nums; font-family:var(--mono); font-size:13px}
-  .asof{display:inline-block; margin-left:6px; padding:1px 5px; font-size:10.5px;
+  .asof{display:inline-block; white-space:nowrap; flex-shrink:0; margin-left:6px; padding:1px 5px; font-size:10.5px;
         font-weight:600; color:var(--dim); background:var(--bg);
         border:1px solid var(--line); border-radius:4px; font-family:var(--mono)}
   /* 좁은 화면에서는 200일선을 접는다. 핵심은 종가·전일대비·σ·52주 위치다. */
