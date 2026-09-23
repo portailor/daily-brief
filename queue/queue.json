@@ -4,10 +4,34 @@
     "file": "queue/ep01_commute.mp4",
     "title": "출근길에 돌부리 만난 하찮이 아나운서 #shorts",
     "description": "오늘도 성실하게 출근하는 하찮이 아나운서…\n그런데 앞에 돌부리가?\n\n[속보] 본인은 \"전혀 안 아팠다\"는 입장입니다.\n\n#하찮이 #애니메이션 #출근길 #shorts",
-    "tags": ["하찮이", "애니메이션", "출근길", "쇼츠", "shorts"],
+    "tags": [
+      "하찮이",
+      "애니메이션",
+      "출근길",
+      "쇼츠",
+      "shorts"
+    ],
     "category": "23",
     "from": "2026-09-28",
     "until": "2026-10-02",
     "mood": "down"
+  },
+  {
+    "id": "anim-ep03-chart",
+    "file": "queue/ep03_chart.mp4",
+    "title": "주식 차트 등산하다 지하실 간 하찮이 #shorts",
+    "description": "하찮이전자 사상 최고가!\n기분 좋게 고점을 걸어가던 하찮이는…\n\n[속보] 바닥 밑에 지하실 있었다\n\n#하찮이 #애니메이션 #주식 #하락장 #지하실 #shorts",
+    "tags": [
+      "하찮이",
+      "애니메이션",
+      "주식",
+      "하락장",
+      "지하실",
+      "쇼츠",
+      "shorts"
+    ],
+    "category": "23",
+    "mood": "down",
+    "hold": true
   }
 ]

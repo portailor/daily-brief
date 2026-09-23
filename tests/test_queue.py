@@ -32,3 +32,9 @@ def test_실제_대기열_파일이_올바르다():
         assert it["title"] and len(it["title"]) <= 100
         assert it.get("mood") in (None, "up", "down")
         json.dumps(it)
+
+
+def test_보류_항목은_조건이_맞아도_올리지_않는다():
+    held = {**ITEM, "hold": True}
+    assert queue.due([held], "2026-09-29", "down", []) is None
+    assert queue.due([held, {"id": "b"}], "2026-09-29", "down", []) == {"id": "b"}
