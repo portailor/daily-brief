@@ -263,17 +263,17 @@
 {% if fl.events %}
 <section>
   <h2>앞으로 7일, 가격에 영향을 줄 수 있는 코인 일정</h2>
-  <p class="hint-plain">시가총액 상위 100개 코인 · 날짜가 정해진 일정 중 종류를 알 수 있는 것만 ·
-    설명은 그 종류가 무엇인지이고, 이번 일정이 가격을 어떻게 움직일지는 말하지 않습니다 · CoinMarketCal</p>
+  <p class="hint-plain">시가총액 상위 100개 코인 · 날짜가 정해진 일정 중 종류를 알 수 있는 것만 · CoinMarketCal</p>
   <div class="card">
     {% for e in fl.events %}
     <div class="ev-row">
       <span class="ev-date">{{ e.label }}</span>
       <span class="ev-body">
+        <span class="ev-coin"><span class="ev-coin-lb">코인</span>{% for c in e.coins %}<b>{{ c.sym }}</b>{% if c.name %}<span class="ev-coin-full">({{ c.name }})</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}</span>
         <span class="ev-kind">{{ e.kind }}</span>
-        {% for c in e.coins %}<b>{{ c.name }}</b> <span class="tk">{{ c.sym }}</span>{{ ', ' if not loop.last }}{% endfor %}
         <span class="ev-title">{{ e.title }}</span>
         <span class="ev-about">{{ e.about }}</span>
+        {% if e.tendency %}<span class="ev-tend"><b>과거 사례</b> {{ e.tendency }}{% if e.tsrc %} <a href="{{ e.tsrc[1] }}" target="_blank" rel="noopener">{{ e.tsrc[0] }}</a>{% endif %}</span>{% endif %}
         <a class="ev-more" href="{{ e.url or e.search }}" target="_blank" rel="noopener">{{ '원문 보기' if e.url else '관련 기사 찾기' }} ↗</a>
       </span>
     </div>

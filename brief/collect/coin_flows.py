@@ -39,27 +39,46 @@ TREASURY_DAYS = 14         # 이 기간 안의 매수·매도만
 SOSO_GAP = 3.2             # 분당 20회 한도
 
 
-# 일정 종류 — (이름, 제목에서 찾는 낱말, 설명). 위에서부터 먼저 맞는 것 하나.
-# 설명은 그 종류가 일반적으로 무엇인지일 뿐, 이번 일정이 가격을 어떻게 움직일지는 말하지 않는다.
+# 일정 종류 — (이름, 제목에서 찾는 낱말, 설명, 대체로 가격은, 출처). 위에서부터 먼저 맞는 것 하나.
+# '대체로 가격은'은 조사·연구가 있는 종류에만 쓰고 출처를 함께 단다(9/23 확인). 연구를 못 찾은
+# 종류는 없다고 적는다 — 금리와 부동산처럼 '보통 이렇다'를 동화님이 원했지만 근거 없이 쓰면 환각이다.
 EVENT_TYPES = [
     ("바이백·소각", r"buy ?back|burn",
-     "운영 측이 시장에서 코인을 되사거나(바이백) 없애는(소각) 일. 시장에 도는 양이 줄어듭니다."),
+     "운영 측이 시장에서 코인을 되사거나(바이백) 없애는(소각) 일. 시장에 도는 양이 줄어듭니다.",
+     "발표 뒤 1주일은 시장 평균보다 나은 경우가 절반 정도였고, 한 달 뒤까지 앞선 경우는 드물었다는 분석이 있습니다.",
+     ("Tokenomist 분석(11개 코인)", "https://tokenomist.ai/research/buyback-and-burn-explained-what-they-are-who-is-doing-them-and-whether-they-actually-work")),
     ("물량 해제", r"unlock|vesting",
-     "묶여 있던 코인이 풀려 팔 수 있게 되는 일. 시장에 나올 수 있는 물량이 늘어납니다."),
+     "묶여 있던 코인이 풀려 팔 수 있게 되는 일. 시장에 나올 수 있는 물량이 늘어납니다.",
+     "대체로 가격이 내렸습니다. 1만 6천여 건을 본 조사에서 90%가 하락 압력이었고, 하락은 해제 한 달 전쯤부터 시작됐습니다.",
+     ("Keyrock 조사", "https://keyrock.com/from-locked-to-liquidity-what-16000-token-unlocks-teach-us/")),
     ("상장폐지", r"delist",
-     "거래소에서 그 코인 거래가 끝나는 일. 그 거래소에서는 더 사고팔 수 없게 됩니다."),
+     "거래소에서 그 코인 거래가 끝나는 일. 그 거래소에서는 더 사고팔 수 없게 됩니다.",
+     "대체로 가격이 내렸습니다. 상장폐지 같은 나쁜 소식이 좋은 소식보다 가격을 더 크게 움직였다는 연구가 있습니다.",
+     ("학술 연구(사건 연구)", "https://dergipark.org.tr/en/pub/epfad/article/1011204")),
     ("거래소 상장", r"\blisting\b|\blists?\b|\blisted\b",
-     "새 거래소에서 거래가 시작되는 일. 사고팔 수 있는 곳이 늘어납니다."),
+     "새 거래소에서 거래가 시작되는 일. 사고팔 수 있는 곳이 늘어납니다.",
+     "대체로 가격이 올랐습니다. 327건을 본 연구에서 상장 당일 평균 +5.7%, 앞뒤 사흘을 합치면 +9.2%의 초과 상승이 있었습니다.",
+     ("Ante(2019) 연구", "https://www.blockchainresearchlab.org/wp-content/uploads/2019/10/Exploring-Market-Reactions-to-Exchange-Listings-of-Cryptocurrencies-BRL-working-paper3.pdf")),
     ("입출금 중단", r"withdrawal|deposit|suspen|maintenance|halt",
-     "거래소가 그 코인의 입금·출금을 잠시 막는 일. 점검이나 네트워크 업그레이드 때 흔합니다."),
+     "거래소가 그 코인의 입금·출금을 잠시 막는 일. 점검이나 네트워크 업그레이드 때 흔합니다.",
+     "가격이 한쪽으로 움직인다는 조사는 찾지 못했습니다. 다만 그 거래소 가격만 다른 곳과 벌어질 수 있습니다.",
+     None),
     ("반감기", r"halving",
-     "새로 만들어지는 코인 양이 절반으로 줄어드는 일. 공급 속도가 느려집니다."),
+     "새로 만들어지는 코인 양이 절반으로 줄어드는 일. 공급 속도가 느려집니다.",
+     "비트코인은 지금까지 네 번의 반감기 뒤 1년 동안 모두 올랐지만, 사례가 네 번뿐이라 일반화하기 어렵습니다.",
+     None),
     ("네트워크 업그레이드", r"mainnet|upgrade|hard ?fork|\bfork\b|activation|migration",
-     "코인이 돌아가는 네트워크의 기술을 바꾸는 일. 전후로 거래소가 입출금을 잠시 멈추기도 합니다."),
+     "코인이 돌아가는 네트워크의 기술을 바꾸는 일. 전후로 거래소가 입출금을 잠시 멈추기도 합니다.",
+     "업그레이드 자체로 가격이 한쪽으로 움직인다는 조사는 찾지 못했습니다.",
+     None),
     ("에어드롭·배분", r"airdrop|distribution|snapshot",
-     "코인을 보유자 등에게 나눠 주는 일. 받은 사람이 팔면 시장에 물량이 늘 수 있습니다."),
+     "코인을 보유자 등에게 나눠 주는 일. 받은 사람이 팔면 시장에 물량이 늘 수 있습니다.",
+     "대체로 가격이 내렸습니다. 2024년 에어드롭 코인의 88.7%가 90일 뒤 가격이 떨어졌고, 대부분 15일 안에 급락했습니다.",
+     ("Keyrock 2024 조사", "https://www.dlnews.com/articles/snapshot/keyrock-study-says-most-token-airdrops-crash-after-launch/")),
     ("보유자 투표", r"\bvote\b|voting|governance|proposal",
-     "보유자 투표로 운영 방침을 정하는 일. 결과에 따라 공급량·수수료 같은 규칙이 바뀔 수 있습니다."),
+     "보유자 투표로 운영 방침을 정하는 일. 결과에 따라 공급량·수수료 같은 규칙이 바뀔 수 있습니다.",
+     "투표 자체로 가격이 한쪽으로 움직인다는 조사는 찾지 못했습니다.",
+     None),
 ]
 # 가격과 거리가 먼 일정 — 종류가 맞아도 뺀다 (예: 'Testnet upgrade', 'Upgrade AMA')
 EVENT_SKIP = r"\bAMA\b|\bcall\b|spaces|livestream|stream|meetup|webinar|conference|summit|hackathon|" \
@@ -149,19 +168,20 @@ def events(key: str, today: date) -> list[dict]:
         q = " ".join(filter(None, [(coins[0].get("name") if coins else ""), e["title"]]))
         out.append({"date": d.isoformat(), "label": f"{d.month}/{d.day}({'월화수목금토일'[d.weekday()]})",
                     "title": e["title"], "kind": kind[0], "about": kind[1],
+                    "tendency": kind[2], "tsrc": kind[3],
                     "coins": [{"sym": c["symbol"].upper(), "name": c.get("name", "")} for c in coins],
                     "url": e.get("sourceUrl") or "",
                     "search": "https://news.google.com/search?" + urlencode({"q": q, "hl": "en-US"})})
     return out
 
 
-def event_kind(title: str) -> tuple[str, str] | None:
+def event_kind(title: str) -> tuple | None:
     """제목으로 일정 종류를 가린다. 가격과 거리가 먼 일정이나 모르는 종류면 None."""
     if re.search(EVENT_SKIP, title, re.I):
         return None
-    for name, pat, about in EVENT_TYPES:
+    for name, pat, about, tendency, src in EVENT_TYPES:
         if re.search(pat, title, re.I):
-            return name, about
+            return name, about, tendency, src
     return None
 
 
