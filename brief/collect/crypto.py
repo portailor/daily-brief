@@ -198,6 +198,22 @@ def collect() -> dict:
     except Exception as exc:                                      # noqa: BLE001
         data["missing"].append(f"공포·탐욕 지수({type(exc).__name__})")
 
+    # 눈여겨볼 코인 — 급등 코인과 대표 코인을 다룬 해외 기사 (brief/collect/coin_news.py)
+    try:
+        from brief.collect import coin_news
+        by_id = {c["id"]: c for c in top}
+        coins = [{"id": c["id"], "name": c["name"], "sym": c["sym"],
+                  "chg24": c["chg24"], "why": "24시간 급등"} for c in data["gainers"]]
+        for cid, _m, ko in MAJORS:
+            g = by_id.get(cid)
+            if g and cid not in {c["id"] for c in coins}:
+                coins.append({"id": cid, "name": g["name"], "sym": g["sym"], "ko": ko,
+                              "chg24": g["chg24"], "why": "대표 코인"})
+        data["news"] = coin_news.collect(coins, now)
+        data["missing"] += [f"뉴스 {m}" for m in data["news"]["missing"]]
+    except Exception as exc:                                      # noqa: BLE001
+        data["missing"].append(f"해외 코인 뉴스({type(exc).__name__})")
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     return data

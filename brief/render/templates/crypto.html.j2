@@ -32,6 +32,54 @@
   {% endif %}
 </section>
 
+{# ── 눈여겨볼 코인: 급등·대표 코인마다 해외 기사 제목(영어 원문) 링크.
+   '오른 이유'라고 쓰지 않는다 — 같은 시간대에 그 코인을 다룬 기사일 뿐이다. ── #}
+{% set nw = cx.news or {} %}
+{% if nw.watch %}
+<section>
+  <h2>눈여겨볼 코인 · 해외 뉴스</h2>
+  <p class="hint-plain">24시간 급등 코인과 대표 코인 · 최근 48시간 해외 기사 중 <b>제목에 그 코인 이름이 나온 것</b> ·
+    기사 제목은 영어 원문 그대로입니다. 기사가 가격을 움직였다는 뜻은 아닙니다.</p>
+  <div class="card">
+    {% for w in nw.watch %}
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name">{{ w.ko or w.name }} <span class="tk">{{ w.sym }}</span></span>
+        <span>
+          <span class="nw-why">{{ w.why }}</span>
+          {% if w.chg24 is not none %}<span class="num {{ 'up' if w.chg24 > 0 else 'down' if w.chg24 < 0 else '' }}">{{ '%+.1f'|format(w.chg24) }}%</span>{% endif %}
+        </span>
+      </div>
+      {% if w.news %}
+      <ul class="nw-list">
+        {% for n in w.news %}
+        <li><a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
+          <span class="nw-meta">{{ n.source }} · {{ n.when }}</span></li>
+        {% endfor %}
+      </ul>
+      {% if w.news_n > w.news|length %}<div class="re-src">같은 48시간 안에 이 코인 이름이 나온 기사 {{ w.news_n }}건 중 최신 {{ w.news|length }}건</div>{% endif %}
+      {% else %}
+      <div class="re-note" style="margin-top:3px">최근 48시간 안에 제목에 이 코인 이름이 나온 해외 기사가 없습니다.</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if nw.institutional %}
+  <div class="card" style="margin-top:8px">
+    <div class="re-sub">기관·ETF 소식 · 제목에 ETF·기관·매수·보유·지분 같은 단어가 들어간 기사</div>
+    <ul class="nw-list">
+      {% for n in nw.institutional %}
+      <li><a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
+        <span class="nw-meta">{{ n.source }} · {{ n.when }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  <div class="re-src" style="margin-top:6px">출처: {{ nw.sources|join(' · ') }} (RSS·Finnhub) · {{ cx.asof }} 기준 · 같은 소식을 여러 매체가 쓴 경우 하나만</div>
+</section>
+{% endif %}
+
 {# ── 30일 흐름: 코인마다 선 하나(범례 없음 — 제목이 곧 이름). 최고·최저만 값을 적고,
    나머지 날짜는 손가락/마우스를 올리면 나온다. 표로도 볼 수 있게 접어 둔다. ── #}
 {% macro usd(v) %}${{ '{:,.0f}'.format(v) if v >= 1000 else '{:,.2f}'.format(v) }}{% endmacro %}
