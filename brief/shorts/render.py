@@ -381,10 +381,13 @@ def _bubble(im: Image.Image, text: str, card_bottom: int, tail_x: int):
     y1 = BUBBLE_MAX_BOTTOM
     top = y1 - h
     d.rounded_rectangle((x0, top, x1, y1), 40, fill="white", outline=INK, width=5)
-    tail = [(tail_x - 34, y1 - 3), (tail_x + 30, y1 - 3), (tail_x + 16, y1 + 50)]
-    d.polygon(tail, fill="white")
-    d.line((tail[0], tail[2]), fill=INK, width=5)
-    d.line((tail[1], tail[2]), fill=INK, width=5)
+    # 꼬리 — 흰 삼각형을 말풍선 테두리(안쪽 5px)보다 위에서 시작해 테두리를 덮는다.
+    # 테두리 선이 꼬리 입구를 가로질러 보이던 것을 없앤다 (9/23 동화님).
+    tip = (tail_x + 16, y1 + 50)
+    left, right = (tail_x - 34, y1 - 5), (tail_x + 30, y1 - 5)
+    d.polygon([(left[0], y1 - 9), (right[0], y1 - 9), tip], fill="white")
+    d.line((left, tip), fill=INK, width=5)
+    d.line((right, tip), fill=INK, width=5)
     y = top + 24
     for line in lines:
         d.text((x0 + 40, y), line, font=f, fill=INK)
