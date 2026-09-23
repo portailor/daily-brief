@@ -399,9 +399,25 @@ def upload_shorts(box: dict, cfg: dict) -> None:
     if not youtube.configured():
         log("  유튜브 자격증명 없음 — 쇼츠 올리기 생략 (scripts/youtube_auth.py)")
         return
+    # 대기열 영상(애니메이션 등)이 오늘 조건에 맞으면 브리핑보다 먼저. 실패해도 브리핑은 올린다.
+    step("대기열 영상 올리기", upload_queued, box, shorts, sc)
     url, status = youtube.upload(shorts["path"], shorts["title"], shorts["description"],
                                  privacy=sc.get("privacy", "public"))
     log(f"✓ 쇼츠 업로드: {url} ({status})")
+
+
+def upload_queued(box: dict, shorts: dict, sc: dict) -> None:
+    from brief.deliver import queue, youtube              # noqa: PLC0415
+    state = _read_json(STATE)
+    done = state.get("queue_done", [])
+    item = queue.due(queue.load(), box.get("brief_date", ""), shorts.get("mood", ""), done)
+    if not item:
+        return
+    url, status = youtube.upload(ROOT / item["file"], item["title"], item["description"],
+                                 privacy=sc.get("privacy", "public"), tags=item.get("tags"),
+                                 category=item.get("category", "25"))
+    _write_json(STATE, {**_read_json(STATE), "queue_done": [*done, item["id"]]})
+    log(f"✓ 대기열 영상 업로드 ({item['id']}): {url} ({status})")
 
 
 def send() -> int:

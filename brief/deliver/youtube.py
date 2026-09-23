@@ -51,7 +51,7 @@ def _access_token(env: dict[str, str]) -> str:
 
 
 def upload(path: str | Path, title: str, description: str, privacy: str = "public",
-           tags: list[str] | None = None) -> tuple[str, str]:
+           tags: list[str] | None = None, category: str = "25") -> tuple[str, str]:
     """영상을 올리고 (영상 주소, 실제 공개 상태)를 돌려준다."""
     path = Path(path)
     env = _env()
@@ -59,7 +59,7 @@ def upload(path: str | Path, title: str, description: str, privacy: str = "publi
     meta = {
         "snippet": {"title": title[:100], "description": description[:4900],
                     "tags": tags or ["경제", "주식", "코스피", "브리핑"],
-                    "categoryId": "25",              # 뉴스/정치
+                    "categoryId": category,          # 25 뉴스/정치, 23 코미디
                     "defaultLanguage": "ko", "defaultAudioLanguage": "ko"},
         "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False},
     }
