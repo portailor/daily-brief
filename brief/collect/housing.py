@@ -204,6 +204,10 @@ def seoul(key: str, today: date) -> dict:
     if ready:
         records.fold(store, lambda c, ym: _trades(key, c, ym), SEOUL_GU, upto, max_months=1)
     highs = records.detect(store, two_months, since) if ready else []
+    # 화면에는 거래가 큰 순으로 보인다. 상승률 순이면 거래가 드문 소규모 단지(예: 2006년
+    # 뒤 처음 팔린 빌라형 아파트 +283%)가 맨 위를 차지해 시장 흐름과 동떨어져 보였다(9/23 검토).
+    # 건수(highs_n)는 모두 센다.
+    highs.sort(key=lambda h: -h["man"])
     for h in highs:
         h["gu"] = SEOUL_GU.get(h["sgg"], h["sgg"])
 

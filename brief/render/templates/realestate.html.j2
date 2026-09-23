@@ -161,7 +161,7 @@
     {% endfor %}
     {% endif %}
     {% if s.highs_from %}
-    <div class="re-sub" style="margin-top:12px">신고가 · 최근 7일 계약 {{ s.highs_n }}건</div>
+    <div class="re-sub" style="margin-top:12px">신고가 · 최근 7일 계약 {{ s.highs_n }}건{% if s.highs_n > s.highs|length %} · 거래가 큰 {{ s.highs|length }}건{% endif %}</div>
     {% for r in s.highs %}
     <div class="re-item">
       <div class="re-item-top">
@@ -175,7 +175,7 @@
     {% else %}
     <div class="re-note">최근 7일 계약된 거래 중 신고가는 없습니다.</div>
     {% endfor %}
-    <div class="re-src">{{ s.highs_from }} 이후 같은 단지·같은 전용면적의 최고가를 넘은 거래 (중개거래만)</div>
+    <div class="re-src">{{ s.highs_from }} 이후 같은 단지·같은 평형(전용면적 ±1㎡)의 최고가를 넘은 거래 · 직거래·해제 제외(2021년 11월 전 거래는 거래 방식 표시가 없어 모두 포함)</div>
     {% endif %}
     <div class="re-src" style="margin-top:6px">국토교통부 실거래 신고 기준 · 해제된 거래 제외.
       서울시·부동산원 공표 통계와 수십 건 차이가 날 수 있습니다 (예: 2026년 7월 신고 기준 5,850건, 공표 5,838건).</div>
