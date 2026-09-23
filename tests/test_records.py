@@ -59,3 +59,10 @@ def test_renamed_complex_matched_by_jibun():
     row = _r("A", 84.9, 290000, 2026, 9, 18)
     row["aptNm"] = "A 리모델링 새 이름"
     assert records.detect(st, [("11680", row)], date(2026, 9, 15)) == []
+
+
+def test_usable_accepts_old_deals_without_type():
+    # 2021년 11월 전 거래는 거래유형·해제 칸이 비어 있다 — 빼면 2006~2021 기록이 통째로 사라진다
+    assert records.usable(_r("A", 84.9, 50000, 2006, 3, 1, gbn=""))
+    assert not records.usable(_r("A", 84.9, 50000, 2024, 3, 1, gbn="직거래"))
+    assert not records.usable(_r("A", 84.9, 50000, 2024, 3, 1, cancel="O"))
