@@ -155,7 +155,8 @@ GENERIC_HEADLINE = re.compile(r"(급등세|급락세|상승세|하락세|강세|
 
 def _clean_headline(t: str) -> str:
     t = re.sub(r"^\s*(\[[^\]]*\]\s*)+", "", t)               # [속보] [특징주] 같은 머리표
-    t = t.replace("株", "주")
+    for a, b in (("株", "주"), ("美", "미국 "), ("中", "중국 "), ("日", "일본 "), ("韓", "한국 "), ("北", "북한 ")):
+        t = t.replace(a, b)
     t = re.sub(r"\s*(…|\.\.\.+|···)\s*", ", ", t)
     t = re.sub(r"[\"'‘’“”?!]", "", t)                        # 따옴표·물음표는 문장 나누기를 흐린다
     return re.sub(r"\s+", " ", t).strip(" ,")
@@ -419,8 +420,9 @@ def build(payload: dict, message: str = "", weekly: bool = False, link: str = ""
     title = "주간 브리핑" if weekly else "경제 브리핑"
     intro = Segment("", [], f"{d.month}월 {d.day}일 {WEEKDAY[d.weekday()]}요일 {title}이에요!",
                     "intro", priority=0)
-    outro = Segment("", [], "더 자세한 건 설명란 링크에서 봐 주세요. 다음에 또 만나요!", "outro",
-                    "전체 브리핑은 설명란 링크에서", priority=0)
+    # 링크는 영상 설명이 아니라 채널 설명에 있다 (9/23 동화님이 영상 설명에서 뺌)
+    outro = Segment("", [], "더 자세한 브리핑은 채널 설명의 링크에서 볼 수 있어요. 다음에 또 만나요!", "outro",
+                    "전체 브리핑은 채널 설명 링크에서", priority=0)
 
     if weekly and payload.get("week"):
         m = next((m for m in payload["week"].moves if m.id == "KOSPI"), None)
