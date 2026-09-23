@@ -160,12 +160,12 @@
 {% if cx.gainers %}
 <section>
   <h2>24시간 급등 코인</h2>
-  <p class="hint-plain">시가총액 상위 250개 중 24시간 상승률 순 · {{ cx_terms.stable|safe }}·토큰화 자산 제외 · 이 코인들을 다룬 해외 기사는 맨 아래 「눈여겨볼 코인」에</p>
+  <p class="hint-plain">시가총액 상위 250개 중 24시간 상승률 순 · {{ cx_terms.stable|safe }}·토큰화 자산 제외</p>
   <div class="card">
     <div class="cx-row cx-head"><span>코인</span><span>시총 순위</span><span>24시간</span><span>7일</span></div>
     {% for c in cx.gainers %}
     <div class="cx-row">
-      <span class="re-name">{{ c.name }} <span class="tk">{{ c.sym }}</span></span>
+      <span class="re-name">{% if cx.news %}<a class="nw-jump" href="#nw-{{ c.id }}">{{ c.name }}</a>{% else %}{{ c.name }}{% endif %} <span class="tk">{{ c.sym }}</span></span>
       <span class="num" style="color:var(--dim)">{{ c.rank or '—' }}위</span>
       <span class="num up">{{ '%+.1f'|format(c.chg24) }}%</span>
       <span class="num {{ 'up' if c.chg7d and c.chg7d > 0 else 'down' if c.chg7d and c.chg7d < 0 else '' }}">{{ ('%+.1f'|format(c.chg7d) ~ '%') if c.chg7d is not none else '—' }}</span>
@@ -205,24 +205,6 @@
       <span class="num {{ 'up' if c.chg24 and c.chg24 > 0 else 'down' if c.chg24 and c.chg24 < 0 else '' }}">{{ ('%+.1f'|format(c.chg24) ~ '%') if c.chg24 is not none else '—' }}</span>
     </div>
     {% endfor %}
-  </div>
-</section>
-{% endif %}
-
-{% set uw = cx.upbit_warn or {} %}
-{% if uw.warning or uw.caution %}
-<section>
-  <h2>업비트 경보</h2>
-  <p class="hint-plain">업비트가 붙인 표시 그대로 · {{ cx.asof }} 기준</p>
-  <div class="card">
-    {% if uw.warning %}
-    <div class="re-sub">투자유의 종목 {{ uw.warning|length }}개 — 거래지원 종료(상장폐지) 여부를 검토 중인 코인</div>
-    <div class="chips">{% for c in uw.warning %}<span class="chip warn">{{ c.name }} <span class="tk">{{ c.sym }}</span></span>{% endfor %}</div>
-    {% endif %}
-    {% if uw.caution %}
-    <div class="re-sub" style="margin-top:10px">투자주의 {{ uw.caution|length }}개 — 단기간 거래가 과열돼 업비트가 주의를 붙인 코인</div>
-    <div class="chips">{% for c in uw.caution %}<span class="chip" title="{{ c.why|join(', ') }}">{{ c.name }} <span class="chip-why">{{ c.why|join('·') }}</span></span>{% endfor %}</div>
-    {% endif %}
   </div>
 </section>
 {% endif %}
@@ -270,7 +252,7 @@
     기사 제목은 영어 원문 그대로입니다. 기사가 가격을 움직였다는 뜻은 아닙니다.</p>
   <div class="card">
     {% for w in nw.watch %}
-    <div class="re-item">
+    <div class="re-item nw-item" id="nw-{{ w.id }}">
       <div class="re-item-top">
         <span class="re-name">{{ w.ko or w.name }} <span class="tk">{{ w.sym }}</span></span>
         <span>

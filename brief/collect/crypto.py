@@ -9,7 +9,6 @@
   검색 급상승 CoinGecko trending — 최근 24시간 CoinGecko 에서 많이 검색된 코인
   분야별 흐름 CoinGecko categories — 레이어1·밈·AI·디파이 등 분야별 시가총액 24시간 변화
   스테이블코인 DefiLlama — 달러 스테이블코인 총 발행액 (코인 시장에 대기 중인 돈의 크기)
-  업비트 경보 업비트 market/all?isDetails=true — 투자유의 종목, 투자주의(거래량 급등 등) 종목
   급등 코인   시가총액 상위 250개 중 24시간 상승률 순 (스테이블·토큰화 자산 제외).
               시총 하한을 두는 이유: 이름 모를 초소형 코인이 몇백 % 뛰는 건 소식이 아니다.
 
@@ -53,9 +52,6 @@ CATEGORIES = [("layer-1", "레이어1"), ("layer-2", "레이어2"), ("decentrali
               ("meme-token", "밈"), ("artificial-intelligence", "AI"), ("real-world-assets-rwa", "실물자산(RWA)"),
               ("gaming", "게임"), ("privacy-coins", "프라이버시"), ("decentralized-exchange", "탈중앙 거래소"),
               ("exchange-based-tokens", "거래소 코인")]
-UPBIT_CAUTION = {"PRICE_FLUCTUATIONS": "가격 급변동", "TRADING_VOLUME_SOARING": "거래량 급증",
-                 "DEPOSIT_AMOUNT_SOARING": "입금량 급증", "GLOBAL_PRICE_DIFFERENCES": "해외와 가격 차이",
-                 "CONCENTRATION_OF_SMALL_ACCOUNTS": "소수 계정 거래 집중"}
 LLAMA_STABLE = "https://stablecoins.llama.fi/stablecoincharts/all"
 # 30일 그래프를 그릴 코인
 HISTORY = [("bitcoin", "비트코인"), ("ethereum", "이더리움")]
@@ -116,7 +112,6 @@ def collect() -> dict:
                   "asof": f"{now.month}/{now.day} {now:%H:%M}",
                   "majors": [], "top": [], "gainers": [], "history": [],
                   "trending": [], "sectors": [], "stable": None,
-                  "upbit_warn": {"warning": [], "caution": []},
                   "market": {}, "upbit_top": [],
                   "fng": None, "missing": []}
 
@@ -246,21 +241,6 @@ def collect() -> dict:
                           "d30": val(last) - val(series[-31]), "asof": f"{d.month}/{d.day}"}
     except Exception as exc:                                      # noqa: BLE001
         data["missing"].append(f"스테이블코인 발행액({type(exc).__name__})")
-
-    # 업비트 투자유의·투자주의 — 국내 투자자가 가장 먼저 알아야 할 경보
-    try:
-        for m in _get(f"{UPBIT}/market/all", isDetails="true"):
-            if not m["market"].startswith("KRW-"):
-                continue
-            ev = m.get("market_event") or {}
-            base = {"name": m.get("korean_name", m["market"]), "sym": m["market"].split("-")[1]}
-            if ev.get("warning"):
-                data["upbit_warn"]["warning"].append(base)
-            why = [UPBIT_CAUTION.get(k, k) for k, v in (ev.get("caution") or {}).items() if v]
-            if why:
-                data["upbit_warn"]["caution"].append({**base, "why": why})
-    except Exception as exc:                                      # noqa: BLE001
-        data["missing"].append(f"업비트 경보({type(exc).__name__})")
 
     # 눈여겨볼 코인 — 급등 코인과 대표 코인을 다룬 해외 기사 (brief/collect/coin_news.py)
     try:

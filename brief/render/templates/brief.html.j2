@@ -142,11 +142,10 @@
   .nw-list a:hover{text-decoration:underline}
   .nw-meta{display:block; font-size:11.5px; color:var(--dim)}
   .nw-why{font-size:11px; color:var(--dim); margin-right:6px; white-space:nowrap}
-  /* 업비트 경보 칩 (분야별 흐름 막대는 주식 탭 업종 막대 .sec-* 를 그대로 쓴다) */
-  .chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px}
-  .chip{font-size:12.5px; padding:3px 8px; border:1px solid var(--line); border-radius:12px; background:var(--bg); white-space:nowrap}
-  .chip.warn{border-color:var(--warn); color:var(--warn); font-weight:650}
-  .chip-why{font-size:11px; color:var(--dim)}
+  /* 급등 코인 이름 → 아래 해외 뉴스로. 도착한 칸은 잠깐 밝게 */
+  .nw-jump{color:inherit; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px}
+  .nw-item{scroll-margin-top:64px; border-radius:6px; transition:background-color .6s}
+  .nw-item:target,.nw-item.flash{background:var(--hl)}
   .cx-head{font-size:12px; color:var(--dim); font-weight:700; padding-top:0}
   .res-period{font-size:12px; color:var(--dim); font-weight:500; margin-left:6px}
   .res-line{display:block; font-size:14px; margin-top:3px; font-variant-numeric:tabular-nums}
@@ -700,7 +699,29 @@
       window.scrollTo(0, 0);
     });
   });
-  show((location.hash || '#market').slice(1));
+  // 급등 코인 이름 → 아래 해외 뉴스 칸. 브라우저 기본 이동에 맡기지 않고 직접 옮겨
+  // 도착한 칸을 잠깐 밝힌다 (미리보기처럼 주소 이동이 막힌 곳에서도 동작하게)
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a.nw-jump');
+    if (!a) return;
+    var el = document.getElementById(a.getAttribute('href').slice(1));
+    if (!el) return;
+    e.preventDefault();
+    try { history.replaceState(null, '', a.getAttribute('href')); } catch (_) {}
+    el.scrollIntoView({behavior: 'smooth', block: 'start'});
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+    setTimeout(function () { el.classList.remove('flash'); }, 2200);
+  });
+  // 주소가 탭 안의 칸을 가리키면(#nw-bitcoin 처럼) 그 칸이 든 탭을 연다
+  var h = (location.hash || '#market').slice(1);
+  var el = document.getElementById(h);
+  var panel = el && el.closest('.panel');
+  if (panel && panel.id !== 'panel-' + h) {
+    show(panel.id.replace('panel-', ''));
+    el.scrollIntoView();
+  } else {
+    show(h);
+  }
 })();
 </script>
 </body>
