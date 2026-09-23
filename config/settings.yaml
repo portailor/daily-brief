@@ -177,8 +177,8 @@ watchlist:
 shorts:
   upload: true
   privacy: public
-  # 목소리 — edge-tts. 음 높이·빠르기를 올려 캐릭터에 맞게 귀엽게 (9/22 동화님)
+  # 목소리 — edge-tts. 9/23 동화님이 후보 A~E 중 C 선택: 영어권 다국어 목소리(Ava)가 한국어를 읽는다
   voice:
-    voice: ko-KR-SunHiNeural
-    rate: "+15%"
-    pitch: "+45Hz"
+    voice: en-US-AvaMultilingualNeural
+    rate: "+10%"
+    pitch: "+20Hz"
