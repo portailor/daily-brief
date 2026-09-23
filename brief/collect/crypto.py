@@ -5,6 +5,9 @@
               (2026-09-22 대조: 코인베이스·크라켄 체결가와 0.04% 이내)
   국내 시세   업비트 — 원화 가격, 24시간 거래대금
   심리 지표   alternative.me 공포·탐욕 지수 (0~100)
+  30일 흐름   CoinGecko market_chart — 비트코인·이더리움 하루 한 점(달러)
+  급등 코인   시가총액 상위 250개 중 24시간 상승률 순 (스테이블·토큰화 자산 제외).
+              시총 하한을 두는 이유: 이름 모를 초소형 코인이 몇백 % 뛰는 건 소식이 아니다.
 
 변동률 기준은 하나로 맞춘다: 모두 '24시간 전 대비'(CoinGecko).
 업비트 자체 등락률은 매일 오전 9시 기준가 대비라 같은 순간에도 다른 숫자가 된다
@@ -41,6 +44,9 @@ MAJORS = [
     ("ripple", "KRW-XRP", "리플(XRP)"),
     ("solana", "KRW-SOL", "솔라나"),
 ]
+# 30일 그래프를 그릴 코인
+HISTORY = [("bitcoin", "비트코인"), ("ethereum", "이더리움")]
+GAINER_UNIVERSE = 250      # 급등 코인을 고르는 범위 — 시가총액 상위 몇 개 안에서
 # 가격이 1달러에 묶이도록 설계된 코인. 시가총액 순위에는 두되 '스테이블'로 표시한다.
 STABLE = {"usdt", "usdc", "dai", "fdusd", "usde", "tusd", "pyusd", "usds"}
 
@@ -64,10 +70,11 @@ def _get(url: str, **params):
 
 
 def _markets() -> list[dict]:
-    """시가총액 상위 20 (달러 기준). 걸러낸 뒤 8개를 쓴다."""
+    """시가총액 상위 GAINER_UNIVERSE 개 (달러 기준). 순위표는 앞 8개, 급등은 전체에서 고른다."""
     rows = _get(f"{CG}/coins/markets", vs_currency="usd", order="market_cap_desc",
-                per_page=20, page=1, price_change_percentage="24h,7d")
+                per_page=GAINER_UNIVERSE, page=1, price_change_percentage="24h,7d")
     return [{"id": r["id"], "sym": r["symbol"].upper(), "name": r["name"],
+             "rank": r.get("market_cap_rank"),
              "usd": r["current_price"], "cap": r["market_cap"],
              "chg24": r.get("price_change_percentage_24h_in_currency")
                       if r.get("price_change_percentage_24h_in_currency") is not None
@@ -76,11 +83,26 @@ def _markets() -> list[dict]:
              "stable": r["symbol"].lower() in STABLE} for r in rows]
 
 
+def _history(cid: str) -> list[dict]:
+    """지난 30일 하루 한 점. 점은 매일 0시(UTC) = 한국시간 오전 9시 가격이고,
+    마지막 점만 수집한 순간의 가격이라 날짜가 앞 점과 겹친다 → '지금'으로 적는다."""
+    raw = _get(f"{CG}/coins/{cid}/market_chart", vs_currency="usd", days=30,
+               interval="daily")["prices"]
+    out = []
+    for ms, price in raw:
+        d = datetime.fromtimestamp(ms / 1000, timezone.utc).astimezone(KST)
+        out.append({"d": f"{d.month}/{d.day}", "p": price})
+    if out:
+        out[-1]["d"] = "지금"
+    return out
+
+
 def collect() -> dict:
     now = datetime.now(KST)
     data: dict = {"collected_at": now.isoformat(timespec="minutes"),
                   "asof": f"{now.month}/{now.day} {now:%H:%M}",
-                  "majors": [], "top": [], "market": {}, "upbit_top": [],
+                  "majors": [], "top": [], "gainers": [], "history": [],
+                  "market": {}, "upbit_top": [],
                   "fng": None, "missing": []}
 
     # 해외 시세 · 시가총액 상위
@@ -90,7 +112,10 @@ def collect() -> dict:
         # 시가총액 순위에서 스테이블코인(1달러 고정)과 토큰화 자산(심볼에 '_', 예: 주택담보
         # 대출을 토큰으로 만든 FIGR_HELOC)은 뺀다. 가격이 움직이지 않거나 코인이 아니라서
         # 순위표를 읽는 데 방해만 된다. 뺀다는 사실은 화면에 적는다.
-        data["top"] = [c for c in top if not c["stable"] and "_" not in c["sym"]][:8]
+        coins = [c for c in top if not c["stable"] and "_" not in c["sym"]]
+        data["top"] = coins[:8]
+        data["gainers"] = sorted([c for c in coins if (c["chg24"] or 0) > 0],
+                                 key=lambda c: -c["chg24"])[:5]
     except Exception as exc:                                      # noqa: BLE001
         data["missing"].append(f"해외 시세({type(exc).__name__})")
 
@@ -130,6 +155,18 @@ def collect() -> dict:
                           "eth_dom": g["market_cap_percentage"]["eth"]}
     except Exception as exc:                                      # noqa: BLE001
         data["missing"].append(f"전체 시장({type(exc).__name__})")
+
+    # 30일 흐름
+    for cid, ko in HISTORY:
+        try:
+            time.sleep(1.5)
+            pts = _history(cid)
+            if len(pts) >= 2:
+                first, last = pts[0]["p"], pts[-1]["p"]
+                data["history"].append({"id": cid, "name": ko, "points": pts,
+                                        "chg": (last / first - 1) * 100})
+        except Exception as exc:                                  # noqa: BLE001
+            data["missing"].append(f"{ko} 30일 흐름({type(exc).__name__})")
 
     # 업비트 24시간 거래대금 상위 — 국내에서 실제로 돈이 몰린 곳
     try:
@@ -186,5 +223,9 @@ if __name__ == "__main__":
     if d["fng"]:
         print(f"  공포·탐욕 {d['fng']['value']} ({d['fng']['label']}) · 전날 {d['fng']['prev']}")
     print("\n  시총 상위:", [(c["sym"], round(c["chg24"] or 0, 2), "S" if c["stable"] else "") for c in d["top"]])
+    print("  급등:", [(c["sym"], c["rank"], round(c["chg24"], 1)) for c in d["gainers"]])
+    for h in d["history"]:
+        print(f"  {h['name']} 30일 {h['points'][0]['d']} {h['points'][0]['p']:,.0f} → "
+              f"{h['points'][-1]['d']} {h['points'][-1]['p']:,.0f} ({h['chg']:+.1f}%, {len(h['points'])}점)")
     print("  업비트 거래대금:", [(c["name"], f"{c['value_eok']:,.0f}억") for c in d["upbit_top"]])
     print("\n못 가져온 것:", d["missing"] or "없음")

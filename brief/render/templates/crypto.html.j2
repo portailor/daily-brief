@@ -32,6 +32,69 @@
   {% endif %}
 </section>
 
+{# ── 30일 흐름: 코인마다 선 하나(범례 없음 — 제목이 곧 이름). 최고·최저만 값을 적고,
+   나머지 날짜는 손가락/마우스를 올리면 나온다. 표로도 볼 수 있게 접어 둔다. ── #}
+{% macro usd(v) %}${{ '{:,.0f}'.format(v) if v >= 1000 else '{:,.2f}'.format(v) }}{% endmacro %}
+{% macro spark(h) %}
+{% set VW, VH, PL, PR, PT, PB = 340, 150, 10, 10, 24, 24 %}
+{% set vals = h.points | map(attribute='p') | list %}
+{% set hi, lo = vals | max, vals | min %}
+{% set span = (hi - lo) if hi > lo else 1 %}
+{% set n = vals | length %}
+{% set step = (VW - PL - PR) / (n - 1) %}
+{% set ns = namespace(d='', hi_i=0, lo_i=0) %}
+{% for v in vals %}
+  {% set x = PL + loop.index0 * step %}{% set y = PT + (hi - v) / span * (VH - PT - PB) %}
+  {% set ns.d = ns.d ~ ('M' if loop.first else ' L') ~ ('%.1f'|format(x)) ~ ',' ~ ('%.1f'|format(y)) %}
+  {% if v == hi %}{% set ns.hi_i = loop.index0 %}{% endif %}
+  {% if v == lo %}{% set ns.lo_i = loop.index0 %}{% endif %}
+{% endfor %}
+{% set hx = PL + ns.hi_i * step %}{% set lx = PL + ns.lo_i * step %}
+{% set ly = VH - PB %}
+<div class="cx-chart" data-pts='{{ vals | map("round", 2) | list | tojson }}'
+     data-days='{{ h.points | map(attribute="d") | list | tojson }}'
+     data-pl="{{ PL }}" data-pr="{{ PR }}" data-pt="{{ PT }}" data-pb="{{ PB }}"
+     data-hi="{{ hi }}" data-lo="{{ lo }}" tabindex="0" role="img"
+     aria-label="{{ h.name }} 지난 30일 달러 가격. 최고 {{ usd(hi) }}({{ h.points[ns.hi_i].d }}), 최저 {{ usd(lo) }}({{ h.points[ns.lo_i].d }})">
+  <svg viewBox="0 0 {{ VW }} {{ VH }}" preserveAspectRatio="none" aria-hidden="true">
+    <line x1="{{ PL }}" x2="{{ VW - PR }}" y1="{{ ly }}" y2="{{ ly }}" class="cx-axis" vector-effect="non-scaling-stroke"/>
+    <path d="{{ ns.d }}" class="cx-line" vector-effect="non-scaling-stroke"/>
+    <line class="cx-cross" x1="0" x2="0" y1="{{ PT - 6 }}" y2="{{ ly }}" vector-effect="non-scaling-stroke"/>
+  </svg>
+  {# 값 글자와 점은 SVG 밖 HTML 로 — 가로로 늘어나는 그림에서 글자가 찌그러지지 않게 #}
+  <span class="cx-dot" style="left:{{ '%.2f'|format(hx / VW * 100) }}%;top:{{ PT }}px"></span>
+  <span class="cx-lbl {{ 'r' if hx > VW * 0.7 else 'l' if hx < VW * 0.3 else '' }}" style="left:{{ '%.2f'|format(hx / VW * 100) }}%;top:{{ PT - 20 }}px">최고 {{ usd(hi) }}</span>
+  <span class="cx-dot" style="left:{{ '%.2f'|format(lx / VW * 100) }}%;top:{{ VH - PB }}px"></span>
+  <span class="cx-lbl {{ 'r' if lx > VW * 0.7 else 'l' if lx < VW * 0.3 else '' }}" style="left:{{ '%.2f'|format(lx / VW * 100) }}%;top:{{ VH - PB + 4 }}px">최저 {{ usd(lo) }}</span>
+  <span class="cx-hover-dot"></span>
+  <div class="cx-tip" role="status"></div>
+  <div class="cx-xaxis"><span>{{ h.points[0].d }}</span><span>지금</span></div>
+</div>
+{% endmacro %}
+
+{% if cx.history %}
+<section>
+  <h2>지난 30일 흐름</h2>
+  <p class="hint-plain">달러 가격 · 하루 한 점(한국시간 오전 9시 값) · 마지막 점만 {{ cx.asof }} 가격 · 그래프를 누르거나 마우스를 올리면 날짜별 값</p>
+  <div class="cx-charts">
+    {% for h in cx.history %}
+    <div class="card">
+      <div class="re-item-top">
+        <span class="re-name">{{ h.name }}</span>
+        <span><span class="num">{{ usd(h.points[-1].p) }}</span>
+          <span class="num {{ 'up' if h.chg > 0 else 'down' if h.chg < 0 else '' }}" style="margin-left:4px">{{ '%+.1f'|format(h.chg) }}%</span></span>
+      </div>
+      <div class="re-src">{{ h.points[0].d }} 오전 9시 대비</div>
+      {{ spark(h) }}
+      <details class="cx-table"><summary>날짜별 값 보기</summary>
+        <div class="cx-tgrid">{% for p in h.points | reverse %}<span>{{ p.d }}</span><span class="num">{{ usd(p.p) }}</span>{% endfor %}</div>
+      </details>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 {% if cx.market or cx.fng %}
 <section>
   <h2>코인 시장 전체</h2>
@@ -83,6 +146,24 @@
 </section>
 {% endif %}
 
+{% if cx.gainers %}
+<section>
+  <h2>24시간 급등 코인</h2>
+  <p class="hint-plain">시가총액 상위 250개 중 24시간 상승률 순 · {{ cx_terms.stable|safe }}·토큰화 자산 제외 · 오른 이유는 확인하지 않았습니다</p>
+  <div class="card">
+    <div class="cx-row cx-head"><span>코인</span><span>시총 순위</span><span>24시간</span><span>7일</span></div>
+    {% for c in cx.gainers %}
+    <div class="cx-row">
+      <span class="re-name">{{ c.name }} <span class="tk">{{ c.sym }}</span></span>
+      <span class="num" style="color:var(--dim)">{{ c.rank or '—' }}위</span>
+      <span class="num up">{{ '%+.1f'|format(c.chg24) }}%</span>
+      <span class="num {{ 'up' if c.chg7d and c.chg7d > 0 else 'down' if c.chg7d and c.chg7d < 0 else '' }}">{{ ('%+.1f'|format(c.chg7d) ~ '%') if c.chg7d is not none else '—' }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 {% if cx.upbit_top %}
 <section>
   <h2>업비트에서 많이 거래된 코인</h2>
@@ -115,3 +196,53 @@
     </div>
   </details>
 </section>
+
+{% if cx.history %}
+<script>
+/* 30일 그래프 — 가로 위치에서 가장 가까운 날짜에 세로선을 붙이고 값을 보여 준다.
+   값은 textContent 로만 넣는다. 키보드: 그래프에 초점을 두고 ←/→. */
+(function () {
+  document.querySelectorAll('.cx-chart').forEach(function (el) {
+    var pts = JSON.parse(el.dataset.pts), days = JSON.parse(el.dataset.days);
+    var pl = +el.dataset.pl, pr = +el.dataset.pr, pt = +el.dataset.pt, pb = +el.dataset.pb;
+    var hi = +el.dataset.hi, lo = +el.dataset.lo, span = (hi - lo) || 1;
+    var svg = el.querySelector('svg'), cross = el.querySelector('.cx-cross');
+    var dot = el.querySelector('.cx-hover-dot'), tip = el.querySelector('.cx-tip');
+    var vw = svg.viewBox.baseVal.width, vh = svg.viewBox.baseVal.height;
+    var cur = pts.length - 1;
+    function fmt(v) { return '$' + v.toLocaleString('en-US', {maximumFractionDigits: v >= 1000 ? 0 : 2}); }
+    function show(i) {
+      cur = Math.max(0, Math.min(pts.length - 1, i));
+      var x = pl + cur * (vw - pl - pr) / (pts.length - 1);
+      var y = pt + (hi - pts[cur]) / span * (vh - pt - pb);
+      cross.setAttribute('x1', x); cross.setAttribute('x2', x);
+      el.classList.add('on');
+      var left = x / vw * 100;
+      dot.style.left = left + '%'; dot.style.top = y + 'px';
+      tip.textContent = '';
+      var b = document.createElement('b'); b.textContent = fmt(pts[cur]);
+      var s = document.createElement('span');
+      s.textContent = ' ' + (days[cur] === '지금' ? '지금' : days[cur] + ' 오전 9시');
+      tip.appendChild(b); tip.appendChild(s);
+      tip.style.left = left + '%';
+      tip.classList.toggle('r', left > 65); tip.classList.toggle('l', left < 35);
+    }
+    function hide() { el.classList.remove('on'); }
+    function fromEvent(e) {
+      var r = svg.getBoundingClientRect();
+      var x = (e.clientX - r.left) / r.width * vw;
+      show(Math.round((x - pl) / ((vw - pl - pr) / (pts.length - 1))));
+    }
+    el.addEventListener('pointermove', fromEvent);
+    el.addEventListener('pointerdown', fromEvent);
+    el.addEventListener('pointerleave', hide);
+    el.addEventListener('focus', function () { show(cur); });
+    el.addEventListener('blur', hide);
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft') { show(cur - 1); e.preventDefault(); }
+      if (e.key === 'ArrowRight') { show(cur + 1); e.preventDefault(); }
+    });
+  });
+})();
+</script>
+{% endif %}

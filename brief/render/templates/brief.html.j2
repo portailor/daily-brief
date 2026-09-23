@@ -104,6 +104,36 @@
           font-size:14px; align-items:baseline}
   .cx-row + .cx-row{border-top:1px solid var(--line)}
   .cx-row > span:not(:first-child){text-align:right}
+  /* 30일 그래프 — 선 하나, 축은 옅게, 값 글자는 본문 색 */
+  .cx-charts{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  @media (max-width:640px){ .cx-charts{grid-template-columns:1fr} }
+  .cx-chart{position:relative; height:150px; margin:26px 0 26px; touch-action:pan-y; outline:none}
+  .cx-chart svg{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
+  .cx-line{fill:none; stroke:var(--accent); stroke-width:2; stroke-linejoin:round; stroke-linecap:round}
+  .cx-axis{stroke:var(--line); stroke-width:1}
+  .cx-cross{stroke:var(--dim); stroke-width:1; opacity:0}
+  .cx-chart.on .cx-cross{opacity:.6}
+  .cx-chart:focus-visible{box-shadow:0 0 0 2px var(--accent); border-radius:6px}
+  .cx-dot,.cx-hover-dot{position:absolute; width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%;
+          background:var(--accent); box-shadow:0 0 0 2px var(--card)}
+  .cx-hover-dot{display:none; width:10px; height:10px; margin:-5px 0 0 -5px}
+  .cx-chart.on .cx-hover-dot{display:block}
+  .cx-lbl{position:absolute; transform:translateX(-50%); font-size:11px; color:var(--dim);
+          white-space:nowrap; font-family:var(--mono)}
+  .cx-lbl.r{transform:translateX(-100%)} .cx-lbl.l{transform:none}
+  .cx-chart.on .cx-lbl{opacity:.25}
+  .cx-tip{position:absolute; top:-8px; transform:translate(-50%,-100%); display:none; white-space:nowrap;
+          background:var(--card); border:1px solid var(--line); border-radius:6px; padding:3px 7px;
+          font-size:12px; color:var(--dim); box-shadow:0 2px 6px rgba(0,0,0,.08); z-index:2}
+  .cx-tip b{color:var(--ink); font-family:var(--mono)}
+  .cx-tip.r{transform:translate(-100%,-100%)} .cx-tip.l{transform:translate(0,-100%)}
+  .cx-chart.on .cx-tip{display:block}
+  .cx-xaxis{position:absolute; left:0; right:0; bottom:-20px; display:flex; justify-content:space-between;
+          font-size:11px; color:var(--dim)}
+  .cx-table summary{font-size:12px; color:var(--dim); cursor:pointer}
+  .cx-tgrid{display:grid; grid-template-columns:auto 1fr; gap:2px 12px; font-size:12px; margin-top:6px;
+          max-height:220px; overflow:auto}
+  .cx-tgrid .num{text-align:right}
   .cx-head{font-size:12px; color:var(--dim); font-weight:700; padding-top:0}
   .res-period{font-size:12px; color:var(--dim); font-weight:500; margin-left:6px}
   .res-line{display:block; font-size:14px; margin-top:3px; font-variant-numeric:tabular-nums}
