@@ -146,6 +146,17 @@
   .nw-jump{color:inherit; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px}
   .nw-item{scroll-margin-top:64px; border-radius:6px; transition:background-color .6s}
   .nw-item:target,.nw-item.flash{background:var(--hl)}
+  /* ETF 하루 순유입 막대 — 가운데 선 위가 유입(빨강), 아래가 유출(파랑) */
+  .etf-bars{display:flex; align-items:stretch; gap:3px; height:64px; margin-top:10px; position:relative}
+  .etf-bars::after{content:""; position:absolute; left:0; right:0; top:50%; height:1px; background:var(--line)}
+  .etf-col{flex:1; position:relative}
+  .etf-col i{position:absolute; left:0; right:0; border-radius:2px}
+  .etf-col i.pos{bottom:50%; background:var(--up)}
+  .etf-col i.neg{top:50%; background:var(--down)}
+  /* 코인 일정 */
+  .ev-row{display:grid; grid-template-columns:5.2em 1fr; gap:8px; padding:6px 0; font-size:13.5px; line-height:1.45}
+  .ev-row + .ev-row{border-top:1px dashed var(--line)}
+  .ev-date{color:var(--dim); font-size:12.5px; white-space:nowrap}
   .cx-head{font-size:12px; color:var(--dim); font-weight:700; padding-top:0}
   .res-period{font-size:12px; color:var(--dim); font-weight:500; margin-left:6px}
   .res-line{display:block; font-size:14px; margin-top:3px; font-variant-numeric:tabular-nums}

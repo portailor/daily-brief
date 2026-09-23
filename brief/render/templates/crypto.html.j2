@@ -142,6 +142,57 @@
 </section>
 {% endif %}
 
+{% set fl = cx.flows or {} %}
+{% macro usd_eok(v, sign=True) %}{{ ('{:+,.1f}' if sign else '{:,.1f}').format(v / 1e8) if (v|abs) < 1e11 else ('{:+,.0f}' if sign else '{:,.0f}').format(v / 1e8) }}억 달러{% endmacro %}
+{% if fl.etf or fl.treasury %}
+<section>
+  <h2>큰돈의 움직임</h2>
+  {% if fl.etf %}
+  <p class="hint-plain">미국 현물 ETF 전체에 하루 동안 들어오고 나간 돈 · 미국 거래일 기준(보통 다음 날 아침 집계) · SoSoValue</p>
+  <div class="cx-charts">
+    {% for e in fl.etf %}
+    <div class="card">
+      <div class="re-item-top">
+        <span class="re-name">{{ e.name }} ETF</span>
+        <span class="asof">미국 {{ e.date[5:7]|int }}/{{ e.date[8:10]|int }}</span>
+      </div>
+      <div class="re-item-val">
+        <span class="num re-big {{ 'up' if e.flow > 0 else 'down' if e.flow < 0 else '' }}">{{ usd_eok(e.flow) }}</span>
+        <span class="re-note">{{ '순유입' if e.flow > 0 else '순유출' }}{% if e.streak|abs >= 2 %} · {{ e.streak|abs }}거래일 연속{% endif %}</span>
+      </div>
+      {% set mx = e.days | map(attribute='flow') | map('abs') | max %}
+      <div class="etf-bars" role="img" aria-label="{{ e.name }} ETF 최근 {{ e.days|length }}거래일 순유입">
+        {% for d in e.days %}
+        <span class="etf-col" title="{{ d.date[5:7]|int }}/{{ d.date[8:10]|int }} {{ usd_eok(d.flow) }}">
+          <i class="{{ 'pos' if d.flow >= 0 else 'neg' }}" style="height:{{ ((d.flow|abs) / (mx or 1) * 50)|round(1) }}%"></i>
+        </span>
+        {% endfor %}
+      </div>
+      <div class="cx-xaxis" style="position:static;margin-top:2px"><span>{{ e.days[0].date[5:7]|int }}/{{ e.days[0].date[8:10]|int }}</span><span>{{ e.days[-1].date[5:7]|int }}/{{ e.days[-1].date[8:10]|int }}</span></div>
+      <div class="re-src">최근 5거래일 {{ usd_eok(e.flow5) }} · 순자산 {{ usd_eok(e.assets, false) }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if fl.treasury %}
+  <div class="card" style="margin-top:8px">
+    <div class="re-sub">비트코인을 사들인 상장사 · 최근 14일 (날짜는 회사 발표일)</div>
+    {% for t in fl.treasury %}
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name">{{ t.name }} <span class="tk">{{ t.ticker }}</span></span>
+        <span class="num {{ 'up' if t.btc > 0 else 'down' }}">{{ '{:+,.0f}'.format(t.btc) }} BTC</span>
+      </div>
+      <div class="re-note">{{ t.date[5:7]|int }}/{{ t.date[8:10]|int }}{% if t.cost %} · {{ '{:,.1f}'.format((t.cost|abs) / 1e6) }}백만 달러{% if t.price %}(개당 약 ${{ '{:,.0f}'.format(t.price) }}){% endif %}{% endif %}{% if t.holding %} · 보유 {{ '{:,.0f}'.format(t.holding) }} BTC{% endif %}</div>
+    </div>
+    {% endfor %}
+    <div class="re-src">SoSoValue 비트코인 보유 기업 목록 중 보유량 상위 20곳</div>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
 {% if cx.top %}
 <section>
   <h2>시가총액 상위 코인</h2>
@@ -203,6 +254,21 @@
       <span><span class="num" style="color:var(--dim);display:inline-block;width:1.6em">{{ loop.index }}</span>{{ c.name }} <span class="tk">{{ c.sym }}</span>
         {% if c.rank %}<span class="re-note">시총 {{ c.rank }}위</span>{% endif %}</span>
       <span class="num {{ 'up' if c.chg24 and c.chg24 > 0 else 'down' if c.chg24 and c.chg24 < 0 else '' }}">{{ ('%+.1f'|format(c.chg24) ~ '%') if c.chg24 is not none else '—' }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if fl.events %}
+<section>
+  <h2>앞으로 7일 코인 일정</h2>
+  <p class="hint-plain">날짜가 정해진 일정만 · 시가총액 상위 100개 코인 · 일정 이름은 영어 원문 · CoinMarketCal</p>
+  <div class="card">
+    {% for e in fl.events %}
+    <div class="ev-row">
+      <span class="ev-date">{{ e.label }}</span>
+      <span class="ev-body">{% for c in e.coins %}<span class="tk">{{ c }}</span> {% endfor %}{% if e.url %}<a href="{{ e.url }}" target="_blank" rel="noopener">{{ e.title }}</a>{% else %}{{ e.title }}{% endif %}</span>
     </div>
     {% endfor %}
   </div>

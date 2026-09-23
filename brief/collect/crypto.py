@@ -242,6 +242,15 @@ def collect() -> dict:
     except Exception as exc:                                      # noqa: BLE001
         data["missing"].append(f"스테이블코인 발행액({type(exc).__name__})")
 
+    # 큰돈과 일정 — 미국 현물 ETF·기업 매수(SoSoValue), 앞으로 7일 일정(CoinMarketCal)
+    try:
+        from brief.collect import coin_flows
+        fl = coin_flows.collect(now.date())
+        data["flows"] = {k: fl[k] for k in ("etf", "treasury", "events")}
+        data["missing"] += fl["missing"]
+    except Exception as exc:                                      # noqa: BLE001
+        data["missing"].append(f"ETF·일정({type(exc).__name__})")
+
     # 눈여겨볼 코인 — 급등 코인과 대표 코인을 다룬 해외 기사 (brief/collect/coin_news.py)
     try:
         from brief.collect import coin_news
