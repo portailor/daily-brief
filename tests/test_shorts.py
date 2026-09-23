@@ -45,3 +45,11 @@ def test_fit_drops_low_priority_first(monkeypatch):
     keep, kept = R._fit(sc, lines)
     assert keep == [0, 1, 3]                                   # priority 4 부터 빠진다
     assert kept[0].start == R.LEAD_SEC
+
+
+def test_mouth_closes_in_pauses_and_smiles_right_after():
+    segs = [Segment("", [], "a")]
+    ln = R.Line(0, "a", Path("a"), dur=3.0, start=1.0, pauses=((1.0, 1.4),))
+    assert R._pose(2.2, [ln], segs, 0) == "talk_closed"        # 문장 속 쉼 → 입 닫음
+    assert R._pose(2.2, [ln], segs, 2) == "talk_closed"
+    assert R._pose(4.0, [ln], segs, 0) == "smile"              # 말 끝난 바로 그 순간 → 웃는 얼굴

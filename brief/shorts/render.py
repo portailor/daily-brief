@@ -44,7 +44,7 @@ VOICE = {"voice": "ko-KR-SunHiNeural", "rate": "+15%", "pitch": "+45Hz"}
 
 CHAR_H = 640
 CHAR_BOTTOM = 30
-CARD_TOP = 340
+CARD_TOP = 380              # 이름표(카드 위 32px)가 진행 점(y 300)에 닿지 않게 (9/23)
 BUBBLE_MAX_BOTTOM = 1225     # 말풍선 아래 끝 (캐릭터 머리 위)
 ROW_H = 132                  # 카드 한 줄 높이
 
@@ -97,6 +97,7 @@ class Line:
     clip: Path
     dur: float = 0.0
     start: float = 0.0
+    pauses: tuple = ()    # 문장 안에서 쉬는 구간 (문장 시작 기준 초) — 이때는 입을 닫는다
 
     @property
     def end(self) -> float:
@@ -123,8 +124,39 @@ def _voice_lines(script: Script, folder: Path, voice: dict) -> list[Line]:
              for k, text in enumerate(sentences(seg.speech))]
     asyncio.run(_tts([(ln.text, ln.clip) for ln in lines], voice))
     for ln in lines:
-        ln.dur = _duration(ln.clip)
+        _trim(ln)
     return lines
+
+
+SILENCE_DB = -45        # 이보다 작은 소리는 말이 아닌 것으로 본다
+PAUSE_MIN = 0.15        # 이보다 긴 무음만 '쉼'으로 친다
+
+
+def _trim(ln: Line) -> None:
+    """읽어 주기 음성의 앞뒤 무음을 잘라 내고, 문장 안 쉼(쉼표 등)을 기록한다.
+
+    edge-tts 음성은 앞에 약 0.15초, 끝에 약 0.34초 무음이 붙어 있다. 자르지 않으면 말이
+    끝난 뒤에도 입이 움직였다 (9/23 동화님: "말이 끝나자마자 칼같이 입을 닫고 웃는 모습으로").
+    """
+    total = _duration(ln.clip)
+    err = subprocess.run([_tool("ffmpeg"), "-hide_banner", "-i", str(ln.clip), "-af",
+                          f"silencedetect=noise={SILENCE_DB}dB:d=0.05", "-f", "null", "-"],
+                         capture_output=True, text=True).stderr
+    starts = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", err)]
+    ends = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", err)]
+    spans = list(zip(starts, ends + [total] * (len(starts) - len(ends))))
+    head = spans[0][1] if spans and spans[0][0] <= 0.01 else 0.0
+    tail = spans[-1][0] if spans and spans[-1][1] >= total - 0.01 and spans[-1][0] > head else total
+    inner = [(a - head, b - head) for a, b in spans
+             if a > head + 0.01 and b < tail - 0.01 and b - a >= PAUSE_MIN]
+    if head > 0 or tail < total:
+        cut = ln.clip.with_name(ln.clip.stem + "_t.mp3")
+        subprocess.run([_tool("ffmpeg"), "-y", "-loglevel", "error", "-i", str(ln.clip),
+                        "-ss", f"{head:.3f}", "-to", f"{tail:.3f}", "-c:a", "libmp3lame",
+                        "-b:a", "96k", str(cut)], check=True)
+        ln.clip = cut
+    ln.dur = tail - head
+    ln.pauses = tuple(inner)
 
 
 def _place(lines: list[Line]) -> float:
@@ -367,6 +399,8 @@ def _pose(t: float, lines: list[Line], segs: list[Segment], frame: int) -> str:
         if ln.start <= t < ln.end:
             if segs[ln.seg].surprise and t - first_start[ln.seg] < SURPRISE_SEC:
                 return "surprised"
+            if any(a <= t - ln.start < b for a, b in ln.pauses):
+                return "talk_closed"                     # 쉼표에서 쉬는 동안은 입을 닫는다
             return "talk_open" if (frame // MOUTH_EVERY) % 2 == 0 else "talk_closed"
     return "smile"
 
@@ -452,8 +486,7 @@ def make(payload: dict, message: str = "", weekly: bool = False, link: str | Non
     title = f"{script.date_label} {script.title} | {headline}"
     desc = "\n".join([f"{script.date_label} {script.title}", "",
                       *[f"[{s.tag}] {s.screen}" for s in used], "",
-                      f"전체 브리핑: {link}" if link else "",
-                      "공식 데이터(한국거래소·연준 등)를 자동으로 모아 만든 영상입니다. 투자 권유가 아닙니다.",
+                      # 링크·면책 문구는 채널 설명에 있다 — 영상마다 넣지 않는다 (9/23 동화님)
                       "#경제 #주식 #코스피 #Shorts"])
     return {"path": str(out), "title": title[:100], "description": desc,
             "mood": script.mood, "speech": " ".join(script.segments[i].speech for i in keep)}
