@@ -262,13 +262,20 @@
 
 {% if fl.events %}
 <section>
-  <h2>앞으로 7일 코인 일정</h2>
-  <p class="hint-plain">날짜가 정해진 일정만 · 시가총액 상위 100개 코인 · 일정 이름은 영어 원문 · CoinMarketCal</p>
+  <h2>앞으로 7일, 가격에 영향을 줄 수 있는 코인 일정</h2>
+  <p class="hint-plain">시가총액 상위 100개 코인 · 날짜가 정해진 일정 중 종류를 알 수 있는 것만 ·
+    설명은 그 종류가 무엇인지이고, 이번 일정이 가격을 어떻게 움직일지는 말하지 않습니다 · CoinMarketCal</p>
   <div class="card">
     {% for e in fl.events %}
     <div class="ev-row">
       <span class="ev-date">{{ e.label }}</span>
-      <span class="ev-body">{% for c in e.coins %}<span class="tk">{{ c }}</span> {% endfor %}{% if e.url %}<a href="{{ e.url }}" target="_blank" rel="noopener">{{ e.title }}</a>{% else %}{{ e.title }}{% endif %}</span>
+      <span class="ev-body">
+        <span class="ev-kind">{{ e.kind }}</span>
+        {% for c in e.coins %}<b>{{ c.name }}</b> <span class="tk">{{ c.sym }}</span>{{ ', ' if not loop.last }}{% endfor %}
+        <span class="ev-title">{{ e.title }}</span>
+        <span class="ev-about">{{ e.about }}</span>
+        <a class="ev-more" href="{{ e.url or e.search }}" target="_blank" rel="noopener">{{ '원문 보기' if e.url else '관련 기사 찾기' }} ↗</a>
+      </span>
     </div>
     {% endfor %}
   </div>
