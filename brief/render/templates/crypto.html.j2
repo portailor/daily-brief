@@ -32,54 +32,6 @@
   {% endif %}
 </section>
 
-{# ── 눈여겨볼 코인: 급등·대표 코인마다 해외 기사 제목(영어 원문) 링크.
-   '오른 이유'라고 쓰지 않는다 — 같은 시간대에 그 코인을 다룬 기사일 뿐이다. ── #}
-{% set nw = cx.news or {} %}
-{% if nw.watch %}
-<section>
-  <h2>눈여겨볼 코인 · 해외 뉴스</h2>
-  <p class="hint-plain">24시간 급등 코인과 대표 코인 · 최근 48시간 해외 기사 중 <b>제목에 그 코인 이름이 나온 것</b> ·
-    기사 제목은 영어 원문 그대로입니다. 기사가 가격을 움직였다는 뜻은 아닙니다.</p>
-  <div class="card">
-    {% for w in nw.watch %}
-    <div class="re-item">
-      <div class="re-item-top">
-        <span class="re-name">{{ w.ko or w.name }} <span class="tk">{{ w.sym }}</span></span>
-        <span>
-          <span class="nw-why">{{ w.why }}</span>
-          {% if w.chg24 is not none %}<span class="num {{ 'up' if w.chg24 > 0 else 'down' if w.chg24 < 0 else '' }}">{{ '%+.1f'|format(w.chg24) }}%</span>{% endif %}
-        </span>
-      </div>
-      {% if w.news %}
-      <ul class="nw-list">
-        {% for n in w.news %}
-        <li><a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
-          <span class="nw-meta">{{ n.source }} · {{ n.when }}</span></li>
-        {% endfor %}
-      </ul>
-      {% if w.news_n > w.news|length %}<div class="re-src">같은 48시간 안에 이 코인 이름이 나온 기사 {{ w.news_n }}건 중 최신 {{ w.news|length }}건</div>{% endif %}
-      {% else %}
-      <div class="re-note" style="margin-top:3px">최근 48시간 안에 제목에 이 코인 이름이 나온 해외 기사가 없습니다.</div>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
-
-  {% if nw.institutional %}
-  <div class="card" style="margin-top:8px">
-    <div class="re-sub">기관·ETF 소식 · 제목에 ETF·기관·매수·보유·지분 같은 단어가 들어간 기사</div>
-    <ul class="nw-list">
-      {% for n in nw.institutional %}
-      <li><a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
-        <span class="nw-meta">{{ n.source }} · {{ n.when }}</span></li>
-      {% endfor %}
-    </ul>
-  </div>
-  {% endif %}
-  <div class="re-src" style="margin-top:6px">출처: {{ nw.sources|join(' · ') }} (RSS·Finnhub) · {{ cx.asof }} 기준 · 같은 소식을 여러 매체가 쓴 경우 하나만</div>
-</section>
-{% endif %}
-
 {# ── 30일 흐름: 코인마다 선 하나(범례 없음 — 제목이 곧 이름). 최고·최저만 값을 적고,
    나머지 날짜는 손가락/마우스를 올리면 나온다. 표로도 볼 수 있게 접어 둔다. ── #}
 {% macro usd(v) %}${{ '{:,.0f}'.format(v) if v >= 1000 else '{:,.2f}'.format(v) }}{% endmacro %}
@@ -143,7 +95,7 @@
 </section>
 {% endif %}
 
-{% if cx.market or cx.fng %}
+{% if cx.market or cx.fng or cx.stable %}
 <section>
   <h2>코인 시장 전체</h2>
   <div class="card">
@@ -162,6 +114,17 @@
         <span class="num re-big">{{ '%.1f'|format(cx.market.btc_dom) }}%</span>
         <span class="re-note">이더리움 {{ '%.1f'|format(cx.market.eth_dom) }}%</span>
       </div>
+    </div>
+    {% endif %}
+    {% if cx.stable %}
+    <div class="re-item">
+      <div class="re-item-top"><span class="re-name">달러 스테이블코인 총 발행액</span><span class="asof">{{ cx.stable.asof }}</span></div>
+      <div class="re-item-val">
+        <span class="num re-big">{{ '{:,.0f}'.format(cx.stable.usd / 1e8) }}억 달러</span>
+        <span class="num {{ 'up' if cx.stable.d7 > 0 else 'down' }}">7일 {{ '%+.1f'|format(cx.stable.d7 / 1e8) }}억 달러</span>
+        <span class="num {{ 'up' if cx.stable.d30 > 0 else 'down' }}">30일 {{ '%+.1f'|format(cx.stable.d30 / 1e8) }}억 달러</span>
+      </div>
+      <div class="re-src">DefiLlama · 코인을 사기 위해 대기 중인 달러의 크기로 봅니다. 늘면 시장에 들어온 돈이 늘었다는 뜻</div>
     </div>
     {% endif %}
     {% if cx.fng %}
@@ -197,7 +160,7 @@
 {% if cx.gainers %}
 <section>
   <h2>24시간 급등 코인</h2>
-  <p class="hint-plain">시가총액 상위 250개 중 24시간 상승률 순 · {{ cx_terms.stable|safe }}·토큰화 자산 제외 · 오른 이유는 확인하지 않았습니다</p>
+  <p class="hint-plain">시가총액 상위 250개 중 24시간 상승률 순 · {{ cx_terms.stable|safe }}·토큰화 자산 제외 · 이 코인들을 다룬 해외 기사는 맨 아래 「눈여겨볼 코인」에</p>
   <div class="card">
     <div class="cx-row cx-head"><span>코인</span><span>시총 순위</span><span>24시간</span><span>7일</span></div>
     {% for c in cx.gainers %}
@@ -208,6 +171,58 @@
       <span class="num {{ 'up' if c.chg7d and c.chg7d > 0 else 'down' if c.chg7d and c.chg7d < 0 else '' }}">{{ ('%+.1f'|format(c.chg7d) ~ '%') if c.chg7d is not none else '—' }}</span>
     </div>
     {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if cx.sectors %}
+<section>
+  <h2>분야별 흐름 · 24시간</h2>
+  <p class="hint-plain">분야마다 속한 코인들의 시가총액 합이 24시간 전보다 얼마나 바뀌었는지 (CoinGecko 분류)</p>
+  <div class="card">
+    {% set mx = cx.sectors | map(attribute='chg24') | map('abs') | max %}
+    {% for c in cx.sectors %}
+    <div class="sec-row">
+      <span class="sec-name">{{ c.name }}</span>
+      <span class="sec-bar"><i class="{{ 'pos' if c.chg24 >= 0 else 'neg' }}" style="width:{{ ((c.chg24|abs) / (mx or 1) * 50)|round(1) }}%"></i></span>
+      <span class="sec-pct num {{ 'up' if c.chg24 > 0 else 'down' if c.chg24 < 0 else '' }}">{{ '%+.1f'|format(c.chg24) }}%</span>
+    </div>
+    {% endfor %}
+    <div class="re-src" style="margin-top:6px">시가총액: {% for c in cx.sectors %}{{ c.name }} {{ '{:,.0f}'.format(c.cap / 1e8) }}억 달러{{ ' · ' if not loop.last }}{% endfor %}</div>
+  </div>
+</section>
+{% endif %}
+
+{% if cx.trending %}
+<section>
+  <h2>검색 급상승 코인</h2>
+  <p class="hint-plain">최근 24시간 CoinGecko 에서 사람들이 많이 찾아본 코인 순 · 관심이 몰렸다는 뜻이지 좋다는 뜻은 아닙니다</p>
+  <div class="card">
+    {% for c in cx.trending %}
+    <div class="re-pair">
+      <span><span class="num" style="color:var(--dim);display:inline-block;width:1.6em">{{ loop.index }}</span>{{ c.name }} <span class="tk">{{ c.sym }}</span>
+        {% if c.rank %}<span class="re-note">시총 {{ c.rank }}위</span>{% endif %}</span>
+      <span class="num {{ 'up' if c.chg24 and c.chg24 > 0 else 'down' if c.chg24 and c.chg24 < 0 else '' }}">{{ ('%+.1f'|format(c.chg24) ~ '%') if c.chg24 is not none else '—' }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% set uw = cx.upbit_warn or {} %}
+{% if uw.warning or uw.caution %}
+<section>
+  <h2>업비트 경보</h2>
+  <p class="hint-plain">업비트가 붙인 표시 그대로 · {{ cx.asof }} 기준</p>
+  <div class="card">
+    {% if uw.warning %}
+    <div class="re-sub">투자유의 종목 {{ uw.warning|length }}개 — 거래지원 종료(상장폐지) 여부를 검토 중인 코인</div>
+    <div class="chips">{% for c in uw.warning %}<span class="chip warn">{{ c.name }} <span class="tk">{{ c.sym }}</span></span>{% endfor %}</div>
+    {% endif %}
+    {% if uw.caution %}
+    <div class="re-sub" style="margin-top:10px">투자주의 {{ uw.caution|length }}개 — 단기간 거래가 과열돼 업비트가 주의를 붙인 코인</div>
+    <div class="chips">{% for c in uw.caution %}<span class="chip" title="{{ c.why|join(', ') }}">{{ c.name }} <span class="chip-why">{{ c.why|join('·') }}</span></span>{% endfor %}</div>
+    {% endif %}
   </div>
 </section>
 {% endif %}
@@ -244,6 +259,54 @@
     </div>
   </details>
 </section>
+
+{# ── 눈여겨볼 코인: 급등·대표 코인마다 해외 기사 제목(영어 원문) 링크.
+   '오른 이유'라고 쓰지 않는다 — 같은 시간대에 그 코인을 다룬 기사일 뿐이다. ── #}
+{% set nw = cx.news or {} %}
+{% if nw.watch %}
+<section>
+  <h2>눈여겨볼 코인 · 해외 뉴스</h2>
+  <p class="hint-plain">24시간 급등 코인과 대표 코인 · 최근 48시간 해외 기사 중 <b>제목에 그 코인 이름이 나온 것</b> ·
+    기사 제목은 영어 원문 그대로입니다. 기사가 가격을 움직였다는 뜻은 아닙니다.</p>
+  <div class="card">
+    {% for w in nw.watch %}
+    <div class="re-item">
+      <div class="re-item-top">
+        <span class="re-name">{{ w.ko or w.name }} <span class="tk">{{ w.sym }}</span></span>
+        <span>
+          <span class="nw-why">{{ w.why }}</span>
+          {% if w.chg24 is not none %}<span class="num {{ 'up' if w.chg24 > 0 else 'down' if w.chg24 < 0 else '' }}">{{ '%+.1f'|format(w.chg24) }}%</span>{% endif %}
+        </span>
+      </div>
+      {% if w.news %}
+      <ul class="nw-list">
+        {% for n in w.news %}
+        <li><a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
+          <span class="nw-meta">{{ n.source }} · {{ n.when }}</span></li>
+        {% endfor %}
+      </ul>
+      {% if w.news_n > w.news|length %}<div class="re-src">같은 48시간 안에 이 코인 이름이 나온 기사 {{ w.news_n }}건 중 최신 {{ w.news|length }}건</div>{% endif %}
+      {% else %}
+      <div class="re-note" style="margin-top:3px">최근 48시간 안에 제목에 이 코인 이름이 나온 해외 기사가 없습니다.</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if nw.institutional %}
+  <div class="card" style="margin-top:8px">
+    <div class="re-sub">기관·ETF 소식 · 제목에 ETF·기관·매수·보유·지분 같은 단어가 들어간 기사</div>
+    <ul class="nw-list">
+      {% for n in nw.institutional %}
+      <li><a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
+        <span class="nw-meta">{{ n.source }} · {{ n.when }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  <div class="re-src" style="margin-top:6px">출처: {{ nw.sources|join(' · ') }} (RSS·Finnhub) · {{ cx.asof }} 기준 · 같은 소식을 여러 매체가 쓴 경우 하나만</div>
+</section>
+{% endif %}
 
 {% if cx.history %}
 <script>
