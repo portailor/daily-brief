@@ -10,6 +10,13 @@
   길이     쇼츠는 3분까지. 우선순위(priority, 클수록 덜 중요)가 큰 구간부터 빼서
            render 가 MAX_SEC 안에 맞춘다.
 
+  덧붙이는 말  화면 카드에 없는 이야기도 하찮이가 한다 (9/23 동화님: "위에 뜬 글에 없는 내용도
+             더 많이 얘기하게, 이유라던가 그 종목의 이슈 한 가지라던가"). 다만 '이유'를 단정하지
+             않는다 — 이미 모은 근거만 말한다:
+               · 급등·급락 종목의 네이버 뉴스 제목 / DART 공시 제목 (detail.kr.issues)
+               · 지수가 평소 하루 변동폭의 몇 배 움직였는지(σ), 지난 1년 중 어느 높이인지(52주 위치)
+             뉴스는 "관련 기사 제목은 '…'" 처럼 제목을 그대로 읽는다. 기사가 원인이라고 말하지 않는다.
+
   자켓 색    코스피가 오른 날(주간은 지난주 코스피가 오른 주) 빨강, 내린 날 파랑.
   놀람 표정  그 구간 지표가 '평소 하루 변동폭의 SURPRISE_SIGMA 배' 이상 움직였을 때만.
 """
@@ -140,6 +147,72 @@ def _join(phrases: list[str | None]) -> str:
     return " ".join("고, ".join(ps[i:i + 2]) + "어요." for i in range(0, len(ps), 2))
 
 
+# ── 카드에 없는 덧붙이는 말 ────────────────────────────────
+
+# 내용 없이 궁금증만 부르는 제목 — 읽어 줘도 정보가 없다
+GENERIC_HEADLINE = re.compile(r"(급등세|급락세|상승세|하락세|강세|약세)\s*[.…·]{1,3}\s*(왜|이유)|왜\s*\?|이유는\s*\?|무슨 회사")
+
+
+def _clean_headline(t: str) -> str:
+    t = re.sub(r"^\s*(\[[^\]]*\]\s*)+", "", t)               # [속보] [특징주] 같은 머리표
+    t = t.replace("株", "주")
+    t = re.sub(r"\s*(…|\.\.\.+|···)\s*", ", ", t)
+    t = re.sub(r"[\"'‘’“”?!]", "", t)                        # 따옴표·물음표는 문장 나누기를 흐린다
+    return re.sub(r"\s+", " ", t).strip(" ,")
+
+
+def _issue(payload: dict, name: str) -> str | None:
+    """그 종목의 뉴스 제목 한 줄, 없으면 공시 제목 한 줄."""
+    for i in ((payload.get("detail") or {}).get("kr") or {}).get("issues") or []:
+        if i.get("name") != name:
+            continue
+        heads = [n["title"] for n in i.get("news", []) if not GENERIC_HEADLINE.search(n["title"])]
+        if heads:
+            h = _clean_headline(heads[0])
+            return f"관련 기사 제목은 '{h}'{josa(h, '이었/였')}어요."
+        if i.get("disclosures"):
+            d = _clean_headline(i["disclosures"][0]["title"])
+            return f"공시로는 '{d}'{josa(d.rstrip(')'), '이/가')} 올라왔어요."
+    return None
+
+
+def _extra_mover(payload: dict, skip: set[str]) -> str | None:
+    """1위 말고도 기사 제목이 뚜렷한 급등 종목 하나."""
+    for i in ((payload.get("detail") or {}).get("kr") or {}).get("issues") or []:
+        if i.get("side") != "up" or i.get("name") in skip:
+            continue
+        heads = [n["title"] for n in i.get("news", []) if not GENERIC_HEADLINE.search(n["title"])]
+        if heads:
+            h = _clean_headline(heads[0])
+            return (f"{i['name']}도 {_pct(i['chg_pct'], 1)} 올랐는데, "
+                    f"'{h}'{josa(h, '이라는/라는')} 기사가 있었어요.")
+    return None
+
+
+def _context(payload: dict, iid: str, name: str, sigma: bool = True) -> str:
+    """평소보다 얼마나 움직였는지(σ), 1년 중 어느 높이인지 — 대시보드 값 그대로."""
+    r = _dash(payload).get(iid)
+    if not r:
+        return ""
+    s, p52 = _num(r.get("sigma")), _num(r.get("p52"))
+    out = []
+    head = f"{SPOKEN.get(name, name)}{josa(name, '은/는')}"
+    if sigma and s is not None:
+        a = abs(s)
+        if a >= SURPRISE_SIGMA:
+            out.append(f"{head} 평소 하루 변동폭의 {a:.1f}배나 움직였어요.")
+        elif a >= 1:
+            out.append(f"{head} 평소보다 조금 크게 움직였어요.")
+        else:
+            out.append(f"{head} 평소 하루 움직임 범위 안이었어요.")
+        head = "지금은"
+    if p52 is not None and p52 >= 95:
+        out.append(f"{head} 지난 1년 중 가장 높은 수준 근처예요.")
+    elif p52 is not None and p52 <= 5:
+        out.append(f"{head} 지난 1년 중 가장 낮은 수준 근처예요.")
+    return " ".join(out)
+
+
 # ── 구간 ────────────────────────────────────────────────────
 
 def _market(payload: dict, ids: tuple[str, ...], tag: str, kind: str,
@@ -154,6 +227,10 @@ def _market(payload: dict, ids: tuple[str, ...], tag: str, kind: str,
     if extra:
         note, more = extra
         speech += " " + more
+    # 카드에 없는 말 — 대표 지표 하나는 σ·52주 위치, 나머지는 1년 최고·최저일 때만
+    lead, *rest = got
+    ctx = [_context(payload, lead, NAME[lead])] + [_context(payload, i, NAME[i], sigma=False) for i in rest]
+    speech += "".join(" " + c for c in ctx if c)
     surprise = any(_sigma(payload, i) >= SURPRISE_SIGMA for i in got)
     return Segment(tag, rows, speech, kind, note, surprise, priority)
 
@@ -213,29 +290,35 @@ def _sectors(payload: dict) -> Segment | None:
 
 def _stocks(payload: dict) -> Segment | None:
     kr = (payload.get("detail") or {}).get("kr") or {}
-    rows, parts = [], []
+    rows, said = [], []
     top = (kr.get("kospi_top") or [None])[0]
     if top:
         rows.append((f"시총 1위 {top['name']}", f"{top['chg_pct']:+.2f}%"))
-        parts.append(f"시가총액 1위 {top['name']}{josa(top['name'], '은/는')} "
-                     f"{_pct(top['chg_pct'])} {_move(top['chg_pct'])}")
+        said.append(f"시가총액 1위 {top['name']}{josa(top['name'], '은/는')} "
+                    f"{_pct(top['chg_pct'])} {_move(top['chg_pct'])}어요.")
+    floor = kr.get("mover_min_eok")
+    names = {x["name"] for key in ("gainers", "losers") for x in (kr.get(key) or [])[:1]}
     for key, label in (("gainers", "많이 오른"), ("losers", "많이 내린")):
         xs = kr.get(key) or []
-        if xs:
-            x = xs[0]
-            rows.append((f"가장 {label} {x['name']}", f"{x['chg_pct']:+.1f}%"))
-            parts.append(f"가장 {label} 종목은 {x['name']}{josa(x['name'], '으로/로')} "
-                         f"{_pct(x['chg_pct'], 1)} {_move(x['chg_pct'])}")
+        if not xs:
+            continue
+        x = xs[0]
+        rows.append((f"가장 {label} {x['name']}", f"{x['chg_pct']:+.1f}%"))
+        # 급등·급락은 거래대금 하한을 넘은 종목 중에서 고른 것 — 처음 한 번 말에서도 밝힌다
+        lead = (f"거래대금 {floor:,.0f}억 원 넘는 종목 중 " if floor and key == "gainers" else "")
+        said.append(f"{lead}가장 {label} 건 {x['name']}{josa(x['name'], '으로/로')} "
+                    f"{_pct(x['chg_pct'], 1)} {_move(x['chg_pct'])}어요.")
+        issue = _issue(payload, x["name"])
+        if issue:
+            said.append(issue)
+        if key == "gainers":
+            extra = _extra_mover(payload, names)       # 오른 쪽 이야기 하나 더
+            if extra:
+                said.append(extra)
     if not rows:
         return None
-    note, speech = "", _join(parts)
-    if kr.get("mover_min_eok") and len(rows) > 1:
-        # 급등·급락 종목은 거래대금 하한을 넘은 종목 중에서 고른 것 — 말에서도 밝힌다
-        note = f"급등·급락은 거래대금 {kr['mover_min_eok']:,.0f}억 원 이상 종목 중"
-        speech = speech.replace("가장 많이 오른 종목은",
-                                f"거래대금 {kr['mover_min_eok']:,.0f}억 원 넘는 종목 중 가장 많이 오른 건", 1)
-        speech = speech.replace("가장 많이 내린 종목은", "가장 많이 내린 건", 1)
-    return Segment("눈에 띈 종목", rows, speech, "stocks", note, priority=4)
+    note = f"급등·급락은 거래대금 {floor:,.0f}억 원 이상 종목 중" if floor and len(rows) > 1 else ""
+    return Segment("눈에 띈 종목", rows, " ".join(said), "stocks", note, priority=4)
 
 
 def _us_big(payload: dict) -> Segment | None:

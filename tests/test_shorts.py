@@ -53,3 +53,12 @@ def test_mouth_closes_in_pauses_and_smiles_right_after():
     assert R._pose(2.2, [ln], segs, 0) == "talk_closed"        # 문장 속 쉼 → 입 닫음
     assert R._pose(2.2, [ln], segs, 2) == "talk_closed"
     assert R._pose(4.0, [ln], segs, 0) == "smile"              # 말 끝난 바로 그 순간 → 웃는 얼굴
+
+
+def test_headline_cleanup_and_generic_filter():
+    from brief.shorts.script import GENERIC_HEADLINE, _clean_headline
+    assert _clean_headline("[속보] 티엠씨 VI 두차례 발동…양대지수 하락 속") == "티엠씨 VI 두차례 발동, 양대지수 하락 속"
+    assert _clean_headline("샌즈랩, AI 보안株 매수세...") == "샌즈랩, AI 보안주 매수세"
+    assert GENERIC_HEADLINE.search("빛샘전자 주가, 급등세... 왜?")
+    assert GENERIC_HEADLINE.search("라온시큐어 주가, 급등세... 이유는?")
+    assert not GENERIC_HEADLINE.search("광전자 1만270원 상한가…거래량 2800만주 돌파")
