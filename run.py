@@ -404,6 +404,12 @@ def upload_shorts(box: dict, cfg: dict) -> None:
     url, status = youtube.upload(shorts["path"], shorts["title"], shorts["description"],
                                  privacy=sc.get("privacy", "public"))
     log(f"✓ 쇼츠 업로드: {url} ({status})")
+    # 썸네일 — 첫 장면(날짜·오늘 이야기할 것·웃는 하찮이). 실패해도 영상은 이미 올라가 있다.
+    thumb = shorts.get("thumb")
+    if thumb and Path(thumb).exists():
+        _, err = step("쇼츠 썸네일", youtube.set_thumbnail, youtube.video_id(url), thumb)
+        if not err:
+            log("✓ 쇼츠 썸네일 설정")
 
 
 def upload_queued(box: dict, shorts: dict, sc: dict) -> None:

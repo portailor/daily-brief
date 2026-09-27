@@ -79,3 +79,24 @@ def upload(path: str | Path, title: str, description: str, privacy: str = "publi
     body = put.json()
     status = (body.get("status") or {}).get("privacyStatus", "")
     return f"https://youtube.com/shorts/{body['id']}", status
+
+
+THUMB_URL = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set"
+
+
+def set_thumbnail(video_id: str, image: str | Path) -> None:
+    """영상 썸네일을 바꾼다 (JPEG·PNG, 2MB 이하).
+
+    채널이 전화번호 인증을 마쳐야 맞춤 썸네일이 허용된다 — 아니면 403 이 온다.
+    """
+    image = Path(image)
+    token = _access_token(_env())
+    kind = "image/png" if image.suffix.lower() == ".png" else "image/jpeg"
+    res = requests.post(THUMB_URL, params={"videoId": video_id}, data=image.read_bytes(), timeout=60,
+                        headers={"Authorization": f"Bearer {token}", "Content-Type": kind})
+    if res.status_code != 200:
+        raise RuntimeError(f"썸네일 설정 실패 ({res.status_code}): {res.text[:300]}")
+
+
+def video_id(url: str) -> str:
+    return url.rstrip("/").rsplit("/", 1)[-1]

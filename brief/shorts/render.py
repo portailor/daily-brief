@@ -462,10 +462,18 @@ def render(script: Script, out: Path, voice: dict | None = None) -> tuple[Path, 
         proc.stdin.close()
         if proc.wait() != 0:
             raise RuntimeError("ffmpeg 영상 만들기 실패")
+        # 썸네일 — 첫 장면 그대로: 날짜·'오늘 이야기할 것' 카드·첫 인사 말풍선·웃는 하찮이(그날 자켓).
+        # (9/27 동화님: "썸네일은 이걸로 통일") 영상 첫 프레임도 같은 장면이다.
+        Image.frombytes("RGB", (W, H), frame_bytes(0, "smile")).save(
+            thumb_path(out), "JPEG", quality=90, optimize=True)
     return out, keep
 
 
 SHORTS_DIR = ROOT / "data" / "shorts"
+
+
+def thumb_path(video: Path) -> Path:
+    return Path(video).with_suffix(".jpg")
 
 
 def make(payload: dict, message: str = "", weekly: bool = False, link: str | None = None,
@@ -491,5 +499,5 @@ def make(payload: dict, message: str = "", weekly: bool = False, link: str | Non
                       *[f"[{s.tag}] {s.screen}" for s in used], "",
                       # 링크·면책 문구는 채널 설명에 있다 — 영상마다 넣지 않는다 (9/23 동화님)
                       "#경제 #주식 #코스피 #Shorts"])
-    return {"path": str(out), "title": title[:100], "description": desc,
+    return {"path": str(out), "thumb": str(thumb_path(out)), "title": title[:100], "description": desc,
             "mood": script.mood, "speech": " ".join(script.segments[i].speech for i in keep)}
