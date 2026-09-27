@@ -70,3 +70,10 @@ def test_ahead_both_today_skips_tomorrow():
 def test_normal_day_unchanged():
     st = market_status(_payload("2026-09-22", "2026-09-21", "2026-09-21"))
     assert st["kr_fresh"] and st["us_fresh"] and not st["ahead"]
+
+
+def test_official_names_mapping():
+    assert mc._kr_name("대체공휴일(개천절)") == "개천절 대체공휴일"
+    assert mc._kr_name("기독탄신일") == "성탄절"
+    assert mc._kr_name("전국동시지방선거") == "지방선거"
+    assert mc._kr_name("제헌절") == "제헌절"
