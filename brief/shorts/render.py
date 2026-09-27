@@ -279,7 +279,7 @@ def _header(im: Image.Image, script: Script, idx: int, keep: list[int]):
     d.rounded_rectangle((60, 100, 60 + w + 56, 164), 32, fill=accent)
     d.text((60 + 28, 132), label, font=f, fill="white", anchor="lm")
     d.text((60, 190), f"{script.date_label} {script.title}", font=_font("round", 80), fill=INK)
-    body = [i for i in keep if script.segments[i].kind not in ("intro", "outro")]
+    body = [i for i in keep if script.segments[i].kind not in ("hook", "intro", "outro")]
     for k, i in enumerate(body):
         on = i == idx
         cx, cy, r = 72 + k * 40, 300, (13 if on else 8)
@@ -294,9 +294,30 @@ def _card(im: Image.Image, script: Script, idx: int, keep: list[int]) -> int:
     x0, x1 = 50, W - 62
     inner = x1 - x0 - 100
 
+    if seg.kind == "hook":                              # 첫 장면 — 숫자 하나를 크게
+        label, value = seg.rows[0] if seg.rows else ("", "")
+        label, value = _t(label), _t(value)
+        y1 = CARD_TOP + 470
+        _sticker(im, (x0, CARD_TOP, x1, y1), accent)
+        tf = _font("round", 42)
+        tag = _t(seg.tag)
+        tw = d.textlength(tag, font=tf)
+        d.rounded_rectangle((x0 + 40, CARD_TOP - 32, x0 + 40 + tw + 60, CARD_TOP + 40), 24,
+                            fill=accent, outline=INK, width=5)
+        d.text((x0 + 70, CARD_TOP + 4), tag, font=tf, fill="white", anchor="lm")
+        mid = (x0 + x1) // 2
+        d.text((mid, CARD_TOP + 120), label, font=_fit_font(d, label, "round", 76, inner), fill=INK, anchor="mm")
+        d.text((mid, CARD_TOP + 270), value, font=_fit_font(d, value, "round", 170, inner),
+               fill=_value_color(value), anchor="mm")
+        if seg.note:
+            d.text((mid, CARD_TOP + 410), _t(seg.note), font=_fit_font(d, _t(seg.note), "round", 44, inner),
+                   fill=SOFT, anchor="mm")
+        return y1
+
     if seg.kind in ("intro", "outro"):
         head = "오늘 이야기할 것" if seg.kind == "intro" else seg.note
-        chips = [_t(script.segments[i].tag) for i in keep if script.segments[i].tag]
+        chips = [_t(script.segments[i].tag) for i in keep
+                 if script.segments[i].tag and script.segments[i].kind != "hook"]
         f = _font("round", 40)
         rows, cur, cw = [], [], 0
         for c in chips:
@@ -464,7 +485,9 @@ def render(script: Script, out: Path, voice: dict | None = None) -> tuple[Path, 
             raise RuntimeError("ffmpeg 영상 만들기 실패")
         # 썸네일 — 첫 장면 그대로: 날짜·'오늘 이야기할 것' 카드·첫 인사 말풍선·웃는 하찮이(그날 자켓).
         # (9/27 동화님: "썸네일은 이걸로 통일") 영상 첫 프레임도 같은 장면이다.
-        Image.frombytes("RGB", (W, H), frame_bytes(0, "smile")).save(
+        # 첫 장면이 '오늘 가장 큰 뉴스'여도 썸네일은 인사 장면(오늘 이야기할 것) — 9/27 동화님
+        intro_j = next((j for j, ln in enumerate(lines) if script.segments[ln.seg].kind == "intro"), 0)
+        Image.frombytes("RGB", (W, H), frame_bytes(intro_j, "smile")).save(
             thumb_path(out), "JPEG", quality=90, optimize=True)
     return out, keep
 
@@ -494,7 +517,9 @@ def make(payload: dict, message: str = "", weekly: bool = False, link: str | Non
     used = [script.segments[i] for i in keep if script.segments[i].kind not in ("intro", "outro")]
     headline = next((s.screen for k in ("kr", "week", "us") for s in used if s.kind == k),
                     used[0].screen if used else "")
-    title = f"{script.date_label} {script.title} | {headline}"
+    # 제목 — 그날 가장 큰 뉴스 한 줄을 앞에 (9/27 동화님: 날짜만 있는 제목은 누를 이유가 없다)
+    title = (f"{script.headline} | {script.date_label} {script.title}" if script.headline
+             else f"{script.date_label} {script.title} | {headline}")
     desc = "\n".join([f"{script.date_label} {script.title}", "",
                       *[f"[{s.tag}] {s.screen}" for s in used], "",
                       # 링크·면책 문구는 채널 설명에 있다 — 영상마다 넣지 않는다 (9/23 동화님)

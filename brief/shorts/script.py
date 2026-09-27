@@ -22,6 +22,11 @@
              장이 쉬기 전 날(과 쉬는 당일)에는 끝에 '내일은 ○○로 한국/미국 증시가 쉬어요'를 덧붙인다.
              쉬었다는 판단은 달력(brief/market_calendar.py)과 실제 데이터 기준일이 둘 다 맞을 때만.
 
+  첫 장면     (9/27 동화님) 날짜 인사보다 그날 가장 센 숫자부터 — '오늘 가장 큰 뉴스'(hook).
+             고르는 규칙: 평소 하루 변동폭의 1.5배 넘게 움직인 지표나 외국인 매매가 있으면 그중
+             가장 큰 것, 없으면 가장 많이 오른 종목(+10% 이상), 그것도 없으면 코스피.
+             영상 제목도 이 한 줄로 시작한다. 썸네일은 그대로 '오늘 이야기할 것' 장면.
+
   자켓 색    코스피가 오른 날(주간은 지난주 코스피가 오른 주) 빨강, 내린 날 파랑.
   놀람 표정  그 구간 지표가 '평소 하루 변동폭의 SURPRISE_SIGMA 배' 이상 움직였을 때만.
 """
@@ -64,6 +69,7 @@ class Script:
     mood: str
     segments: list[Segment] = field(default_factory=list)
     link: str = ""
+    headline: str = ""          # 영상 제목 앞머리 — 첫 장면(hook)의 한 줄
 
     @property
     def text(self) -> str:
@@ -482,6 +488,73 @@ def _ahead(st: dict, today: date) -> Segment | None:
     return Segment("쉬어가는 날", rows, "참고로 " + " ".join(said), "ahead", priority=1)
 
 
+# ── 첫 장면: 오늘 가장 큰 뉴스 ─────────────────────────────
+
+HOOK_SIGMA = 1.5          # 리포트의 '오늘 볼 것' 기준과 같다
+HOOK_STOCK_PCT = 10.0
+
+
+def _hook(payload: dict, kr: bool, us: bool) -> tuple[Segment, str, str] | None:
+    """(장면, 영상 제목용 한 줄, 겹치면 뺄 결론 속 이름). 숫자는 모두 payload 그대로."""
+    dash = _dash(payload)
+    stale = (KR_IDS if not kr else set()) | (US_IDS if not us else set())
+    best = None                                    # (σ, 종류, 값)
+    for iid, name in NAME.items():
+        r = dash.get(iid)
+        if not r or iid in stale or _num(r.get("change")) is None:
+            continue
+        sg = _num(r.get("sigma"))
+        if sg is not None and (best is None or abs(sg) > best[0]):
+            best = (abs(sg), "row", (iid, name, r["change"], sg))
+    if kr:
+        for f in payload.get("flow_stats", []):
+            if f.market == "KOSPI" and f.investor == "외국인합계" and f.sigma is not None:
+                if best is None or abs(f.sigma) > best[0]:
+                    best = (abs(f.sigma), "flow", f)
+
+    if best and best[0] >= HOOK_SIGMA:
+        if best[1] == "row":
+            iid, name, change, sg = best[2]
+            v = _num(change)
+            amount = f"{abs(v) / 100:.2f}퍼센트포인트" if change.endswith("bp") else _pct(v)
+            spoken = SPOKEN.get(name, name)
+            speech = (f"{spoken}{josa(name, '이/가')} 하루 만에 {amount}{'나' if best[0] >= SURPRISE_SIGMA else ''} "
+                      f"{_move(v)}어요! 평소 하루 변동폭의 {best[0]:.1f}배예요.")
+            seg = Segment("오늘 가장 큰 뉴스", [(name, change)], speech, "hook",
+                          f"평소 하루 변동폭의 {best[0]:.1f}배", best[0] >= SURPRISE_SIGMA, 0)
+            return seg, f"{name} {change}, 평소 변동폭의 {best[0]:.1f}배", name
+        f = best[2]
+        verb, word = ("샀", "순매수") if f.eok > 0 else ("팔았", "순매도")
+        kospi = dash.get("KOSPI")
+        kv = _num(kospi["change"]) if kospi else None
+        speech = f"외국인이 코스피에서 {_won(f.eok)}어치를 {verb}어요!"
+        title = f"외국인 {kt._eok(f.eok)} {word}"
+        if kv is not None:
+            opposite = (kv > 0) != (f.eok > 0) and kv != 0
+            speech += f" {'그런데 ' if opposite else ''}코스피는 {_pct(kv)} {_move(kv)}어요."
+            title += f"{'에도' if opposite else ','} 코스피 {kospi['change']}"
+        seg = Segment("오늘 가장 큰 뉴스", [("외국인 코스피", f"{'+' if f.eok > 0 else '-'}{kt._eok(f.eok)}")],
+                      speech, "hook", f"평소 하루 매매 규모의 {best[0]:.1f}배", best[0] >= SURPRISE_SIGMA, 0)
+        return seg, title, "외국인"
+
+    kr_d = (payload.get("detail") or {}).get("kr") or {}
+    top = (kr_d.get("gainers") or [None])[0] if kr else None
+    if top and top["chg_pct"] >= HOOK_STOCK_PCT:
+        speech = f"오늘 가장 많이 오른 종목은 {top['name']}, 무려 {_pct(top['chg_pct'], 1)} 올랐어요!"
+        seg = Segment("오늘 가장 큰 뉴스", [(top["name"], f"{top['chg_pct']:+.2f}%")], speech, "hook",
+                      "오늘 가장 많이 오른 종목", top["chg_pct"] >= 15, 0)
+        return seg, f"{top['name']} {top['chg_pct']:+.2f}%, 오늘 가장 많이 오른 종목", top["name"]
+
+    iid = "KOSPI" if kr else "SPX"
+    r = dash.get(iid)
+    if not r or _num(r.get("change")) is None:
+        return None
+    name = NAME[iid]
+    speech = _join([_index_phrase(name, r["change"])])
+    return Segment("오늘 가장 큰 뉴스", [(name, r["change"])], speech, "hook", priority=0), \
+        f"{name} {r['change']}", name
+
+
 def build(payload: dict, message: str = "", weekly: bool = False, link: str = "") -> Script | None:
     """그날 payload 로 전체 브리핑 대본을 만든다. 시장 숫자가 하나도 없으면 None."""
     st = market_status(payload, weekly)
@@ -493,6 +566,9 @@ def build(payload: dict, message: str = "", weekly: bool = False, link: str = ""
     if verdict and ((not kr and any(w in verdict.note for w in KR_WORDS))
                     or (not us and any(w in verdict.note for w in US_WORDS))):
         verdict = None                                # 쉰 장의 옛 숫자로 만든 결론은 읽지 않는다
+    hooked = None if weekly else _hook(payload, kr, us)
+    if hooked and verdict and hooked[2] in verdict.note:
+        verdict = None                                # 첫 장면과 같은 이야기면 결론은 되풀이하지 않는다
     if not (kr and us):
         stale = (KR_IDS if not kr else set()) | (US_IDS if not us else set())
         payload = {**payload, "triggers": [t for t in payload.get("triggers", [])
@@ -533,4 +609,6 @@ def build(payload: dict, message: str = "", weekly: bool = False, link: str = ""
         t = _dash(payload).get("KOSPI" if kr else "SPX")
         v = _num(t["change"]) if t else None
     mood = "down" if v is not None and v < 0 else "up"
-    return Script(payload["date_short"], title, mood, [intro, *segs, outro], link)
+    lead = [hooked[0]] if hooked else []
+    return Script(payload["date_short"], title, mood, [*lead, intro, *segs, outro], link,
+                  hooked[1] if hooked else "")
