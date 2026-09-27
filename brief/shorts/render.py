@@ -484,7 +484,7 @@ def make(payload: dict, message: str = "", weekly: bool = False, link: str | Non
             voice = {}
     out, keep = render(script, SHORTS_DIR / f"{payload['brief_date']}.mp4", voice)
     used = [script.segments[i] for i in keep if script.segments[i].kind not in ("intro", "outro")]
-    headline = next((s.screen for s in used if s.kind in ("kr", "week")),
+    headline = next((s.screen for k in ("kr", "week", "us") for s in used if s.kind == k),
                     used[0].screen if used else "")
     title = f"{script.date_label} {script.title} | {headline}"
     desc = "\n".join([f"{script.date_label} {script.title}", "",

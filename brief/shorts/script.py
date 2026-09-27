@@ -17,6 +17,11 @@
                · 지수가 평소 하루 변동폭의 몇 배 움직였는지(σ), 지난 1년 중 어느 높이인지(52주 위치)
              뉴스는 "관련 기사 제목은 '…'" 처럼 제목을 그대로 읽는다. 기사가 원인이라고 말하지 않는다.
 
+  휴장       (9/27 동화님) 한국장이 쉰 다음 날은 한국 부분을 되풀이하지 않고 미국 소식만,
+             미국장이 쉰 다음 날은 한국 소식만 — 어느 장이 왜 쉬었는지 말한다. 둘 다 쉬면 영상 없음.
+             장이 쉬기 전 날(과 쉬는 당일)에는 끝에 '내일은 ○○로 한국/미국 증시가 쉬어요'를 덧붙인다.
+             쉬었다는 판단은 달력(brief/market_calendar.py)과 실제 데이터 기준일이 둘 다 맞을 때만.
+
   자켓 색    코스피가 오른 날(주간은 지난주 코스피가 오른 주) 빨강, 내린 날 파랑.
   놀람 표정  그 구간 지표가 '평소 하루 변동폭의 SURPRISE_SIGMA 배' 이상 움직였을 때만.
 """
@@ -24,7 +29,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 
 from brief.interpret.rules import josa
 from brief.render import kakao_text as kt
@@ -395,22 +400,118 @@ def _week(payload: dict) -> Segment | None:
     return Segment(f"지난주 · {week.period}", rows, speech, "week")
 
 
+# ── 휴장 ────────────────────────────────────────────────────
+
+KR_IDS = {"KOSPI", "KOSDAQ", "KTB3Y", "KR_BASE"}
+US_IDS = {"SPX", "NASDAQ", "DOW", "RUSSELL2000", "VIX", "US10Y"}
+KR_WORDS = ("코스피", "코스닥", "국고채", "한국 기준금리")
+US_WORDS = ("S&P", "나스닥", "다우", "러셀", "VIX", "미 국채", "미국 10년물")
+
+
+def _eul(word: str) -> str:
+    return "으로" if word and _batchim(word[-1]) and (ord(word[-1]) - 0xAC00) % 28 != 8 else "로"
+
+
+def market_status(payload: dict, weekly: bool = False) -> dict:
+    """어제(직전 평일) 한국·미국 장이 열렸는지, 앞으로 쉬는 날은 언제인지.
+
+    '쉬었다'는 달력이 휴장이라 하고 실제 데이터 기준일도 그날보다 앞일 때만 — 둘 중 하나만이면
+    쉬었다고 말하지 않는다 (달력에 없는 임시 휴장, 또는 수집 실패와 헷갈리지 않게).
+    """
+    from brief import market_calendar as mc
+    d = date.fromisoformat(payload["brief_date"])
+    out = {"kr_fresh": True, "us_fresh": True, "kr_reason": None, "us_reason": None, "ahead": []}
+    if not weekly:
+        prev = mc.prev_weekday(d)
+        for m, key in (("KR", "kr"), ("US", "us")):
+            name = mc.holiday_name(m, prev)
+            got = payload.get(f"{key}_date") or ""
+            if name and got and got < prev.isoformat():
+                out[f"{key}_fresh"], out[f"{key}_reason"] = False, name
+    # 앞으로 — 오늘이 휴장이면 오늘부터, 아니면 다음 평일부터 이어지는 휴장
+    for m in ("KR", "US"):
+        start = d if (d.weekday() < 5 and mc.holiday_name(m, d)) else mc.next_weekday(d)
+        run = mc.closed_run(m, start)
+        if run:
+            out["ahead"].append({"market": m, "label": mc.label(m), "days": run,
+                                 "name": mc.holiday_name(m, run[0])})
+    return out
+
+
+def _closed_now(st: dict) -> Segment | None:
+    """어제 한쪽 장이 쉬었을 때 — 브리핑 앞머리 안내."""
+    for key, other in (("kr", "미국"), ("us", "한국")):
+        reason = st[f"{key}_reason"]
+        if st[f"{key}_fresh"] or not reason:
+            continue
+        label = "한국 증시" if key == "kr" else "미국 증시"
+        speech = (f"어제는 {reason}{_eul(reason)} {label}가 쉬었어요. "
+                  f"그래서 오늘은 {other} 증시 소식을 중심으로 전해 드릴게요.")
+        return Segment("휴장 안내", [(label, f"휴장 · {reason}")], speech, "closed", priority=0)
+    return None
+
+
+def _ahead(st: dict, today: date) -> Segment | None:
+    """쉬기 전 날(과 쉬는 날) — 끝에 덧붙이는 안내."""
+    if not st["ahead"]:
+        return None
+
+    def when(d: date) -> str:
+        if d == today:
+            return "오늘"
+        if d == today + timedelta(days=1):
+            return "내일"
+        return f"{d.month}월 {d.day}일 {WEEKDAY[d.weekday()]}요일"
+
+    items = st["ahead"]
+    same = len(items) == 2 and items[0]["days"] == items[1]["days"]
+    # 두 장이 같은 날 쉬면 한 문장으로 (이름은 한국 쪽 — 성탄절/크리스마스처럼 같은 날이 대부분)
+    groups = ([(items[0]["days"], "한국과 미국 증시가 모두", items[0]["name"])] if same
+              else [(it["days"], f"{it['label']}는", it["name"]) for it in items])
+    rows, said = [], []
+    for days, who, name in groups:
+        first, last = days[0], days[-1]
+        span = f"{when(first)}부터 {last.month}월 {last.day}일까지" if len(days) > 1 else f"{when(first)}은"
+        said.append(f"{span} {name}{_eul(name)} {who} 쉬어요.")
+        dates = f"{first.month}/{first.day}" + (f"~{last.month}/{last.day}" if len(days) > 1 else "")
+        rows.append(("한국·미국 증시" if same else who.replace("는", ""), f"{dates} {name}"))
+    # 오늘 두 장이 모두 쉬면 내일 아침엔 새 소식이 없다 — 영상도 쉰다
+    both_today = all(it["days"][0] == today for it in items) and len(items) == 2
+    if both_today and today.weekday() < 5:
+        said.append("그래서 내일은 영상을 쉬어 갈게요.")
+    return Segment("쉬어가는 날", rows, "참고로 " + " ".join(said), "ahead", priority=1)
+
+
 def build(payload: dict, message: str = "", weekly: bool = False, link: str = "") -> Script | None:
     """그날 payload 로 전체 브리핑 대본을 만든다. 시장 숫자가 하나도 없으면 None."""
+    st = market_status(payload, weekly)
+    kr, us = st["kr_fresh"], st["us_fresh"]
+    if not (kr or us):
+        return None                                   # 두 장 모두 쉰 다음 날 — 영상 없음
+    fx_ids = ("USDKRW", "US10Y", "WTI", "GOLD") if us else ("USDKRW", "WTI", "GOLD")
+    verdict = _verdict(payload)
+    if verdict and ((not kr and any(w in verdict.note for w in KR_WORDS))
+                    or (not us and any(w in verdict.note for w in US_WORDS))):
+        verdict = None                                # 쉰 장의 옛 숫자로 만든 결론은 읽지 않는다
+    if not (kr and us):
+        stale = (KR_IDS if not kr else set()) | (US_IDS if not us else set())
+        payload = {**payload, "triggers": [t for t in payload.get("triggers", [])
+                                           if getattr(t, "instrument", "") not in stale]}
     body = [
         _week(payload) if weekly else None,
-        _verdict(payload),
-        _market(payload, ("KOSPI", "KOSDAQ"), "한국 증시", "kr", _breadth(payload)),
-        _market(payload, ("SPX", "NASDAQ", "DOW"), "미국 증시", "us"),
-        _market(payload, ("USDKRW", "US10Y", "WTI", "GOLD"), "환율 · 금리 · 원자재", "fx",
-                priority=3),
-        _flows(payload),
-        _sectors(payload),
-        _stocks(payload),
-        _us_big(payload),
+        _closed_now(st),
+        verdict,
+        _market(payload, ("KOSPI", "KOSDAQ"), "한국 증시", "kr", _breadth(payload)) if kr else None,
+        _market(payload, ("SPX", "NASDAQ", "DOW"), "미국 증시", "us") if us else None,
+        _market(payload, fx_ids, "환율 · 금리 · 원자재", "fx", priority=3),
+        _flows(payload) if kr else None,
+        _sectors(payload) if kr else None,
+        _stocks(payload) if kr else None,
+        _us_big(payload) if us else None,
         _results(payload),
         _events(payload),
         _triggers(payload),
+        _ahead(st, date.fromisoformat(payload["brief_date"])),
     ]
     segs = [s for s in body if s]
     if not any(s.kind in ("kr", "us", "week") for s in segs):
@@ -428,7 +529,8 @@ def build(payload: dict, message: str = "", weekly: bool = False, link: str = ""
         m = next((m for m in payload["week"].moves if m.id == "KOSPI"), None)
         v = m.change if m else None
     else:
-        t = _dash(payload).get("KOSPI")
+        # 자켓 색 — 코스피 방향. 한국장이 쉰 다음 날은 S&P 500 방향
+        t = _dash(payload).get("KOSPI" if kr else "SPX")
         v = _num(t["change"]) if t else None
     mood = "down" if v is not None and v < 0 else "up"
     return Script(payload["date_short"], title, mood, [intro, *segs, outro], link)
