@@ -27,6 +27,11 @@
              가장 큰 것, 없으면 가장 많이 오른 종목(+10% 이상), 그것도 없으면 코스피.
              영상 제목도 이 한 줄로 시작한다. 썸네일은 그대로 '오늘 이야기할 것' 장면.
 
+  길이       (9/29 동화님: "너무 길다, 쓸데없는 문장 빼고 중요한 것 위주로") 1분 남짓을 목표로:
+             '평소 범위 안이었다' 같은 안 중요한 맥락, 오늘 한 줄(첫 장면과 겹침), 오른·내린 종목 수,
+             외국인 1위 종목 이름, 시총 1위, 급등 종목 하나 더, 미국 대형주는 말하지 않는다(카드에는
+             남는 것도 있다). 환율·금리·원자재는 원/달러 + 크게 움직인 것만, 지켜볼 조건은 하나.
+
   자켓 색    코스피가 오른 날(주간은 지난주 코스피가 오른 주) 빨강, 내린 날 파랑.
   놀람 표정  그 구간 지표가 '평소 하루 변동폭의 SURPRISE_SIGMA 배' 이상 움직였을 때만.
 """
@@ -161,14 +166,15 @@ def _join(phrases: list[str | None]) -> str:
 # ── 카드에 없는 덧붙이는 말 ────────────────────────────────
 
 # 내용 없이 궁금증만 부르는 제목 — 읽어 줘도 정보가 없다
-GENERIC_HEADLINE = re.compile(r"(급등세|급락세|상승세|하락세|강세|약세)\s*[.…·]{1,3}\s*(왜|이유)|왜\s*\?|이유는\s*\?|무슨 회사")
+GENERIC_HEADLINE = re.compile(r"(급등세|급락세|상승세|하락세|강세|약세)\s*[.…·]{1,3}\s*(왜|이유)|왜\s*\?|이유는\s*\?|무슨 회사"
+                              r"|등\s*마감|등\s*상한가|등\s*\d+개|특징주\s*모음")
 
 
 def _clean_headline(t: str) -> str:
     t = re.sub(r"^\s*(\[[^\]]*\]\s*)+", "", t)               # [속보] [특징주] 같은 머리표
     for a, b in (("株", "주"), ("美", "미국 "), ("中", "중국 "), ("日", "일본 "), ("韓", "한국 "), ("北", "북한 ")):
         t = t.replace(a, b)
-    t = re.sub(r"\s*(…|\.\.\.+|···)\s*", ", ", t)
+    t = re.sub(r"\s*(…|⋯|\.\.\.+|···)\s*", ", ", t)
     t = re.sub(r"[\"'‘’“”?!]", "", t)                        # 따옴표·물음표는 문장 나누기를 흐린다
     return re.sub(r"\s+", " ", t).strip(" ,")
 
@@ -181,7 +187,7 @@ def _issue(payload: dict, name: str) -> str | None:
         heads = [n["title"] for n in i.get("news", []) if not GENERIC_HEADLINE.search(n["title"])]
         if heads:
             h = _clean_headline(heads[0])
-            return f"관련 기사 제목은 '{h}'{josa(h, '이었/였')}어요."
+            return f"기사 제목은 '{h}'{josa(h, '이었/였')}어요."
         if i.get("disclosures"):
             d = _clean_headline(i["disclosures"][0]["title"])
             return f"공시로는 '{d}'{josa(d.rstrip(')'), '이/가')} 올라왔어요."
@@ -211,13 +217,9 @@ def _context(payload: dict, iid: str, name: str, sigma: bool = True) -> str:
     head = f"{SPOKEN.get(name, name)}{josa(name, '은/는')}"
     if sigma and s is not None:
         a = abs(s)
-        if a >= SURPRISE_SIGMA:
+        if a >= SURPRISE_SIGMA:                    # 짧게 — 크게 움직였을 때만 말한다
             out.append(f"{head} 평소 하루 변동폭의 {a:.1f}배나 움직였어요.")
-        elif a >= 1:
-            out.append(f"{head} 평소보다 조금 크게 움직였어요.")
-        else:
-            out.append(f"{head} 평소 하루 움직임 범위 안이었어요.")
-        head = "지금은"
+            head = "지금은"
     if p52 is not None and p52 >= 95:
         out.append(f"{head} 지난 1년 중 가장 높은 수준 근처예요.")
     elif p52 is not None and p52 <= 5:
@@ -237,11 +239,10 @@ def _market(payload: dict, ids: tuple[str, ...], tag: str, kind: str,
     speech = _join([_index_phrase(NAME[i], d[i]["change"]) for i in got])
     note = ""
     if extra:
-        note, more = extra
-        speech += " " + more
+        note, _more = extra                        # 말로는 하지 않고 카드에만 (짧게)
     # 카드에 없는 말 — 대표 지표 하나는 σ·52주 위치, 나머지는 1년 최고·최저일 때만
     lead, *rest = got
-    ctx = [_context(payload, lead, NAME[lead])] + [_context(payload, i, NAME[i], sigma=False) for i in rest]
+    ctx = [_context(payload, lead, NAME[lead])] +           ([_context(payload, i, NAME[i], sigma=False) for i in rest] if kind == "fx" else [])
     speech += "".join(" " + c for c in ctx if c)
     surprise = any(_sigma(payload, i) >= SURPRISE_SIGMA for i in got)
     return Segment(tag, rows, speech, kind, note, surprise, priority)
@@ -283,7 +284,7 @@ def _flows(payload: dict) -> Segment | None:
     if f.get("buy") and f.get("sell"):
         b, s = f["buy"][0], f["sell"][0]
         note = f"외국인 순매수 1위 {b['name']} · 순매도 1위 {s['name']}"
-        speech += f" 외국인이 가장 많이 산 종목은 {b['name']}, 가장 많이 판 종목은 {s['name']}{_ieyo(s['name'])}."
+
     return Segment("누가 사고 팔았나", rows, speech, "flows", note, priority=2)
 
 
@@ -304,10 +305,8 @@ def _stocks(payload: dict) -> Segment | None:
     kr = (payload.get("detail") or {}).get("kr") or {}
     rows, said = [], []
     top = (kr.get("kospi_top") or [None])[0]
-    if top:
+    if top:                                        # 시총 1위는 카드에만
         rows.append((f"시총 1위 {top['name']}", f"{top['chg_pct']:+.2f}%"))
-        said.append(f"시가총액 1위 {top['name']}{josa(top['name'], '은/는')} "
-                    f"{_pct(top['chg_pct'])} {_move(top['chg_pct'])}어요.")
     floor = kr.get("mover_min_eok")
     names = {x["name"] for key in ("gainers", "losers") for x in (kr.get(key) or [])[:1]}
     for key, label in (("gainers", "많이 오른"), ("losers", "많이 내린")):
@@ -317,20 +316,17 @@ def _stocks(payload: dict) -> Segment | None:
         x = xs[0]
         rows.append((f"가장 {label} {x['name']}", f"{x['chg_pct']:+.1f}%"))
         # 급등·급락은 거래대금 하한을 넘은 종목 중에서 고른 것 — 처음 한 번 말에서도 밝힌다
-        lead = (f"거래대금 {floor:,.0f}억 원 넘는 종목 중 " if floor and key == "gainers" else "")
+        lead = (f"거래대금 {floor:,.0f}억 넘는 종목 중 " if floor and key == "gainers" else "")
         said.append(f"{lead}가장 {label} 건 {x['name']}{josa(x['name'], '으로/로')} "
                     f"{_pct(x['chg_pct'], 1)} {_move(x['chg_pct'])}어요.")
         issue = _issue(payload, x["name"])
         if issue:
             said.append(issue)
-        if key == "gainers":
-            extra = _extra_mover(payload, names)       # 오른 쪽 이야기 하나 더
-            if extra:
-                said.append(extra)
+
     if not rows:
         return None
     note = f"급등·급락은 거래대금 {floor:,.0f}억 원 이상 종목 중" if floor and len(rows) > 1 else ""
-    return Segment("눈에 띈 종목", rows, " ".join(said), "stocks", note, priority=4)
+    return Segment("눈에 띈 종목", rows, " ".join(said), "stocks", note, priority=2)
 
 
 def _us_big(payload: dict) -> Segment | None:
@@ -373,7 +369,7 @@ def _events(payload: dict) -> Segment | None:
 
 def _triggers(payload: dict) -> Segment | None:
     ts = [t for t in payload.get("triggers", [])
-          if t.probability is not None and not getattr(t, "is_uncertain", False)][:2]
+          if t.probability is not None and not getattr(t, "is_uncertain", False)][:1]
     if not ts:
         return None
     rows, parts = [], []
@@ -388,7 +384,7 @@ def _triggers(payload: dict) -> Segment | None:
             situ = f"{head} {haeyo(t.situation)}."
         else:
             situ = ""
-        parts.append(f"{situ} 비슷했던 과거로 보면 {t.prob_name}{josa(t.prob_name, '은/는')} {pct}퍼센트예요.")
+        parts.append(f"{situ} {t.prob_name}{josa(t.prob_name, '은/는')} {pct}퍼센트예요.")
     title = "이번 주 지켜볼 것" if payload.get("mode") == "weekly" else "내일 지켜볼 것"
     return Segment(title, rows, " ".join(p.strip() for p in parts), "triggers", priority=2)
 
@@ -545,14 +541,9 @@ def _hook(payload: dict, kr: bool, us: bool) -> tuple[Segment, str, str] | None:
                       "오늘 가장 많이 오른 종목", top["chg_pct"] >= 15, 0)
         return seg, f"{top['name']} {top['chg_pct']:+.2f}%, 오늘 가장 많이 오른 종목", top["name"]
 
-    iid = "KOSPI" if kr else "SPX"
-    r = dash.get(iid)
-    if not r or _num(r.get("change")) is None:
-        return None
-    name = NAME[iid]
-    speech = _join([_index_phrase(name, r["change"])])
-    return Segment("오늘 가장 큰 뉴스", [(name, r["change"])], speech, "hook", priority=0), \
-        f"{name} {r['change']}", name
+    # 조용한 날(크게 움직인 것도 +10% 종목도 없음)은 첫 장면을 따로 두지 않는다 —
+    # 지수로 시작하면 바로 뒤 '한국/미국 증시'에서 같은 말을 되풀이하게 된다.
+    return None
 
 
 def build(payload: dict, message: str = "", weekly: bool = False, link: str = "") -> Script | None:
@@ -562,6 +553,8 @@ def build(payload: dict, message: str = "", weekly: bool = False, link: str = ""
     if not (kr or us):
         return None                                   # 두 장 모두 쉰 다음 날 — 영상 없음
     fx_ids = ("USDKRW", "US10Y", "WTI", "GOLD") if us else ("USDKRW", "WTI", "GOLD")
+    # 원/달러는 늘, 나머지는 평소보다 크게(1.5σ) 움직였을 때만 (9/29 짧게)
+    fx_ids = tuple(i for i in fx_ids if i == "USDKRW" or _sigma(payload, i) >= HOOK_SIGMA)
     verdict = _verdict(payload)
     if verdict and ((not kr and any(w in verdict.note for w in KR_WORDS))
                     or (not us and any(w in verdict.note for w in US_WORDS))):
@@ -569,6 +562,10 @@ def build(payload: dict, message: str = "", weekly: bool = False, link: str = ""
     hooked = None if weekly else _hook(payload, kr, us)
     if hooked and verdict and hooked[2] in verdict.note:
         verdict = None                                # 첫 장면과 같은 이야기면 결론은 되풀이하지 않는다
+    if hooked:                                        # 첫 장면 지표는 환율 칸·지켜볼 조건에서 다시 말하지 않는다
+        fx_ids = tuple(i for i in fx_ids if NAME.get(i) != hooked[2])
+        payload = {**payload, "triggers": [t for t in payload.get("triggers", [])
+                                           if getattr(t, "name", "") != hooked[2]]}
     if not (kr and us):
         stale = (KR_IDS if not kr else set()) | (US_IDS if not us else set())
         payload = {**payload, "triggers": [t for t in payload.get("triggers", [])
@@ -576,14 +573,14 @@ def build(payload: dict, message: str = "", weekly: bool = False, link: str = ""
     body = [
         _week(payload) if weekly else None,
         _closed_now(st),
-        verdict,
+        None,                                   # 오늘 한 줄 — 첫 장면과 겹쳐 뺀다 (9/29 짧게)
         _market(payload, ("KOSPI", "KOSDAQ"), "한국 증시", "kr", _breadth(payload)) if kr else None,
         _market(payload, ("SPX", "NASDAQ", "DOW"), "미국 증시", "us") if us else None,
         _market(payload, fx_ids, "환율 · 금리 · 원자재", "fx", priority=3),
         _flows(payload) if kr else None,
         _sectors(payload) if kr else None,
         _stocks(payload) if kr else None,
-        _us_big(payload) if us else None,
+        None,                                   # 미국 대형주 — 짧게 (9/29)
         _results(payload),
         _events(payload),
         _triggers(payload),
@@ -595,10 +592,10 @@ def build(payload: dict, message: str = "", weekly: bool = False, link: str = ""
 
     d = date.fromisoformat(payload["brief_date"])
     title = "주간 브리핑" if weekly else "경제 브리핑"
-    intro = Segment("", [], f"{d.month}월 {d.day}일 {WEEKDAY[d.weekday()]}요일 {title}이에요!",
+    intro = Segment("", [], f"{d.month}월 {d.day}일 {WEEKDAY[d.weekday()]}요일 브리핑이에요!",
                     "intro", priority=0)
     # 링크는 영상 설명이 아니라 채널 설명에 있다 (9/23 동화님이 영상 설명에서 뺌)
-    outro = Segment("", [], "더 자세한 브리핑은 채널 설명의 링크에서 볼 수 있어요. 다음에 또 만나요!", "outro",
+    outro = Segment("", [], "자세한 건 채널 설명 링크에서 봐 주세요!", "outro",
                     "전체 브리핑은 채널 설명 링크에서", priority=0)
 
     if weekly and payload.get("week"):

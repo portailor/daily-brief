@@ -38,7 +38,7 @@ SENT_GAP_SEC = 0.12          # 한 이슈 안 문장 사이
 LEAD_SEC = 0.35
 TAIL_SEC = 0.8
 SURPRISE_SEC = 1.1
-MAX_SEC = 170                # 쇼츠 상한 180초에 여유를 둔다
+MAX_SEC = 70                 # 1분 남짓이 목표 (9/29 동화님: 너무 길다). 넘으면 덜 중요한 구간부터 뺀다
 
 VOICE = {"voice": "ko-KR-SunHiNeural", "rate": "+15%", "pitch": "+45Hz"}
 
