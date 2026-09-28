@@ -309,6 +309,7 @@ def _stocks(payload: dict) -> Segment | None:
         rows.append((f"시총 1위 {top['name']}", f"{top['chg_pct']:+.2f}%"))
     floor = kr.get("mover_min_eok")
     names = {x["name"] for key in ("gainers", "losers") for x in (kr.get(key) or [])[:1]}
+    has_news = False
     for key, label in (("gainers", "많이 오른"), ("losers", "많이 내린")):
         xs = kr.get(key) or []
         if not xs:
@@ -319,12 +320,15 @@ def _stocks(payload: dict) -> Segment | None:
         lead = (f"거래대금 {floor:,.0f}억 넘는 종목 중 " if floor and key == "gainers" else "")
         said.append(f"{lead}가장 {label} 건 {x['name']}{josa(x['name'], '으로/로')} "
                     f"{_pct(x['chg_pct'], 1)} {_move(x['chg_pct'])}어요.")
-        issue = _issue(payload, x["name"])
-        if issue:
-            said.append(issue)
+        if _issue(payload, x["name"]):
+            has_news = True
 
     if not rows:
         return None
+    # 기사는 하나씩 읽지 않고 브리핑 페이지로 안내한다 (9/29 동화님). 쇼츠 설명란 링크는
+    # 눌리지 않아서(유튜브 정책) 채널 설명의 브리핑 페이지 링크로 보낸다.
+    if has_news:
+        said.append("두 종목 관련 기사는 브리핑 페이지에 링크로 모아 뒀으니 들어가서 확인해 보세요.")
     note = f"급등·급락은 거래대금 {floor:,.0f}억 원 이상 종목 중" if floor and len(rows) > 1 else ""
     return Segment("눈에 띈 종목", rows, " ".join(said), "stocks", note, priority=2)
 
