@@ -20,7 +20,10 @@ on:
     - cron: '7 19 * * 0-5'      # 한국시간 04:07 (예비 1)
     - cron: '43 19 * * 0-5'     # 한국시간 04:43 (예비 2)
     - cron: '45 20 * * 0-5'     # 한국시간 05:45 (예비 3)
-  workflow_dispatch:            # 수동 실행은 기다리지 않고 바로 만들고 보낸다
+  # 외부 알람 — GitHub 예약은 늦거나 빠진다(9/29 누락). cron-job.org 가 매일 06:05(한국)에
+  # API 로 workflow_dispatch(send=true, wait=true)를 부른다. 예약 실행과 똑같이 기다렸다 보내고,
+  # 먼저 보낸 실행이 있으면 건너뛴다. 토큰은 이 저장소 Actions 쓰기 권한만 있는 것.
+  workflow_dispatch:            # 수동 실행은 기다리지 않고 바로 만들고 보낸다 (wait=true 면 예약처럼)
     # 주의: 예약 실행에는 inputs 가 비어 있다. GitHub 식에서는 빈 값(null)이 false 와
     # '같다'로 비교되므로 'inputs.send != false' 로 쓰면 매일 아침 발송이 조용히 꺼진다.
     # 그래서 수동 실행일 때만 inputs.send 를 본다.
@@ -29,6 +32,10 @@ on:
         description: '카카오톡·메일도 보낼까요? (false = 페이지만 새로 만들기)'
         type: boolean
         default: true
+      wait:
+        description: '예약 실행처럼 06:15·07:25 까지 기다리고, 오늘 이미 보냈으면 건너뛸까요? (외부 알람용)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write           # 리포트와 기록을 커밋하기 위해 필요
@@ -50,6 +57,7 @@ jobs:
         id: guard
         env:
           EVENT: ${{ github.event_name }}
+          WAIT: ${{ inputs.wait }}
         run: |
           python - <<'PY'
           import json, os, pathlib
@@ -57,14 +65,16 @@ jobs:
           today = (datetime.now(timezone.utc) + timedelta(hours=9)).date().isoformat()
           p = pathlib.Path("data/state.json")
           sent = json.loads(p.read_text(encoding="utf-8")).get("sent_date") if p.exists() else None
-          skip = os.environ["EVENT"] == "schedule" and sent == today
+          # 외부 알람(cron-job.org → workflow_dispatch, wait=true)도 예약 실행과 똑같이 다룬다
+          scheduled = os.environ["EVENT"] == "schedule" or os.environ.get("WAIT") == "true"
+          skip = scheduled and sent == today
           print(f"오늘(한국) {today} · 마지막 발송 {sent} · 건너뜀 {skip}")
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               print(f"skip={'true' if skip else 'false'}", file=f)
           PY
 
       - name: 미국장 마감 반영까지 대기 (한국시간 06:15)
-        if: steps.guard.outputs.skip != 'true' && github.event_name == 'schedule'
+        if: steps.guard.outputs.skip != 'true' && (github.event_name == 'schedule' || inputs.wait)
         # 미국 정규장 마감은 한국시간 05:00(서머타임) 또는 06:00(표준시).
         # 겨울에도 전날 미국 종가가 확정된 뒤에 만들도록 06:15 까지 기다린다.
         run: python3 scripts/wait_until_kst.py 06:15
@@ -205,7 +215,7 @@ jobs:
           fi
 
       - name: 발송 시각까지 대기 (한국시간 07:25)
-        if: steps.guard.outputs.skip != 'true' && github.event_name == 'schedule'
+        if: steps.guard.outputs.skip != 'true' && (github.event_name == 'schedule' || inputs.wait)
         run: python3 scripts/wait_until_kst.py 07:25
 
       - name: 카카오톡 발송
