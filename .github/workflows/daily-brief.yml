@@ -63,8 +63,16 @@ jobs:
           import json, os, pathlib
           from datetime import datetime, timedelta, timezone
           today = (datetime.now(timezone.utc) + timedelta(hours=9)).date().isoformat()
+          # 체크아웃된 파일이 아니라 지금 main 의 기록을 본다. 체크아웃은 '실행이 걸린 순간'의
+          # 커밋이라, 줄 서 있다가 뒤늦게 시작한 실행은 앞 실행이 남긴 발송 기록을 못 본다
+          # (9/29: 시험 실행이 '마지막 발송 9/28'로 읽고 다시 만들기 시작해 수동으로 취소했다).
+          import subprocess
+          subprocess.run(["git", "fetch", "-q", "origin", "main"], check=False)
+          remote = subprocess.run(["git", "show", "origin/main:data/state.json"],
+                                  capture_output=True, text=True)
           p = pathlib.Path("data/state.json")
-          sent = json.loads(p.read_text(encoding="utf-8")).get("sent_date") if p.exists() else None
+          raw = remote.stdout if remote.returncode == 0 else (p.read_text(encoding="utf-8") if p.exists() else "{}")
+          sent = json.loads(raw).get("sent_date")
           # 외부 알람(cron-job.org → workflow_dispatch, wait=true)도 예약 실행과 똑같이 다룬다
           scheduled = os.environ["EVENT"] == "schedule" or os.environ.get("WAIT") == "true"
           skip = scheduled and sent == today
@@ -227,7 +235,18 @@ jobs:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-        run: python run.py --send-only
+        run: |
+          # 보내기 직전에 한 번 더 — 기다리는 동안 다른 실행이 이미 보냈을 수 있다 (예약·외부 알람만)
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.wait }}" = "true" ]; then
+            git fetch -q origin main || true
+            SENT=$(git show origin/main:data/state.json 2>/dev/null | python -c "import json,sys; print(json.load(sys.stdin).get('sent_date',''))" || true)
+            TODAY=$(TZ=Asia/Seoul date +%Y-%m-%d)
+            if [ "$SENT" = "$TODAY" ]; then
+              echo "오늘($TODAY) 이미 다른 실행이 보냈습니다 — 발송하지 않습니다"
+              exit 0
+            fi
+          fi
+          python run.py --send-only
 
       - name: 발송 기록 올리기
         if: steps.guard.outputs.skip != 'true' && (github.event_name != 'workflow_dispatch' || inputs.send)
