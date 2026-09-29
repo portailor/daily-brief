@@ -326,9 +326,10 @@ def _stocks(payload: dict) -> Segment | None:
     if not rows:
         return None
     # 기사는 하나씩 읽지 않고 브리핑 페이지로 안내한다 (9/29 동화님). 쇼츠 설명란 링크는
-    # 눌리지 않아서(유튜브 정책) 채널 설명의 브리핑 페이지 링크로 보낸다.
+    # 눌리지 않아서(유튜브 정책) 주소를 영상 설명에 적어 두고 복사해 들어가게 한다.
+    # 브리핑 웹사이트는 지인·구독자 전용이라 영상에서 알리지 않는다 (9/29 동화님).
     if has_news:
-        said.append("두 종목 관련 기사는 브리핑 페이지에 링크로 모아 뒀으니 들어가서 확인해 보세요.")
+        said.append("두 종목 관련 기사 주소는 영상 설명에 적어 뒀으니 확인해 보세요.")
     note = f"급등·급락은 거래대금 {floor:,.0f}억 원 이상 종목 중" if floor and len(rows) > 1 else ""
     return Segment("눈에 띈 종목", rows, " ".join(said), "stocks", note, priority=1)
 
@@ -561,7 +562,7 @@ def _macro_ref(payload: dict, kr: bool) -> Segment | None:
         spoken = want.replace("S&P 500", "S&P 500")
         speech = (f"참고로 과거에 {m['cond']}, 한 달 뒤까지 확인된 {st['n']}번 중 "
                   f"{spoken}{josa(want, '이/가')} 오른 경우가 {st['up']}퍼센트였어요. "
-                  f"평소엔 {st['base']['up']}퍼센트예요. 투자 권유는 아니고 참고만 하세요!")
+                  f"평소엔 {st['base']['up']}퍼센트예요. 직접적인 투자 권유는 못하니 참고만 하세요!")
         rows = [(f"한 달 뒤 {want} 오른 비율", f"{st['up']}%"), ("평소(모든 날)", f"{st['base']['up']}%")]
         return Segment("과거 데이터로 본 참고", rows, speech, "macro", m["cond"], priority=1)
     return None
@@ -616,9 +617,9 @@ def build(payload: dict, message: str = "", weekly: bool = False, link: str = ""
     title = "주간 브리핑" if weekly else "경제 브리핑"
     intro = Segment("", [], f"{d.month}월 {d.day}일 {WEEKDAY[d.weekday()]}요일 브리핑이에요!",
                     "intro", priority=0)
-    # 링크는 영상 설명이 아니라 채널 설명에 있다 (9/23 동화님이 영상 설명에서 뺌)
-    outro = Segment("", [], "자세한 건 채널 설명 링크에서 봐 주세요!", "outro",
-                    "전체 브리핑은 채널 설명 링크에서", priority=0)
+    # 브리핑 웹사이트는 알리지 않는다 — 지인·구독자 전용 (9/29 동화님)
+    outro = Segment("", [], "오늘 브리핑은 여기까지예요. 다음에 또 만나요!", "outro",
+                    "오늘 브리핑은 여기까지", priority=0)
 
     if weekly and payload.get("week"):
         m = next((m for m in payload["week"].moves if m.id == "KOSPI"), None)

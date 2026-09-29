@@ -520,9 +520,25 @@ def make(payload: dict, message: str = "", weekly: bool = False, link: str | Non
     # 제목 — 그날 가장 큰 뉴스 한 줄을 앞에 (9/27 동화님: 날짜만 있는 제목은 누를 이유가 없다)
     title = (f"{script.headline} | {script.date_label} {script.title}" if script.headline
              else f"{script.date_label} {script.title} | {headline}")
+    # 관련 기사 주소 — 쇼츠 설명란 링크는 눌리지 않지만 복사해서 들어갈 수 있다 (9/29 동화님).
+    # 영상에 나온 종목(가장 많이 오른·내린)의 기사 하나씩. 브리핑 웹사이트 주소는 넣지 않는다
+    # (지인·구독자 전용).
+    articles = []
+    if any(s.kind == "stocks" for s in used):
+        kr = (payload.get("detail") or {}).get("kr") or {}
+        issues = {i["name"]: i for i in kr.get("issues") or []}
+        for key, label in (("gainers", "가장 많이 오른"), ("losers", "가장 많이 내린")):
+            x = (kr.get(key) or [None])[0]
+            it = issues.get(x["name"]) if x else None
+            from brief.shorts.script import GENERIC_HEADLINE
+            news = [n for n in (it or {}).get("news") or [] if not GENERIC_HEADLINE.search(n["title"])]
+            ref = (news or (it or {}).get("disclosures") or [None])[0]
+            if ref and ref.get("url"):
+                articles += [f"{label} {x['name']}: {ref['title']}", ref["url"]]
     desc = "\n".join([f"{script.date_label} {script.title}", "",
                       *[f"[{s.tag}] {s.screen}" for s in used], "",
-                      # 링크·면책 문구는 채널 설명에 있다 — 영상마다 넣지 않는다 (9/23 동화님)
+                      *(["관련 기사 (주소를 복사해서 열어 주세요)", *articles, ""] if articles else []),
+                      "공식 데이터를 자동으로 모아 만든 영상입니다. 직접적인 투자 권유는 아닙니다.",
                       "#경제 #주식 #코스피 #Shorts"])
     return {"path": str(out), "thumb": str(thumb_path(out)), "title": title[:100], "description": desc,
             "mood": script.mood, "speech": " ".join(script.segments[i].speech for i in keep)}
