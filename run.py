@@ -281,6 +281,13 @@ def generate(args) -> int:
             else:
                 log(f"✓ 코인: {cx['asof']} 기준")
 
+        tn, err = step("주제별 뉴스", _theme_news)
+        if err:
+            failures.append(err)
+        elif tn:
+            n = sum(len(t["news"]) for t in tn["themes"])
+            log(f"✓ 주제별 뉴스: {n}건" + (f" (△ {', '.join(tn['missing'])})" if tn.get("missing") else ""))
+
         d, err = step("종목·업종 상세", detail.collect)
         if err:
             failures.append(err)
@@ -379,6 +386,11 @@ def generate(args) -> int:
 # ─────────────────────────────────────────────────────────────
 #  발송
 # ─────────────────────────────────────────────────────────────
+
+def _theme_news():
+    from brief.collect import theme_news                  # noqa: PLC0415
+    return theme_news.collect()
+
 
 def _make_shorts(payload, message, weekly, link):
     # 가져오기도 단계 안에서 — 영상 도구가 없어도 브리핑 생성은 멈추지 않게

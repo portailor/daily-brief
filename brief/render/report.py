@@ -22,6 +22,7 @@ from brief.collect.market import Instrument, load_instruments   # noqa: E402
 from brief.collect import flows as flows_mod                    # noqa: E402
 from brief import clock                                         # noqa: E402
 from brief.interpret import rules, weekly as weekly_mod          # noqa: E402
+from brief.interpret import macro_view as macro_view_mod        # noqa: E402
 from brief.collect import events as events_mod                  # noqa: E402
 from brief.collect import detail as detail_mod                  # noqa: E402
 from brief.collect import results as results_mod                # noqa: E402
@@ -283,6 +284,17 @@ def render(trade_date: str | None = None,
         detail = detail_mod.load()
         notable = build_notable_lines(snapshot, insts, acfg, gloss, seen)
         trigs = rules.build_triggers(conn, snapshot, insts, acfg)[:6]
+        # 핵심 거시 이슈 + 과거 데이터로 본 참고 (brief/interpret/macro_view.py)
+        try:
+            macro_view = macro_view_mod.build(conn, snapshot, insts)
+        except Exception:                                   # noqa: BLE001  없어도 브리핑은 나간다
+            macro_view = []
+        # 주제별 뉴스 — 같은 주제의 경제 신호 아래에 '관련 기사'로도 붙인다 (원인이라는 뜻은 아님)
+        from brief.collect import theme_news as theme_news_mod
+        theme_news = theme_news_mod.load()
+        by_theme = {t["name"]: t["news"] for t in theme_news.get("themes", [])}
+        for m in macro_view:
+            m["news"] = by_theme.get(macro_view_mod.THEME_OF.get(m["id"], ""), [])[:2]
 
         flow_rows, flow_lines = build_flows(conn, gloss, seen)
         flow_stats = [st for m in flows_mod.MARKETS for inv in flows_mod.INVESTORS
@@ -405,6 +417,8 @@ def render(trade_date: str | None = None,
         track=track,
         dashboard=dashboard,
         notable=notable,
+        macro_view=macro_view,
+        theme_news=theme_news,
         flows=flow_rows,
         flow_lines=flow_lines,
         pockets=pockets,
@@ -437,6 +451,7 @@ def render(trade_date: str | None = None,
         "verdict": verdict, "score": card, "track": track,
         "notable_rows": notable_rows, "flow_stats": flow_stats,
         "triggers": trigs, "trade_date": trade_date,
+        "macro_view": macro_view,
         "brief_date": brief_date.isoformat(),
         "date_kr": clock.label_long(brief_date),
         "date_short": clock.label(brief_date),

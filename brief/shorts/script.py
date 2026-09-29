@@ -298,7 +298,7 @@ def _sectors(payload: dict) -> Segment | None:
     speech = _join([
         f"업종 중에서는 {hi['name']}{josa(hi['name'], '이/가')} {_pct(hi['chg_pct'], 1)} {_move(hi['chg_pct'])}",
         f"{lo['name']}{josa(lo['name'], '은/는')} {_pct(lo['chg_pct'], 1)} {_move(lo['chg_pct'])}"])
-    return Segment("업종", rows, speech, "sectors", priority=2)
+    return Segment("업종", rows, speech, "sectors", priority=3)
 
 
 def _stocks(payload: dict) -> Segment | None:
@@ -330,7 +330,7 @@ def _stocks(payload: dict) -> Segment | None:
     if has_news:
         said.append("두 종목 관련 기사는 브리핑 페이지에 링크로 모아 뒀으니 들어가서 확인해 보세요.")
     note = f"급등·급락은 거래대금 {floor:,.0f}억 원 이상 종목 중" if floor and len(rows) > 1 else ""
-    return Segment("눈에 띈 종목", rows, " ".join(said), "stocks", note, priority=2)
+    return Segment("눈에 띈 종목", rows, " ".join(said), "stocks", note, priority=1)
 
 
 def _us_big(payload: dict) -> Segment | None:
@@ -550,6 +550,23 @@ def _hook(payload: dict, kr: bool, us: bool) -> tuple[Segment, str, str] | None:
     return None
 
 
+def _macro_ref(payload: dict, kr: bool) -> Segment | None:
+    """쇼츠 끝 한마디 — 핵심 거시 이슈의 '과거 데이터로 본 참고' (9/29 동화님).
+    행동을 권하지 않고 과거 통계와 '평소' 비율만 말한다."""
+    want = "코스피" if kr else "S&P 500"
+    for m in payload.get("macro_view") or []:
+        st = next((x for x in m.get("stats", []) if x["target"] == want), None)
+        if not st or not st.get("base"):
+            continue
+        spoken = want.replace("S&P 500", "S&P 500")
+        speech = (f"참고로 과거에 {m['cond']}, 한 달 뒤까지 확인된 {st['n']}번 중 "
+                  f"{spoken}{josa(want, '이/가')} 오른 경우가 {st['up']}퍼센트였어요. "
+                  f"평소엔 {st['base']['up']}퍼센트예요. 투자 권유는 아니고 참고만 하세요!")
+        rows = [(f"한 달 뒤 {want} 오른 비율", f"{st['up']}%"), ("평소(모든 날)", f"{st['base']['up']}%")]
+        return Segment("과거 데이터로 본 참고", rows, speech, "macro", m["cond"], priority=1)
+    return None
+
+
 def build(payload: dict, message: str = "", weekly: bool = False, link: str = "") -> Script | None:
     """그날 payload 로 전체 브리핑 대본을 만든다. 시장 숫자가 하나도 없으면 None."""
     st = market_status(payload, weekly)
@@ -588,6 +605,7 @@ def build(payload: dict, message: str = "", weekly: bool = False, link: str = ""
         _results(payload),
         _events(payload),
         _triggers(payload),
+        _macro_ref(payload, kr),
         _ahead(st, date.fromisoformat(payload["brief_date"])),
     ]
     segs = [s for s in body if s]
