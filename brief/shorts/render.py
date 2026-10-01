@@ -538,7 +538,7 @@ def make(payload: dict, message: str = "", weekly: bool = False, link: str | Non
     desc = "\n".join([f"{script.date_label} {script.title}", "",
                       *[f"[{s.tag}] {s.screen}" for s in used], "",
                       *(["관련 기사 (주소를 복사해서 열어 주세요)", *articles, ""] if articles else []),
-                      "공식 데이터를 자동으로 모아 만든 영상입니다. 직접적인 투자 권유는 아닙니다.",
+                      "공식 데이터를 모아 만든 정확한 정보의 영상입니다!",
                       "#경제 #주식 #코스피 #Shorts"])
     return {"path": str(out), "thumb": str(thumb_path(out)), "title": title[:100], "description": desc,
             "mood": script.mood, "speech": " ".join(script.segments[i].speech for i in keep)}
