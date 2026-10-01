@@ -562,7 +562,7 @@ def _macro_ref(payload: dict, kr: bool) -> Segment | None:
         spoken = want.replace("S&P 500", "S&P 500")
         speech = (f"참고로 과거에 {m['cond']}, 한 달 뒤까지 확인된 {st['n']}번 중 "
                   f"{spoken}{josa(want, '이/가')} 오른 경우가 {st['up']}퍼센트였어요. "
-                  f"평소엔 {st['base']['up']}퍼센트예요. 직접적인 투자 권유는 못하니 참고만 하세요!")
+                  f"평소엔 {st['base']['up']}퍼센트예요. 참고만 하세요!")
         rows = [(f"한 달 뒤 {want} 오른 비율", f"{st['up']}%"), ("평소(모든 날)", f"{st['base']['up']}%")]
         return Segment("과거 데이터로 본 참고", rows, speech, "macro", m["cond"], priority=1)
     return None
