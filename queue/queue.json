@@ -13,7 +13,8 @@
     ],
     "category": "23",
     "from": "2026-10-05",
-    "mood": "down"
+    "mood": "down",
+    "hold": true
   },
   {
     "id": "anim-ep03-chart",
