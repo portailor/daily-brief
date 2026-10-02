@@ -176,6 +176,8 @@ watchlist:
 # 감사 받지 않은 API 프로젝트는 public 으로 올려도 유튜브가 비공개로 잠근다.
 shorts:
   upload: true
+  # one = '오늘의 숫자' (그날 가장 센 숫자 하나, 20~30초 — 10/2 동화님) / full = 예전 전체 브리핑(1분 남짓)
+  format: one
   privacy: public
   # 목소리 — edge-tts. 9/23 동화님이 후보 A~E 중 C 선택: 영어권 다국어 목소리(Ava)가 한국어를 읽는다
   voice:

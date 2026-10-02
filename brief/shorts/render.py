@@ -274,7 +274,7 @@ def _header(im: Image.Image, script: Script, idx: int, keep: list[int]):
     d = ImageDraw.Draw(im)
     accent = THEME[script.mood]["accent"]
     f = _font("round", 36)
-    label = "매일 경제 브리핑"
+    label = "하찮이의 오늘의 숫자" if script.title == "오늘의 숫자" else "매일 경제 브리핑"
     w = d.textlength(label, font=f)
     d.rounded_rectangle((60, 100, 60 + w + 56, 164), 32, fill=accent)
     d.text((60 + 28, 132), label, font=f, fill="white", anchor="lm")
@@ -486,8 +486,10 @@ def render(script: Script, out: Path, voice: dict | None = None) -> tuple[Path, 
         # 썸네일 — 첫 장면 그대로: 날짜·'오늘 이야기할 것' 카드·첫 인사 말풍선·웃는 하찮이(그날 자켓).
         # (9/27 동화님: "썸네일은 이걸로 통일") 영상 첫 프레임도 같은 장면이다.
         # 첫 장면이 '오늘 가장 큰 뉴스'여도 썸네일은 인사 장면(오늘 이야기할 것) — 9/27 동화님
+        # '오늘의 숫자'(10/2~)는 인사 장면이 없다 — 썸네일도 첫 장면(큰 숫자 + 하찮이 표정)
         intro_j = next((j for j, ln in enumerate(lines) if script.segments[ln.seg].kind == "intro"), 0)
-        Image.frombytes("RGB", (W, H), frame_bytes(intro_j, "smile")).save(
+        pose = "surprised" if script.segments[lines[intro_j].seg].surprise else "smile"
+        Image.frombytes("RGB", (W, H), frame_bytes(intro_j, pose)).save(
             thumb_path(out), "JPEG", quality=90, optimize=True)
     return out, keep
 
@@ -502,17 +504,19 @@ def thumb_path(video: Path) -> Path:
 def make(payload: dict, message: str = "", weekly: bool = False, link: str | None = None,
          voice: dict | None = None) -> dict | None:
     """대본을 만들고 영상까지. 올릴 때 쓸 제목·설명과 함께 돌려준다."""
-    from brief.shorts.script import build
+    from brief.shorts.script import build, build_one
+    try:
+        import yaml
+        sc = yaml.safe_load((ROOT / "config" / "settings.yaml").read_text(encoding="utf-8")).get("shorts") or {}
+    except Exception:                                      # noqa: BLE001
+        sc = {}
+    if voice is None:
+        voice = sc.get("voice") or {}
+    if sc.get("format", "one") == "one":                   # 10/2~ '오늘의 숫자' (settings.yaml shorts.format)
+        return _make_one(payload, weekly, voice)
     script = build(payload, message, weekly=weekly, link=link or "")
     if script is None:
         return None
-    if voice is None:
-        try:
-            import yaml
-            cfg = yaml.safe_load((ROOT / "config" / "settings.yaml").read_text(encoding="utf-8"))
-            voice = (cfg.get("shorts") or {}).get("voice") or {}
-        except Exception:                                  # noqa: BLE001
-            voice = {}
     out, keep = render(script, SHORTS_DIR / f"{payload['brief_date']}.mp4", voice)
     used = [script.segments[i] for i in keep if script.segments[i].kind not in ("intro", "outro")]
     headline = next((s.screen for k in ("kr", "week", "us") for s in used if s.kind == k),
@@ -540,5 +544,46 @@ def make(payload: dict, message: str = "", weekly: bool = False, link: str | Non
                       *(["관련 기사 (주소를 복사해서 열어 주세요)", *articles, ""] if articles else []),
                       "공식 데이터를 모아 만든 정확한 정보의 영상입니다!",
                       "#경제 #주식 #코스피 #Shorts"])
+    return {"path": str(out), "thumb": str(thumb_path(out)), "title": title[:100], "description": desc,
+            "mood": script.mood, "speech": " ".join(script.segments[i].speech for i in keep)}
+
+
+def _articles(payload: dict, names: list[str]) -> list[str]:
+    """영상에 나온 종목의 기사 하나씩 — (제목 줄, 주소 줄). 쇼츠 설명란 링크는 눌리지 않아 복사해서 연다."""
+    from brief.shorts.script import GENERIC_HEADLINE
+    issues = {i["name"]: i for i in ((payload.get("detail") or {}).get("kr") or {}).get("issues") or []}
+    out = []
+    for name in names:
+        it = issues.get(name) or {}
+        news = [n for n in it.get("news") or [] if not GENERIC_HEADLINE.search(n["title"])]
+        ref = (news or it.get("disclosures") or [None])[0]
+        if ref and ref.get("url"):
+            out += [f"{name}: {ref['title']}", ref["url"]]
+    return out
+
+
+def _make_one(payload: dict, weekly: bool, voice: dict) -> dict | None:
+    """'오늘의 숫자' 영상 + 제목·설명."""
+    from brief.shorts.script import ONE_NAME as NAME, build_one
+    script = build_one(payload, weekly=weekly)
+    if script is None:
+        return None
+    out, keep = render(script, SHORTS_DIR / f"{payload['brief_date']}.mp4", voice)
+    used = [script.segments[i] for i in keep]
+    hook = next(s for s in used if s.kind == "hook")
+    # 제목 — 숫자부터. 날짜는 뒤로 (10/2: 쇼츠는 제목 앞부분만 보인다)
+    title = f"{script.headline} | {script.date_label} 오늘의 숫자"
+    dash = {r["id"]: r for r in payload.get("dashboard", [])}
+    market = [f"{NAME[i]} {dash[i]['change']}" for i in ("KOSPI", "KOSDAQ", "SPX", "NASDAQ", "USDKRW")
+              if i in dash and dash[i].get("change")]
+    lead = hook.rows[0][0] if hook.rows else ""
+    stock = [lead] if lead and lead not in NAME.values() and not lead.startswith("외국인") else []
+    articles = _articles(payload, stock)
+    desc = "\n".join([f"{script.date_label} 하찮이의 오늘의 숫자", "",
+                      *[f"[{s.tag}] {s.screen}" for s in used if s.tag and s.screen], "",
+                      "오늘 시장 한눈에: " + " · ".join(market), "",
+                      *(["관련 기사 (주소를 복사해서 열어 주세요)", *articles, ""] if articles else []),
+                      "공식 데이터를 모아 만든 정확한 정보의 영상입니다!",
+                      "#경제 #주식 #코스피 #오늘의숫자 #Shorts"])
     return {"path": str(out), "thumb": str(thumb_path(out)), "title": title[:100], "description": desc,
             "mood": script.mood, "speech": " ".join(script.segments[i].speech for i in keep)}
