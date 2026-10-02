@@ -13,10 +13,10 @@ def _payload(rows=(), gainers=(), flow=None, macro=(), brief="2026-10-07", kr="2
             "detail": {"kr": {"gainers": [{"name": n, "chg_pct": p} for n, p in gainers], "issues": []}}}
 
 
-def test_big_sigma_row_wins_with_context_and_past():
+def test_sigma_row_wins_when_no_big_gainer():
     macro = [{"id": "DXY", "cond": "달러인덱스가 하루에 평소의 1.5배 넘게 오른 날",
               "stats": [{"target": "코스피", "n": 32, "up": 53, "base": {"up": 57}}]}]
-    sc = build_one(_payload(rows=[("DXY", ("+0.64%", "+2.19", "100%"))], gainers=[("가나다", 20.0)], macro=macro))
+    sc = build_one(_payload(rows=[("DXY", ("+0.64%", "+2.19", "100%"))], gainers=[("가나다", 8.0)], macro=macro))
     kinds = [s.kind for s in sc.segments]
     assert kinds == ["hook", "why", "macro", "outro"]
     hook = sc.segments[0]
@@ -26,8 +26,8 @@ def test_big_sigma_row_wins_with_context_and_past():
     assert sc.title == "오늘의 숫자"
 
 
-def test_big_stock_beats_mid_sigma_and_limit_up_only_at_30():
-    p = _payload(rows=[("USDKRW", ("+0.80%", "+1.70", "60%"))], gainers=[("가나다", 56.15)])
+def test_big_gainer_first_and_limit_up_only_at_30():
+    p = _payload(rows=[("DXY", ("+0.64%", "+2.19", "100%"))], gainers=[("가나다", 56.15)])   # 2σ 지표보다 급등주 먼저
     sc = build_one(p)
     assert sc.segments[0].rows[0][0] == "가나다"
     assert "상한가" not in sc.segments[0].speech and "상한가" not in sc.headline   # 상장 첫날 +56% 는 상한가가 아니다

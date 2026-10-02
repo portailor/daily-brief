@@ -576,7 +576,7 @@ def _macro_ref(payload: dict, kr: bool) -> Segment | None:
 # '급등·급락'은 평소 하루 변동폭의 SURPRISE_SIGMA 배를 넘을 때만 쓴다. 원인은 지어내지 않는다.
 
 ONE_STOCK_PCT = 5.0       # 조용한 날 — 이만큼 넘게 오른 종목이 있으면 그 종목 이야기
-ONE_STOCK_BIG = 15.0      # 이만큼 오른 종목은 1.5~2σ 지표보다 먼저 (2σ 넘는 지표가 있으면 지표가 먼저)
+ONE_STOCK_BIG = 10.0      # 급등 종목(이만큼 이상)이 있으면 무엇보다 먼저 (10/2 동화님: "급등을 먼저")
 ONE_NAME = {**NAME, "DXY": "달러인덱스"}
 
 
@@ -653,7 +653,7 @@ def _one_stock(payload: dict, x: dict):
         kv = _num(kospi["change"])
         said.append(f"같은 날 코스피는 {_pct(kv)} {_move(kv)}어요.")
     why = Segment("무슨 일이냐면", rows, " ".join(said), "why", "", False, 1) if said else None
-    title = f"{x['name']} 하루 {pct:+.1f}%" + (" 상한가" if limit else " 급등" if pct >= 15 else "")
+    title = f"{x['name']} 하루 {pct:+.1f}%" + (" 상한가" if limit else " 급등" if pct >= ONE_STOCK_BIG else "")
     return hook, why, title
 
 
@@ -698,9 +698,10 @@ def build_one(payload: dict, weekly: bool = False) -> Script | None:
     kr_d = (payload.get("detail") or {}).get("kr") or {}
     top = (kr_d.get("gainers") or [None])[0] if kr else None
     past, iid = None, None
-    macro_first = best and (best[0] >= SURPRISE_SIGMA
-                            or (best[0] >= HOOK_SIGMA and not (top and top["chg_pct"] >= ONE_STOCK_BIG)))
-    if macro_first:
+    # 순서: 급등 종목(+10%↑) > 평소의 1.5배 넘게 움직인 지표·외국인 > +5% 종목 > 가장 많이 움직인 지표
+    if top and top["chg_pct"] >= ONE_STOCK_BIG:
+        hook, why, title = _one_stock(payload, top)
+    elif best and best[0] >= HOOK_SIGMA:
         if best[1] == "row":
             iid = best[2][0]
             hook, why, title = _one_row(payload, *best[2])
