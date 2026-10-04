@@ -365,6 +365,16 @@ def generate(args) -> int:
         elif shorts:
             log(f"✓ 쇼츠 영상: {shorts['path']}")
 
+    # 잠깐! 경제 용어 — 토요일 실행에서 만들어 일요일 10시에 공개 (10/4 동화님, 주 1회)
+    term_shorts = None
+    if today.weekday() == 5 and (cfg_shorts().get("terms", True)):
+        term_shorts, err = step("경제 용어 쇼츠", _make_term, payload,
+                                _read_json(STATE).get("terms_done", []))
+        if err:
+            failures.append("경제 용어 쇼츠")
+        elif term_shorts:
+            log(f"✓ 경제 용어 쇼츠: {term_shorts['path']}")
+
     _write_json(OUTBOX, {"message": message, "link": link,
                          "build_id": payload["build_id"],
                          "brief_date": today.isoformat(), "is_new": is_new,
@@ -375,7 +385,7 @@ def generate(args) -> int:
                          # 메일은 200자 제한이 없어 표와 상세도 함께 보낸다
                          "dashboard": payload.get("dashboard", []),
                          "detail": payload.get("detail", {}),
-                         "shorts": shorts})
+                         "shorts": shorts, "term_shorts": term_shorts})
     log(f"✓ 발송 대기 메시지 준비 ({len(message)}자)")
 
     if failures:
@@ -390,6 +400,42 @@ def generate(args) -> int:
 def _theme_news():
     from brief.collect import theme_news                  # noqa: PLC0415
     return theme_news.collect()
+
+
+def cfg_shorts() -> dict:
+    import yaml                                           # noqa: PLC0415
+    return (yaml.safe_load((ROOT / "config" / "settings.yaml").read_text(encoding="utf-8"))
+            .get("shorts") or {})
+
+
+def _make_term(payload, done):
+    from brief.shorts import render as shorts_render      # noqa: PLC0415
+    return shorts_render.make_term(payload, done)
+
+
+def upload_term(box: dict, cfg: dict) -> None:
+    """경제 용어 쇼츠 — 다음 날(일요일) 10시 예약 공개. 올린 용어는 terms_done 에 남긴다."""
+    from datetime import date, timedelta                  # noqa: PLC0415
+
+    from brief.deliver import youtube                     # noqa: PLC0415
+    ts = box.get("term_shorts")
+    sc = cfg.get("shorts") or {}
+    if not ts or not sc.get("upload", False) or not Path(ts["path"]).exists():
+        return
+    done = _read_json(STATE).get("terms_done", [])
+    if ts["id"] in done:
+        log(f"  경제 용어 '{ts['id']}' 은 이미 올렸습니다")
+        return
+    day = date.fromisoformat(box["brief_date"]) + timedelta(days=1)
+    url, status = youtube.upload(ts["path"], ts["title"], ts["description"],
+                                 privacy=sc.get("privacy", "public"),
+                                 tags=["경제용어", "경제공부", "재테크", "하찮이", "쇼츠"], category="27",
+                                 publish_at=f"{day.isoformat()}T10:00:00+09:00")
+    _write_json(STATE, {**_read_json(STATE), "terms_done": [*done, ts["id"]]})
+    log(f"✓ 경제 용어 쇼츠 업로드 ({ts['id']}): {url} ({status}, {day} 10시 공개)")
+    thumb = ts.get("thumb")
+    if thumb and Path(thumb).exists():
+        step("경제 용어 썸네일", youtube.set_thumbnail, youtube.video_id(url), thumb)
 
 
 def _make_shorts(payload, message, weekly, link):
@@ -516,6 +562,7 @@ def send() -> int:
 
     # 쇼츠 — 카톡이 나간 뒤에 올린다. 실패해도 카톡 발송은 이미 끝났으니 성공으로 친다.
     step("쇼츠 올리기", upload_shorts, box, cfg)
+    step("경제 용어 쇼츠 올리기", upload_term, box, cfg)
 
     log("완료")
     return 0

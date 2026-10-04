@@ -51,8 +51,10 @@ def _access_token(env: dict[str, str]) -> str:
 
 
 def upload(path: str | Path, title: str, description: str, privacy: str = "public",
-           tags: list[str] | None = None, category: str = "25") -> tuple[str, str]:
-    """영상을 올리고 (영상 주소, 실제 공개 상태)를 돌려준다."""
+           tags: list[str] | None = None, category: str = "25",
+           publish_at: str | None = None) -> tuple[str, str]:
+    """영상을 올리고 (영상 주소, 실제 공개 상태)를 돌려준다.
+    publish_at(ISO, 시간대 포함)을 주면 지금은 비공개로 올리고 그 시각에 유튜브가 공개한다."""
     path = Path(path)
     env = _env()
     token = _access_token(env)
@@ -63,6 +65,11 @@ def upload(path: str | Path, title: str, description: str, privacy: str = "publi
                     "defaultLanguage": "ko", "defaultAudioLanguage": "ko"},
         "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False},
     }
+    if publish_at:
+        from datetime import datetime, timezone
+        when = datetime.fromisoformat(publish_at).astimezone(timezone.utc)
+        if when > datetime.now(timezone.utc):
+            meta["status"].update(privacyStatus="private", publishAt=when.strftime("%Y-%m-%dT%H:%M:%S.000Z"))
     size = path.stat().st_size
     start = requests.post(UPLOAD_URL, timeout=30, headers={
         "Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=UTF-8",

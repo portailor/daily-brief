@@ -274,11 +274,12 @@ def _header(im: Image.Image, script: Script, idx: int, keep: list[int]):
     d = ImageDraw.Draw(im)
     accent = THEME[script.mood]["accent"]
     f = _font("round", 36)
-    label = "하찮이의 오늘의 숫자" if script.title == "오늘의 숫자" else "매일 경제 브리핑"
+    label = ("하찮이의 오늘의 숫자" if script.title == "오늘의 숫자"
+             else "하찮이의 경제 용어" if script.title.startswith("잠깐 경제 용어") else "매일 경제 브리핑")
     w = d.textlength(label, font=f)
     d.rounded_rectangle((60, 100, 60 + w + 56, 164), 32, fill=accent)
     d.text((60 + 28, 132), label, font=f, fill="white", anchor="lm")
-    d.text((60, 190), f"{script.date_label} {script.title}", font=_font("round", 80), fill=INK)
+    d.text((60, 190), f"{script.date_label} {script.title}".strip(), font=_font("round", 80), fill=INK)
     body = [i for i in keep if script.segments[i].kind not in ("hook", "intro", "outro")]
     for k, i in enumerate(body):
         on = i == idx
@@ -587,3 +588,23 @@ def _make_one(payload: dict, weekly: bool, voice: dict) -> dict | None:
                       "#경제 #주식 #코스피 #오늘의숫자 #Shorts"])
     return {"path": str(out), "thumb": str(thumb_path(out)), "title": title[:100], "description": desc,
             "mood": script.mood, "speech": " ".join(script.segments[i].speech for i in keep)}
+
+
+def make_term(payload: dict | None, done: list[str], voice: dict | None = None) -> dict | None:
+    """'잠깐! 경제 용어' — 다음 용어 하나로 영상. 남은 용어가 없으면 None."""
+    from brief.shorts import term as T
+    t = T.next_term(done)
+    if t is None:
+        return None
+    if voice is None:
+        try:
+            import yaml
+            voice = (yaml.safe_load((ROOT / "config" / "settings.yaml").read_text(encoding="utf-8"))
+                     .get("shorts") or {}).get("voice") or {}
+        except Exception:                                  # noqa: BLE001
+            voice = {}
+    script = T.build(t, payload, number=len(done) + 1)
+    out, _keep = render(script, SHORTS_DIR / f"term_{t['id']}.mp4", voice)
+    title, desc = T.meta(t, script)
+    return {"id": t["id"], "path": str(out), "thumb": str(thumb_path(out)), "title": title,
+            "description": desc}
