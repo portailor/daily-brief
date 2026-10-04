@@ -23,6 +23,8 @@ data/*
 !data/state.json
 # 서울 아파트 신고가 판정용 과거 최고가 기록. 클라우드 실행마다 이어서 쓴다.
 !data/seoul_highs.json
+# 잠깐! 경제 용어 목록 (10/4)
+!data/terms.json
 *.db
 *.db-wal
 *.db-shm
