@@ -30,7 +30,7 @@ def next_term(done: list[str], terms: list[dict] | None = None) -> dict | None:
 
 
 def _live(term: dict, payload: dict | None) -> tuple[str, str, str] | None:
-    """(이름, 화면 값, 읽는 값) — 대시보드에 그 값이 있을 때만."""
+    """(이름, 화면 값, 읽는 값, 기준일) — 대시보드에 값이 있고 기준일을 알 때만."""
     lv = term.get("live")
     if not lv or not payload:
         return None
@@ -40,7 +40,14 @@ def _live(term: dict, payload: dict | None) -> tuple[str, str, str] | None:
         return None
     unit = lv.get("unit", "")
     spoken = f"{val}{'퍼센트' if unit == '%' else unit}"
-    return lv["name"], f"{val}{unit}", spoken
+    # 며칠 마감 값인지 꼭 밝힌다 — '지금'이라고만 하면 옛 값을 오늘 값처럼 말하게 된다 (10/4 환율 편)
+    side = "us_date" if lv["id"] in ("SPX", "NASDAQ", "DOW", "US10Y", "VIX", "DXY") else "kr_date"
+    asof = payload.get(side) or ""
+    if not asof:
+        return None
+    from datetime import date
+    d = date.fromisoformat(asof)
+    return lv["name"], f"{val}{unit}", spoken, f"{d.month}월 {d.day}일"
 
 
 def build(term: dict, payload: dict | None = None, number: int = 0) -> Script:
@@ -54,10 +61,10 @@ def build(term: dict, payload: dict | None = None, number: int = 0) -> Script:
                    term["screen"], False, 0)
     segs = [hook, mean]
     if live:
-        name, shown, spoken = live
+        name, shown, spoken, day = live
         segs.append(Segment("지금은?", [(name, shown)],
-                            f"참고로 지금 {SPOKEN.get(name, name)}{josa(name, '은/는')} {spoken}{_ieyo(spoken)}.",
-                            "live", "가장 최근 마감 기준", False, 1))
+                            f"참고로 {day} 마감 기준 {SPOKEN.get(name, name)}{josa(name, '은/는')} {spoken}{_ieyo(spoken)}.",
+                            "live", f"{day} 마감 기준", False, 1))
     segs.append(Segment("", [], "다음 주에도 경제 용어 하나 알려 드릴게요!", "outro", "잠깐 경제 용어 끝", priority=0))
     title = f"잠깐 경제 용어{f' {number}편' if number else ''}"
     return Script("", title, "up", segs, "", hook_q)
