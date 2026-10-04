@@ -1,6 +1,6 @@
 """'잠깐! 경제 용어' 쇼츠 — 주 1회, 용어 하나를 25~35초에 (10/4 동화님).
 
-  첫 장면  "잠깐! 경제 용어 하나만 알고 가실게요" + 큰 글씨 용어 + 궁금증 한 줄(hook)
+  첫 장면  "잠깐! ○○에 대해 정확히 알고 계신가요?" (10/4 동화님) + 큰 글씨 용어 + 궁금증 한 줄(hook)
   뜻       한국은행 ECOS 통계용어사전 설명을 쉬운 말로 — 사전에 없는 사실은 보태지 않는다
   지금은   그 용어와 이어지는 그날 숫자(대시보드 값)가 있으면 한 줄
   끝       "다음 주에도 경제 용어 하나 알려 드릴게요!"
@@ -49,7 +49,7 @@ def build(term: dict, payload: dict | None = None, number: int = 0) -> Script:
     if "{live}" in term["hook"] and not live:                 # 숫자가 없으면 숫자 없는 질문으로
         hook_q = f"'{term['term']}', 정확히 뭘까?"
     hook = Segment("잠깐! 경제 용어", [("오늘의 경제 용어", term["term"])],
-                   f"잠깐! 경제 용어 하나만 알고 가실게요. {hook_q}", "hook", hook_q, True, 0)   # '잠깐!' 손 번쩍
+                   f"잠깐! {term['term']}에 대해 정확히 알고 계신가요? {hook_q}", "hook", hook_q, True, 0)   # '잠깐!' 손 번쩍
     mean = Segment(f"{term['term']}{josa(term['term'], '이란/란')}", [], " ".join(term["speech"]), "term",
                    term["screen"], False, 0)
     segs = [hook, mean]

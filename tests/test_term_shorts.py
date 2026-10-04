@@ -23,7 +23,7 @@ def test_build_with_and_without_live_number():
     sc = T.build(fx, payload, number=1)
     kinds = [s.kind for s in sc.segments]
     assert kinds == ["hook", "term", "live", "outro"]
-    assert sc.segments[0].speech.startswith("잠깐! 경제 용어 하나만 알고 가실게요.")
+    assert sc.segments[0].speech.startswith("잠깐! 환율에 대해 정확히 알고 계신가요?")
     assert "1,356.84원이에요" in sc.segments[2].speech
     assert [s.kind for s in T.build(fx, None).segments] == ["hook", "term", "outro"]
 
