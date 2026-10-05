@@ -365,15 +365,18 @@ def generate(args) -> int:
         elif shorts:
             log(f"✓ 쇼츠 영상: {shorts['path']}")
 
-    # 잠깐! 경제 용어 — 토요일 실행에서 만들어 일요일 10시에 공개 (10/4 동화님, 주 1회)
+    # 잠깐! 경제 용어 — 공개하는 요일(settings.yaml shorts.term_days)의 아침 실행에서 만들어
+    # 그날 저녁에 예약 공개. 일요일 것은 브리핑이 없으니 토요일 실행에서 미리 (10/5 동화님: 주 4회)
     term_shorts = None
-    if today.weekday() == 5 and (cfg_shorts().get("terms", True)):
+    slot = term_slot(today, cfg_shorts())
+    if slot:
         term_shorts, err = step("경제 용어 쇼츠", _make_term, payload,
                                 _read_json(STATE).get("terms_done", []))
         if err:
             failures.append("경제 용어 쇼츠")
         elif term_shorts:
-            log(f"✓ 경제 용어 쇼츠: {term_shorts['path']}")
+            term_shorts["slot"] = slot
+            log(f"✓ 경제 용어 쇼츠: {term_shorts['path']} ({slot} 공개 예정)")
 
     _write_json(OUTBOX, {"message": message, "link": link,
                          "build_id": payload["build_id"],
@@ -408,15 +411,28 @@ def cfg_shorts() -> dict:
             .get("shorts") or {})
 
 
+def term_slot(today, sc: dict) -> str | None:
+    """오늘 실행에서 만들 경제 용어 쇼츠의 공개 시각(ISO) — 없으면 None.
+    term_days: 0=월 … 6=일. 일요일 것은 토요일에 만든다 (일요일엔 실행이 없다)."""
+    from datetime import timedelta                        # noqa: PLC0415
+    days = sc.get("term_days", [0, 2, 4, 6])
+    at = sc.get("term_time", "19:00")
+    if today.weekday() in days and today.weekday() != 6:
+        day = today
+    elif today.weekday() == 5 and 6 in days:
+        day = today + timedelta(days=1)
+    else:
+        return None
+    return f"{day.isoformat()}T{at}:00+09:00"
+
+
 def _make_term(payload, done):
     from brief.shorts import render as shorts_render      # noqa: PLC0415
     return shorts_render.make_term(payload, done)
 
 
 def upload_term(box: dict, cfg: dict) -> None:
-    """경제 용어 쇼츠 — 다음 날(일요일) 10시 예약 공개. 올린 용어는 terms_done 에 남긴다."""
-    from datetime import date, timedelta                  # noqa: PLC0415
-
+    """경제 용어 쇼츠 — term_slot 시각에 예약 공개. 올린 용어는 terms_done 에 남긴다."""
     from brief.deliver import youtube                     # noqa: PLC0415
     ts = box.get("term_shorts")
     sc = cfg.get("shorts") or {}
@@ -426,13 +442,12 @@ def upload_term(box: dict, cfg: dict) -> None:
     if ts["id"] in done:
         log(f"  경제 용어 '{ts['id']}' 은 이미 올렸습니다")
         return
-    day = date.fromisoformat(box["brief_date"]) + timedelta(days=1)
     url, status = youtube.upload(ts["path"], ts["title"], ts["description"],
                                  privacy=sc.get("privacy", "public"),
                                  tags=["경제용어", "경제공부", "재테크", "하찮이", "쇼츠"], category="27",
-                                 publish_at=f"{day.isoformat()}T10:00:00+09:00")
+                                 publish_at=ts["slot"])
     _write_json(STATE, {**_read_json(STATE), "terms_done": [*done, ts["id"]]})
-    log(f"✓ 경제 용어 쇼츠 업로드 ({ts['id']}): {url} ({status}, {day} 10시 공개)")
+    log(f"✓ 경제 용어 쇼츠 업로드 ({ts['id']}): {url} ({status}, {ts['slot']} 공개)")
     thumb = ts.get("thumb")
     if thumb and Path(thumb).exists():
         step("경제 용어 썸네일", youtube.set_thumbnail, youtube.video_id(url), thumb)

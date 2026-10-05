@@ -41,3 +41,18 @@ def test_meta_cites_source():
     title, desc = T.meta(fx, T.build(fx))
     assert "잠깐! 경제 용어 '환율'" in title
     assert "한국은행 경제통계시스템(ECOS) 통계용어사전 '환율'" in desc
+
+
+def test_term_slots_mon_wed_fri_sun():
+    import importlib.util
+    from datetime import date
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("run_mod", Path(__file__).resolve().parent.parent / "run.py")
+    run = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(run)
+    got = {d: run.term_slot(date(2026, 10, d), {}) for d in range(5, 12)}
+    assert got[5] == "2026-10-05T19:00:00+09:00"            # 월
+    assert got[6] is None and got[8] is None                 # 화·목
+    assert got[10] == "2026-10-11T19:00:00+09:00"           # 토 → 일요일 것
+    assert got[11] is None                                    # 일요일엔 실행이 없다
+    assert run.term_slot(date(2026, 10, 6), {"term_days": list(range(7))}) == "2026-10-06T19:00:00+09:00"

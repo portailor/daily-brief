@@ -25,6 +25,7 @@ data/*
 !data/seoul_highs.json
 # 잠깐! 경제 용어 목록 (10/4)
 !data/terms.json
+!data/term_pool.json
 *.db
 *.db-wal
 *.db-shm
