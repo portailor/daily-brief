@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 from brief.interpret.rules import josa
-from brief.shorts.script import SPOKEN, Script, Segment, _ieyo
+from brief.shorts.script import SPOKEN, Script, Segment, _ieyo, _say
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 TERMS = ROOT / "data" / "terms.json"
@@ -57,7 +57,7 @@ def build(term: dict, payload: dict | None = None, number: int = 0) -> Script:
         hook_q = f"'{term['term']}', 정확히 뭘까?"
     hook = Segment("잠깐! 경제 용어", [("오늘의 경제 용어", term["term"])],
                    f"잠깐! {term['term']}에 대해 정확히 알고 계신가요? {hook_q}", "hook", hook_q, True, 0)   # '잠깐!' 손 번쩍
-    mean = Segment(f"{term['term']}{josa(term['term'], '이란/란')}", [], " ".join(term["speech"]), "term",
+    mean = Segment(f"{term['term']}{josa(term['term'], '이란/란')}", [], _say(" ".join(term["speech"])), "term",
                    term["screen"], False, 0)
     segs = [hook, mean]
     if live:
