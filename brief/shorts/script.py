@@ -673,8 +673,142 @@ def _one_past(payload: dict, iid: str, kr: bool) -> Segment | None:
     return None
 
 
+# ── 10/6 동화님: "확률보다 어떤 종목이 오르고 내렸는지 중심으로. 확률이 많이 높을 때만 확률로.
+#    오늘 영상은 무슨 얘기를 하고 싶은지 모르겠다" → 오늘 무슨 일이 있었나를 종목으로 보여 준다.
+STOCK_BIG = 10.0          # 이만큼 넘게 움직인 종목은 '급등·급락'
+SKEW_PP = 15              # '과거엔 어땠나'는 오른 비율이 평소와 이만큼(%p) 넘게 다를 때만
+
+
+def _headline(payload: dict, name: str) -> str | None:
+    """그 종목의 기사 제목(없으면 공시 제목) 한 줄 — 손대지 않고 정리만."""
+    for i in ((payload.get("detail") or {}).get("kr") or {}).get("issues") or []:
+        if i.get("name") != name:
+            continue
+        heads = [n["title"] for n in i.get("news", []) if not GENERIC_HEADLINE.search(n["title"])]
+        # [특징주] 기사는 그날 왜 움직였는지를 다루는 경우가 많아 먼저 (제목 그대로 읽는다)
+        heads.sort(key=lambda t: "특징주" not in t)
+        if heads:
+            return _clean_headline(heads[0])
+        if i.get("disclosures"):
+            return _clean_headline(i["disclosures"][0]["title"])
+    return None
+
+
+def _stock_word(pct: float) -> str:
+    if 29.5 <= pct <= 30.05:
+        return "상한가"
+    if -30.05 <= pct <= -29.5:
+        return "하한가"
+    if abs(pct) >= STOCK_BIG:
+        return "급등" if pct > 0 else "급락"
+    return "상승" if pct > 0 else "하락"
+
+
+def _movers(payload: dict, kr: bool, us: bool):
+    """(가장 크게 움직인 종목, 반대 방향으로 가장 크게 움직인 종목, 출처 'kr'/'us')."""
+    if kr:
+        kd = (payload.get("detail") or {}).get("kr") or {}
+        g, l = (kd.get("gainers") or [None])[0], (kd.get("losers") or [None])[0]
+        if g or l:
+            lead, other = (g, l) if (g and (not l or abs(g["chg_pct"]) >= abs(l["chg_pct"]))) else (l, g)
+            return lead, other, "kr"
+    if us:
+        big = [x for x in ((payload.get("detail") or {}).get("us") or {}).get("big") or []
+               if x.get("chg_pct") is not None]
+        if big:
+            lead = max(big, key=lambda x: abs(x["chg_pct"]))
+            opp = [x for x in big if (x["chg_pct"] > 0) != (lead["chg_pct"] > 0) and x["chg_pct"] != 0]
+            return lead, (max(opp, key=lambda x: abs(x["chg_pct"])) if opp else None), "us"
+    return None, None, ""
+
+
+def _market_line(payload: dict, side: str, stale: set) -> Segment | None:
+    """오늘 시장 한 줄 — 지수 둘, 그리고 평소의 2배 넘게 움직인 환율·금리·원자재가 있으면 하나."""
+    dash = _dash(payload)
+    ids = ("KOSPI", "KOSDAQ") if side == "kr" else ("SPX", "NASDAQ")
+    got = [i for i in ids if i in dash and _num(dash[i]["change"]) is not None]
+    if not got:
+        return None
+    rows = [(NAME[i], dash[i]["change"]) for i in got]
+    speech = _join([_index_phrase(NAME[i], dash[i]["change"]) for i in got])
+    big = None
+    for iid in ("USDKRW", "DXY", "US10Y", "KTB3Y", "WTI", "GOLD", "VIX"):
+        r = dash.get(iid)
+        sg = _num((r or {}).get("sigma"))
+        if r and iid not in stale and sg is not None and abs(sg) >= SURPRISE_SIGMA and (big is None or abs(sg) > big[1]):
+            big = (iid, abs(sg))
+    if big:
+        iid, sg = big
+        name = ONE_NAME[iid]
+        ch = dash[iid]["change"]
+        v = _num(ch)
+        amount = f"{abs(v) / 100:.2f}퍼센트포인트" if ch.endswith("bp") else _pct(v)
+        rows.append((name, ch))
+        speech += (f" 그리고 {SPOKEN.get(name, name)}{josa(name, '이/가')} {amount} {_move(v)}는데, "
+                   f"평소 하루 움직임의 {sg:.1f}배였어요.")
+    return Segment("오늘 시장은", rows, speech, "market", "", False, 1), (big[0] if big else None)
+
+
 def build_one(payload: dict, weekly: bool = False) -> Script | None:
-    """그날 가장 센 숫자 하나로 20~30초 대본. 시장 숫자가 없으면 None."""
+    """'오늘의 숫자' — 오늘 가장 크게 움직인 종목 이야기 20~35초. 시장 숫자가 없으면 None."""
+    st = market_status(payload, weekly)
+    kr, us = st["kr_fresh"], st["us_fresh"]
+    if not (kr or us):
+        return None
+    lead, other, side = _movers(payload, kr, us)
+    if not lead:
+        return _build_one_macro(payload, weekly)
+    stale = (KR_IDS if not kr else set()) | (US_IDS if not us else set())
+    dash = _dash(payload)
+
+    pct = lead["chg_pct"]
+    word = _stock_word(pct)
+    where = "" if side == "kr" else "미국 대형주 중 "
+    hook = Segment("오늘의 숫자", [(lead["name"], f"{pct:+.2f}%")],
+                   f"{where}{lead['name']}{josa(lead['name'], '이/가')} 하루 만에 {_pct(pct, 1)}"
+                   f"{'나' if abs(pct) >= STOCK_BIG else ''} {_move(pct)}어요!"
+                   + (f" {word}예요." if word in ("상한가", "하한가") else ""), "hook",
+                   ("오늘 가장 많이 " + ("오른" if pct > 0 else "내린") + " 종목") if side == "kr"
+                   else "미국 대형주 중 가장 크게 움직인 종목", abs(pct) >= STOCK_BIG, 0)
+    segs = [hook]
+    head = _headline(payload, lead["name"]) if side == "kr" else None
+    if head:                                            # 기사 제목은 그대로 — 원인이라고 말하지 않는다
+        segs.append(Segment("무슨 일이?", [], f"관련 기사 제목은 '{head}'{josa(head, '이었/였')}어요.",
+                            "news", f"관련 기사: {head}", False, 1))
+    if other:
+        p2 = other["chg_pct"]
+        segs.append(Segment("반대로", [(other["name"], f"{p2:+.2f}%")],
+                            f"반대로 {other['name']}{josa(other['name'], '은/는')} {_pct(p2, 1)} {_move(p2)}어요.",
+                            "other", "", False, 1))
+    mk = _market_line(payload, side, stale)
+    big_iid = None
+    if mk:
+        seg, big_iid = mk
+        segs.append(seg)
+    # 과거 통계 — 평소와 많이 다를 때만 (10/6 동화님)
+    past = _one_past(payload, big_iid, kr) if big_iid else None
+    if past:
+        a, b = (_num(past.rows[0][1]) or 0), (_num(past.rows[1][1]) or 0)
+        if abs(a - b) < SKEW_PP:
+            past = None
+    d = date.fromisoformat(payload["brief_date"])
+    ahead = _ahead(st, d)
+    if ahead and past:
+        ahead.speech = ahead.speech.replace("참고로 ", "그리고 ", 1)
+    closed = _closed_now(st)
+    outro = Segment("", [], "오늘의 숫자였어요. 내일 또 만나요!", "outro", "오늘의 숫자 끝", priority=0)
+    segs = [segs[0], *([closed] if closed else []), *segs[1:], *(s for s in (past, ahead, outro) if s)]
+
+    title = f"{lead['name']} {pct:+.1f}% {word}"
+    if other:
+        title += f", {other['name']} {other['chg_pct']:+.1f}%"
+    v = _num((dash.get("KOSPI" if kr else "SPX") or {}).get("change"))
+    mood = "down" if v is not None and v < 0 else "up"
+    return Script(payload["date_short"], "오늘의 숫자", mood, segs, "", title)
+
+
+def _build_one_macro(payload: dict, weekly: bool = False) -> Script | None:
+    """(예비) 종목 자료가 없는 날 — 가장 크게 움직인 지표 하나로."""
     st = market_status(payload, weekly)
     kr, us = st["kr_fresh"], st["us_fresh"]
     if not (kr or us):

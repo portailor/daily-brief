@@ -556,7 +556,8 @@ def _articles(payload: dict, names: list[str]) -> list[str]:
     out = []
     for name in names:
         it = issues.get(name) or {}
-        news = [n for n in it.get("news") or [] if not GENERIC_HEADLINE.search(n["title"])]
+        news = sorted([n for n in it.get("news") or [] if not GENERIC_HEADLINE.search(n["title"])],
+                      key=lambda n: "특징주" not in n["title"])            # 영상에서 읽은 기사와 같게
         ref = (news or it.get("disclosures") or [None])[0]
         if ref and ref.get("url"):
             out += [f"{name}: {ref['title']}", ref["url"]]
@@ -577,8 +578,8 @@ def _make_one(payload: dict, weekly: bool, voice: dict) -> dict | None:
     dash = {r["id"]: r for r in payload.get("dashboard", [])}
     market = [f"{NAME[i]} {dash[i]['change']}" for i in ("KOSPI", "KOSDAQ", "SPX", "NASDAQ", "USDKRW")
               if i in dash and dash[i].get("change")]
-    lead = hook.rows[0][0] if hook.rows else ""
-    stock = [lead] if lead and lead not in NAME.values() and not lead.startswith("외국인") else []
+    stock = [s.rows[0][0] for s in used if s.kind in ("hook", "other") and s.rows
+             and s.rows[0][0] not in NAME.values() and not s.rows[0][0].startswith("외국인")]
     articles = _articles(payload, stock)
     desc = "\n".join([f"{script.date_label} 하찮이의 오늘의 숫자", "",
                       *[f"[{s.tag}] {s.screen}" for s in used if s.tag and s.screen], "",
