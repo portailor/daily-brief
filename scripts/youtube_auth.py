@@ -1,4 +1,4 @@
-"""유튜브 업로드 권한을 한 번 받는다.
+"""유튜브 권한(업로드 + 재생목록 등 채널 관리)을 한 번 받는다.
 
   python scripts/youtube_auth.py
 
@@ -24,7 +24,9 @@ ROOT = Path(__file__).resolve().parent.parent
 ENV = ROOT / "config" / ".env"
 PORT = 8765
 REDIRECT = f"http://127.0.0.1:{PORT}/"
-SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+# upload: 영상 올리기 · youtube: 재생목록 넣기·예약 날짜 바꾸기 등 채널 관리 (10/6 동화님: 재생목록까지 자동으로)
+SCOPE = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube"
+REPOS = ("portailor/daily-brief", "portailor/hachani-anim")      # 같은 유튜브 키를 쓰는 저장소
 
 _got: dict[str, str] = {}
 
@@ -98,11 +100,12 @@ def main() -> int:
     print("✓ config/.env 에 저장했습니다")
 
     env = _read_env()
-    for key in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN"):
-        p = subprocess.run(["gh", "secret", "set", key], input=env[key], text=True,
-                           capture_output=True, cwd=ROOT)
-        print(f"{'✓' if p.returncode == 0 else '✗'} GitHub Secret {key}"
-              + ("" if p.returncode == 0 else f" 등록 실패: {p.stderr.strip()[:200]}"))
+    for repo in REPOS:
+        for key in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN"):
+            p = subprocess.run(["gh", "secret", "set", key, "--repo", repo], input=env[key], text=True,
+                               capture_output=True, cwd=ROOT)
+            print(f"{'✓' if p.returncode == 0 else '✗'} {repo} Secret {key}"
+                  + ("" if p.returncode == 0 else f" 등록 실패: {p.stderr.strip()[:200]}"))
     return 0
 
 

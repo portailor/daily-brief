@@ -107,3 +107,17 @@ def set_thumbnail(video_id: str, image: str | Path) -> None:
 
 def video_id(url: str) -> str:
     return url.rstrip("/").rsplit("/", 1)[-1]
+
+
+PLAYLIST_URL = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet"
+
+
+def add_to_playlist(video_id: str, playlist_id: str) -> None:
+    """영상을 재생목록 끝에 넣는다 (10/6~ 'youtube' 권한 필요 — scripts/youtube_auth.py)."""
+    token = _access_token(_env())
+    r = requests.post(PLAYLIST_URL, timeout=30, headers={
+        "Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=UTF-8"},
+        data=json.dumps({"snippet": {"playlistId": playlist_id,
+                                     "resourceId": {"kind": "youtube#video", "videoId": video_id}}}))
+    if r.status_code not in (200, 201):
+        raise RuntimeError(f"재생목록 추가 실패 ({r.status_code}): {r.text[:200]}")

@@ -431,6 +431,16 @@ def _make_term(payload, done):
     return shorts_render.make_term(payload, done)
 
 
+def _playlist(url: str, sc: dict, kind: str) -> None:
+    """올린 영상을 재생목록에 — 실패해도 영상은 이미 올라가 있다."""
+    from brief.deliver import youtube                     # noqa: PLC0415
+    pid = (sc.get("playlists") or {}).get(kind)
+    if pid:
+        _, err = step(f"재생목록({kind})", youtube.add_to_playlist, youtube.video_id(url), pid)
+        if not err:
+            log(f"✓ 재생목록 추가 ({kind})")
+
+
 def upload_term(box: dict, cfg: dict) -> None:
     """경제 용어 쇼츠 — term_slot 시각에 예약 공개. 올린 용어는 terms_done 에 남긴다."""
     from brief.deliver import youtube                     # noqa: PLC0415
@@ -448,6 +458,7 @@ def upload_term(box: dict, cfg: dict) -> None:
                                  publish_at=ts["slot"])
     _write_json(STATE, {**_read_json(STATE), "terms_done": [*done, ts["id"]]})
     log(f"✓ 경제 용어 쇼츠 업로드 ({ts['id']}): {url} ({status}, {ts['slot']} 공개)")
+    _playlist(url, sc, "terms")
     thumb = ts.get("thumb")
     if thumb and Path(thumb).exists():
         step("경제 용어 썸네일", youtube.set_thumbnail, youtube.video_id(url), thumb)
@@ -477,6 +488,7 @@ def upload_shorts(box: dict, cfg: dict) -> None:
     url, status = youtube.upload(shorts["path"], shorts["title"], shorts["description"],
                                  privacy=sc.get("privacy", "public"))
     log(f"✓ 쇼츠 업로드: {url} ({status})")
+    _playlist(url, sc, "brief")
     # 썸네일 — 첫 장면(날짜·오늘 이야기할 것·웃는 하찮이). 실패해도 영상은 이미 올라가 있다.
     thumb = shorts.get("thumb")
     if thumb and Path(thumb).exists():
@@ -497,6 +509,7 @@ def upload_queued(box: dict, shorts: dict, sc: dict) -> None:
                                  category=item.get("category", "25"))
     _write_json(STATE, {**_read_json(STATE), "queue_done": [*done, item["id"]]})
     log(f"✓ 대기열 영상 업로드 ({item['id']}): {url} ({status})")
+    _playlist(url, sc, "episodes")
 
 
 def send() -> int:
