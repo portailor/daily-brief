@@ -454,7 +454,7 @@ def upload_term(box: dict, cfg: dict) -> None:
         return
     url, status = youtube.upload(ts["path"], ts["title"], ts["description"],
                                  privacy=sc.get("privacy", "public"),
-                                 tags=["경제용어", "경제공부", "재테크", "하찮이", "쇼츠"], category="27",
+                                 tags=["경제용어", "경제공부", "재테크", "하차니", "쇼츠"], category="27",
                                  publish_at=ts["slot"])
     _write_json(STATE, {**_read_json(STATE), "terms_done": [*done, ts["id"]]})
     log(f"✓ 경제 용어 쇼츠 업로드 ({ts['id']}): {url} ({status}, {ts['slot']} 공개)")
@@ -489,7 +489,7 @@ def upload_shorts(box: dict, cfg: dict) -> None:
                                  privacy=sc.get("privacy", "public"))
     log(f"✓ 쇼츠 업로드: {url} ({status})")
     _playlist(url, sc, "brief")
-    # 썸네일 — 첫 장면(날짜·오늘 이야기할 것·웃는 하찮이). 실패해도 영상은 이미 올라가 있다.
+    # 썸네일 — 첫 장면(날짜·오늘 이야기할 것·웃는 하차니). 실패해도 영상은 이미 올라가 있다.
     thumb = shorts.get("thumb")
     if thumb and Path(thumb).exists():
         _, err = step("쇼츠 썸네일", youtube.set_thumbnail, youtube.video_id(url), thumb)

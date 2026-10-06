@@ -274,8 +274,8 @@ def _header(im: Image.Image, script: Script, idx: int, keep: list[int]):
     d = ImageDraw.Draw(im)
     accent = THEME[script.mood]["accent"]
     f = _font("round", 36)
-    label = ("하찮이의 오늘의 숫자" if script.title == "오늘의 숫자"
-             else "하찮이의 경제 용어" if script.title.startswith("잠깐 경제 용어") else "매일 경제 브리핑")
+    label = ("하차니의 오늘의 숫자" if script.title == "오늘의 숫자"
+             else "하차니의 경제 용어" if script.title.startswith("잠깐 경제 용어") else "매일 경제 브리핑")
     w = d.textlength(label, font=f)
     d.rounded_rectangle((60, 100, 60 + w + 56, 164), 32, fill=accent)
     d.text((60 + 28, 132), label, font=f, fill="white", anchor="lm")
@@ -484,10 +484,10 @@ def render(script: Script, out: Path, voice: dict | None = None) -> tuple[Path, 
         proc.stdin.close()
         if proc.wait() != 0:
             raise RuntimeError("ffmpeg 영상 만들기 실패")
-        # 썸네일 — 첫 장면 그대로: 날짜·'오늘 이야기할 것' 카드·첫 인사 말풍선·웃는 하찮이(그날 자켓).
+        # 썸네일 — 첫 장면 그대로: 날짜·'오늘 이야기할 것' 카드·첫 인사 말풍선·웃는 하차니(그날 자켓).
         # (9/27 동화님: "썸네일은 이걸로 통일") 영상 첫 프레임도 같은 장면이다.
         # 첫 장면이 '오늘 가장 큰 뉴스'여도 썸네일은 인사 장면(오늘 이야기할 것) — 9/27 동화님
-        # '오늘의 숫자'(10/2~)는 인사 장면이 없다 — 썸네일도 첫 장면(큰 숫자 + 하찮이 표정)
+        # '오늘의 숫자'(10/2~)는 인사 장면이 없다 — 썸네일도 첫 장면(큰 숫자 + 하차니 표정)
         intro_j = next((j for j, ln in enumerate(lines) if script.segments[ln.seg].kind == "intro"), 0)
         pose = "surprised" if script.segments[lines[intro_j].seg].surprise else "smile"
         Image.frombytes("RGB", (W, H), frame_bytes(intro_j, pose)).save(
@@ -581,7 +581,7 @@ def _make_one(payload: dict, weekly: bool, voice: dict) -> dict | None:
     stock = [s.rows[0][0] for s in used if s.kind in ("hook", "other") and s.rows
              and s.rows[0][0] not in NAME.values() and not s.rows[0][0].startswith("외국인")]
     articles = _articles(payload, stock)
-    desc = "\n".join([f"{script.date_label} 하찮이의 오늘의 숫자", "",
+    desc = "\n".join([f"{script.date_label} 하차니의 오늘의 숫자", "",
                       *[f"[{s.tag}] {s.screen}" for s in used if s.tag and s.screen], "",
                       "오늘 시장 한눈에: " + " · ".join(market), "",
                       *(["관련 기사 (주소를 복사해서 열어 주세요)", *articles, ""] if articles else []),

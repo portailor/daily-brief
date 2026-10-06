@@ -6,7 +6,7 @@ queue/queue.json 에 영상을 적어 두면, 쇼츠 올리기 단계에서 오�
 
 항목 예:
   {"id": "ep01", "file": "queue/ep01.mp4", "title": "...", "description": "...",
-   "tags": ["하찮이"], "category": "23",
+   "tags": ["하차니"], "category": "23",
    "from": "2026-09-28", "until": "2026-10-02",   # 브리핑 날짜 기준, 양 끝 포함
    "mood": "down",                                # 선택 — 브리핑 자켓 색 (down=파랑, up=빨강)
    "hold": true}                                  # 선택 — true 면 자동으로 올리지 않고 대기만 (올릴 때 지운다)
