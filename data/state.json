@@ -1,7 +1,7 @@
 {
   "market_key": "KOSPI:2026-10-06|SPX:2026-10-06",
   "brief_date": "2026-10-07",
-  "sent_date": "2026-10-06",
+  "sent_date": "2026-10-07",
   "results_shown": {
     "fomc:2026-09-16": "2026-09-22",
     "macro:RSAFS:2026-08-01:2026-09-16": "2026-09-22",
@@ -21,6 +21,7 @@
     "anim-ep01-commute"
   ],
   "terms_done": [
-    "fx"
+    "fx",
+    "base_rate"
   ]
 }
