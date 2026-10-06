@@ -60,3 +60,30 @@ def test_kr_closed_uses_us_big_movers():
 
 def test_both_markets_closed_no_video():
     assert build_one(_payload(brief="2026-12-26", kr="2026-12-24", us="2026-12-24")) is None
+
+
+def test_monday_is_last_week_story():
+    from brief.interpret.weekly import WeekMove
+    week = SimpleNamespace(period="9/28(월) ~ 10/2(금)", flows=[{"market": "KOSPI", "total_eok": -15000.0}],
+                           moves=[WeekMove("KOSPI", "코스피", 6971.0, 2.71, "index", 2),
+                                  WeekMove("SPX", "S&P 500", 7666.0, 1.21, "index", 2)])
+    iss = [{"name": "HLB", "news": [{"title": "[특징주] HLB, 신약 허가 기대에 급등", "url": "u"}], "disclosures": []}]
+    p = _payload(brief="2026-10-12", kr="2026-10-09", us="2026-10-09", gainers=[("오늘종목", 15.0)])
+    p["week"] = week
+    p["detail"]["kr_week"] = {"gainers": [{"name": "HLB", "chg_pct": 32.4}],
+                              "losers": [{"name": "와이즈플래닛컴퍼니", "chg_pct": -61.3}], "issues": iss}
+    sc = build_one(p, weekly=True)
+    assert sc.title == "지난주의 숫자"
+    assert sc.segments[0].rows[0][0] == "와이즈플래닛컴퍼니"                # 더 크게 움직인 쪽이 먼저
+    assert "일주일 만에 61.3퍼센트나 내렸어요" in sc.segments[0].speech
+    other = next(s for s in sc.segments if s.kind == "other")
+    assert "HLB는 한 주 동안 32.4퍼센트 올랐어요" in other.speech
+    mk = next(s for s in sc.segments if s.kind == "market")
+    assert "외국인은 코스피에서 한 주 동안" in mk.speech and "순매도" in mk.speech
+    assert "오늘종목" not in " ".join(s.speech for s in sc.segments)          # 금요일 하루 숫자를 되풀이하지 않는다
+    assert sc.headline.startswith("지난주 와이즈플래닛컴퍼니 -61.3% 급락")
+
+
+def test_monday_without_week_data_falls_back():
+    p = _payload(gainers=[("가", 12.0)])
+    assert build_one(p, weekly=True).title == "오늘의 숫자"

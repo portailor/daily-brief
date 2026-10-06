@@ -91,8 +91,8 @@ def _clean(s: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", "", s or "")).strip()
 
 
-def headlines(client_id: str, secret: str, name: str, trade_day: date) -> list[dict]:
-    """거래일 전날~당일(한국시간)에 나온 기사 제목. 종목명이 제목에 들어간 것만."""
+def headlines(client_id: str, secret: str, name: str, trade_day: date, back_days: int = 1) -> list[dict]:
+    """거래일 back_days 전~당일(한국시간)에 나온 기사 제목. 종목명이 제목에 들어간 것만."""
     res = with_retry(lambda: requests.get(
         NAVER_NEWS, params={"query": f"{name} 주가", "display": 30, "sort": "date",
                             "format": "json"},
@@ -100,7 +100,7 @@ def headlines(client_id: str, secret: str, name: str, trade_day: date) -> list[d
         timeout=20), attempts=2, label="네이버 뉴스")
     res.raise_for_status()
 
-    lo, hi = trade_day - timedelta(days=1), trade_day
+    lo, hi = trade_day - timedelta(days=back_days), trade_day
     out, seen = [], set()
     for it in res.json().get("items", []):
         title = _clean(it.get("title"))
@@ -121,9 +121,10 @@ def headlines(client_id: str, secret: str, name: str, trade_day: date) -> list[d
     return out[:3]
 
 
-def attach(detail: dict) -> dict:
-    """detail['kr'] 의 급등·급락 종목에 공시·뉴스를 붙인다. 실패해도 브리핑은 계속된다."""
-    kr = detail.get("kr") or {}
+def attach(detail: dict, key: str = "kr", back_days: int = 1) -> dict:
+    """detail[key] 의 급등·급락 종목에 공시·뉴스를 붙인다. 실패해도 브리핑은 계속된다.
+    key='kr_week' 이면 지난주(월~금) 종목 — 기사도 그 주 전체(back_days=6)에서 찾는다."""
+    kr = detail.get(key) or {}
     movers = [("up", s) for s in kr.get("gainers", [])] + [("down", s) for s in kr.get("losers", [])]
     if not movers or not kr.get("date"):
         return detail
@@ -153,7 +154,7 @@ def attach(detail: dict) -> dict:
                 problems.append(f"{s['name']} 공시({type(exc).__name__})")
         if nid and nsec:
             try:
-                item["news"] = headlines(nid, nsec, s["name"], trade_day)
+                item["news"] = headlines(nid, nsec, s["name"], trade_day, back_days)
             except Exception as exc:                        # noqa: BLE001
                 problems.append(f"{s['name']} 뉴스({type(exc).__name__})")
         issues.append(item)

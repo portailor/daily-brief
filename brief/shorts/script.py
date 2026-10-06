@@ -679,9 +679,9 @@ STOCK_BIG = 10.0          # 이만큼 넘게 움직인 종목은 '급등·급락
 SKEW_PP = 15              # '과거엔 어땠나'는 오른 비율이 평소와 이만큼(%p) 넘게 다를 때만
 
 
-def _headline(payload: dict, name: str) -> str | None:
-    """그 종목의 기사 제목(없으면 공시 제목) 한 줄 — 손대지 않고 정리만."""
-    for i in ((payload.get("detail") or {}).get("kr") or {}).get("issues") or []:
+def _headline(payload: dict, name: str, key: str = "kr") -> str | None:
+    """그 종목의 기사 제목(없으면 공시 제목) 한 줄 — 손대지 않고 정리만. key='kr_week' 은 지난주 종목."""
+    for i in ((payload.get("detail") or {}).get(key) or {}).get("issues") or []:
         if i.get("name") != name:
             continue
         heads = [n["title"] for n in i.get("news", []) if not GENERIC_HEADLINE.search(n["title"])]
@@ -749,8 +749,61 @@ def _market_line(payload: dict, side: str, stale: set) -> Segment | None:
     return Segment("오늘 시장은", rows, speech, "market", "", False, 1), (big[0] if big else None)
 
 
+def _build_week_one(payload: dict) -> Script | None:
+    """월요일 '지난주의 숫자' — 지난주 한 주 동안 가장 크게 움직인 종목 (10/6 동화님).
+    토요일과 월요일 아침이 같은 금요일 마감 숫자를 되풀이하던 것을 막는다."""
+    kw = (payload.get("detail") or {}).get("kr_week") or {}
+    week = payload.get("week")
+    g, l = (kw.get("gainers") or [None])[0], (kw.get("losers") or [None])[0]
+    if not (g or l) or not week:
+        return None
+    lead, other = (g, l) if (g and (not l or abs(g["chg_pct"]) >= abs(l["chg_pct"]))) else (l, g)
+    pct = lead["chg_pct"]
+    word = _stock_word(pct) if abs(pct) >= STOCK_BIG else ("상승" if pct > 0 else "하락")
+    word = {"상한가": "급등", "하한가": "급락"}.get(word, word)        # 주간 등락에 상·하한가는 없다
+    segs = [Segment("지난주의 숫자", [(lead["name"], f"{pct:+.2f}%")],
+                    f"지난주 {lead['name']}{josa(lead['name'], '이/가')} 일주일 만에 {_pct(pct, 1)}"
+                    f"{'나' if abs(pct) >= STOCK_BIG else ''} {_move(pct)}어요!", "hook",
+                    "지난주 가장 많이 " + ("오른" if pct > 0 else "내린") + " 종목", abs(pct) >= STOCK_BIG, 0)]
+    head = _headline(payload, lead["name"], "kr_week")
+    if head:
+        segs.append(Segment("무슨 일이?", [], f"지난주 관련 기사 제목은 '{head}'{josa(head, '이었/였')}어요.",
+                            "news", f"관련 기사: {head}", False, 1))
+    if other:
+        p2 = other["chg_pct"]
+        segs.append(Segment("반대로", [(other["name"], f"{p2:+.2f}%")],
+                            f"반대로 {other['name']}{josa(other['name'], '은/는')} 한 주 동안 {_pct(p2, 1)} {_move(p2)}어요.",
+                            "other", "", False, 1))
+    moves = {m.id: m for m in week.moves}
+    got = [i for i in ("KOSPI", "KOSDAQ", "SPX", "NASDAQ") if i in moves]
+    if got:
+        rows = [(NAME[i], moves[i].change_text) for i in got]
+        speech = "지난주 " + _join([_index_phrase(NAME[i], moves[i].change_text) for i in got])
+        f = next((x for x in getattr(week, "flows", []) if x.get("market") == "KOSPI"), None)
+        if f and f.get("total_eok"):
+            verb = "순매수" if f["total_eok"] > 0 else "순매도"
+            rows.append(("외국인 코스피 (한 주)", f"{'+' if f['total_eok'] > 0 else '-'}{kt._eok(f['total_eok'])}"))
+            speech += f" 외국인은 코스피에서 한 주 동안 {_won(f['total_eok'])}어치를 {verb}했어요."
+        segs.append(Segment("지난주 시장은", rows, speech, "market", week.period, False, 1))
+    st = market_status(payload, weekly=True)
+    ahead = _ahead(st, date.fromisoformat(payload["brief_date"]))
+    segs += [s for s in (ahead, Segment("", [], "지난주의 숫자였어요. 이번 주도 하차니와 함께해요!", "outro",
+                                         "지난주의 숫자 끝", priority=0)) if s]
+    title = f"지난주 {lead['name']} {pct:+.1f}% {word}"
+    if other:
+        title += f", {other['name']} {other['chg_pct']:+.1f}%"
+    km = moves.get("KOSPI")
+    mood = "down" if km and km.change < 0 else "up"
+    return Script(payload["date_short"], "지난주의 숫자", mood, segs, "", title)
+
+
 def build_one(payload: dict, weekly: bool = False) -> Script | None:
-    """'오늘의 숫자' — 오늘 가장 크게 움직인 종목 이야기 20~35초. 시장 숫자가 없으면 None."""
+    """'오늘의 숫자' — 오늘 가장 크게 움직인 종목 이야기 20~35초. 시장 숫자가 없으면 None.
+    월요일(weekly)은 '지난주의 숫자' — 지난주 자료가 없을 때만 오늘의 숫자로."""
+    if weekly:
+        wk = _build_week_one(payload)
+        if wk:
+            return wk
     st = market_status(payload, weekly)
     kr, us = st["kr_fresh"], st["us_fresh"]
     if not (kr or us):

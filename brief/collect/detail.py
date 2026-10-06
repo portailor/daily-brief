@@ -177,6 +177,33 @@ def collect_us() -> dict:
             "sectors": sorted(pack(US_SECTORS), key=lambda r: -r["chg_pct"])}
 
 
+WEEK_MIN_TRADING_VALUE = 2500 * EOK    # 주간 급등락은 한 주 거래대금 2,500억 이상 (하루 500억 × 5일)
+
+
+def collect_kr_week(start: date, end: date) -> dict:
+    """지난주(월~금) 기간 등락률 상위·하위 종목 — 월요일 '지난주의 숫자' 쇼츠용 (10/6 동화님)."""
+    if not _ensure_credentials():
+        return {"error": "KRX 자격증명 없음"}
+    from pykrx import stock                             # noqa: PLC0415
+    import pandas as pd                                 # noqa: PLC0415
+    s, e = start.strftime("%Y%m%d"), end.strftime("%Y%m%d")
+    parts = []
+    for market in ("KOSPI", "KOSDAQ"):
+        df = with_retry(lambda m=market: stock.get_market_price_change(s, e, market=m),
+                        attempts=4, base_delay=5.0, label=f"KRX {market} 주간 등락")
+        parts.append(df.assign(시장=market))
+    both = pd.concat(parts)
+    liquid = both[both["거래대금"] >= WEEK_MIN_TRADING_VALUE]
+    pack = lambda frame: [{                              # noqa: E731
+        "name": r["종목명"], "code": t, "market": r["시장"], "close": int(r["종가"]),
+        "chg_pct": float(r["등락률"]), "value_eok": float(r["거래대금"] / EOK),
+    } for t, r in frame.iterrows()]
+    return {"start": start.isoformat(), "end": end.isoformat(), "date": end.isoformat(),
+            "gainers": pack(liquid.sort_values("등락률", ascending=False).head(3)),
+            "losers": pack(liquid.sort_values("등락률").head(3)),
+            "mover_min_eok": WEEK_MIN_TRADING_VALUE / EOK}
+
+
 def collect() -> dict:
     with db.connect() as conn:
         kr_date = _latest_kr_date(conn)
@@ -193,6 +220,17 @@ def collect() -> dict:
             news.attach(detail)
         except Exception as exc:                        # noqa: BLE001
             detail["kr"].setdefault("errors", []).append(f"공시·뉴스: {type(exc).__name__}")
+    # 월요일 — 지난주 한 주 동안 가장 많이 오르고 내린 종목 (+ 그 주의 기사)
+    from brief.clock import today_kst                   # noqa: PLC0415
+    today = today_kst()
+    if today.weekday() == 0:
+        from brief.interpret.weekly import last_week    # noqa: PLC0415
+        try:
+            detail["kr_week"] = collect_kr_week(*last_week(today))
+            from brief.collect import news
+            news.attach(detail, key="kr_week", back_days=6)
+        except Exception as exc:                        # noqa: BLE001
+            detail["kr_week"] = {"error": f"{type(exc).__name__}: {exc}"}
     try:
         detail["us"] = collect_us()
     except Exception as exc:                            # noqa: BLE001

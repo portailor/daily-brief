@@ -274,7 +274,7 @@ def _header(im: Image.Image, script: Script, idx: int, keep: list[int]):
     d = ImageDraw.Draw(im)
     accent = THEME[script.mood]["accent"]
     f = _font("round", 36)
-    label = ("하차니의 오늘의 숫자" if script.title == "오늘의 숫자"
+    label = (f"하차니의 {script.title}" if script.title in ("오늘의 숫자", "지난주의 숫자")
              else "하차니의 경제 용어" if script.title.startswith("잠깐 경제 용어") else "매일 경제 브리핑")
     w = d.textlength(label, font=f)
     d.rounded_rectangle((60, 100, 60 + w + 56, 164), 32, fill=accent)
@@ -552,7 +552,8 @@ def make(payload: dict, message: str = "", weekly: bool = False, link: str | Non
 def _articles(payload: dict, names: list[str]) -> list[str]:
     """영상에 나온 종목의 기사 하나씩 — (제목 줄, 주소 줄). 쇼츠 설명란 링크는 눌리지 않아 복사해서 연다."""
     from brief.shorts.script import GENERIC_HEADLINE
-    issues = {i["name"]: i for i in ((payload.get("detail") or {}).get("kr") or {}).get("issues") or []}
+    det = payload.get("detail") or {}
+    issues = {i["name"]: i for key in ("kr_week", "kr") for i in (det.get(key) or {}).get("issues") or []}
     out = []
     for name in names:
         it = issues.get(name) or {}
@@ -574,14 +575,14 @@ def _make_one(payload: dict, weekly: bool, voice: dict) -> dict | None:
     used = [script.segments[i] for i in keep]
     hook = next(s for s in used if s.kind == "hook")
     # 제목 — 숫자부터. 날짜는 뒤로 (10/2: 쇼츠는 제목 앞부분만 보인다)
-    title = f"{script.headline} | {script.date_label} 오늘의 숫자"
+    title = f"{script.headline} | {script.date_label} {script.title}"
     dash = {r["id"]: r for r in payload.get("dashboard", [])}
     market = [f"{NAME[i]} {dash[i]['change']}" for i in ("KOSPI", "KOSDAQ", "SPX", "NASDAQ", "USDKRW")
               if i in dash and dash[i].get("change")]
     stock = [s.rows[0][0] for s in used if s.kind in ("hook", "other") and s.rows
              and s.rows[0][0] not in NAME.values() and not s.rows[0][0].startswith("외국인")]
     articles = _articles(payload, stock)
-    desc = "\n".join([f"{script.date_label} 하차니의 오늘의 숫자", "",
+    desc = "\n".join([f"{script.date_label} 하차니의 {script.title}", "",
                       *[f"[{s.tag}] {s.screen}" for s in used if s.tag and s.screen], "",
                       "오늘 시장 한눈에: " + " · ".join(market), "",
                       *(["관련 기사 (주소를 복사해서 열어 주세요)", *articles, ""] if articles else []),
