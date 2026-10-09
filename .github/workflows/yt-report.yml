@@ -1,0 +1,31 @@
+name: 유튜브 주간 성과 보고
+
+# 매주 일요일 저녁 동화님 메일(SMTP_USER 본인)로 지난 7일 영상별 숫자를 보낸다 (10/9 동화님).
+# 친구 목록(MAIL_TO)에는 보내지 않는다. 결과는 공개 저장소에 남기지 않는다.
+on:
+  schedule:
+    - cron: '7 11 * * 0'        # 한국시간 일요일 20:07 (GitHub 예약은 늦게 시작하는 일이 잦다)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 주간 성과 메일
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+        run: python scripts/yt_report.py --mail

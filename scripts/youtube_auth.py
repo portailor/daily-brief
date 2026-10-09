@@ -1,4 +1,4 @@
-"""유튜브 권한(업로드 + 재생목록 등 채널 관리)을 한 번 받는다.
+"""유튜브 권한(업로드 + 재생목록 등 채널 관리 + 통계·댓글 읽기)을 한 번 받는다.
 
   python scripts/youtube_auth.py
 
@@ -25,7 +25,9 @@ ENV = ROOT / "config" / ".env"
 PORT = 8765
 REDIRECT = f"http://127.0.0.1:{PORT}/"
 # upload: 영상 올리기 · youtube: 재생목록 넣기·예약 날짜 바꾸기 등 채널 관리 (10/6 동화님: 재생목록까지 자동으로)
-SCOPE = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube"
+# yt-analytics.readonly: 주간 성과 보고(지속률·구독 증가) · youtube.force-ssl: 댓글 읽기 (10/9 동화님)
+SCOPE = " ".join("https://www.googleapis.com/auth/" + s for s in
+                 ("youtube.upload", "youtube", "yt-analytics.readonly", "youtube.force-ssl"))
 REPOS = ("portailor/daily-brief", "portailor/hachani-anim")      # 같은 유튜브 키를 쓰는 저장소
 
 _got: dict[str, str] = {}

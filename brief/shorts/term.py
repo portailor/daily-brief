@@ -3,7 +3,8 @@
   첫 장면  "잠깐! ○○에 대해 정확히 알고 계신가요?" (10/4 동화님) + 큰 글씨 용어 + 궁금증 한 줄(hook)
   뜻       한국은행 ECOS 통계용어사전 설명을 쉬운 말로 — 사전에 없는 사실은 보태지 않는다
   지금은   그 용어와 이어지는 그날 숫자(대시보드 값)가 있으면 한 줄
-  끝       "다음에도 경제 용어 하나 알려 드릴게요!"
+  끝       "궁금한 경제 용어가 있으면 댓글로 남겨 주세요!" (10/9 — 댓글로 다음 용어를 받는다)
+  바탕     연노랑 (10/9 동화님)
 
 용어 목록과 순서는 data/terms.json. 올린 것은 data/state.json terms_done 에 남는다.
 """
@@ -65,17 +66,22 @@ def build(term: dict, payload: dict | None = None, number: int = 0) -> Script:
         segs.append(Segment("지금은?", [(name, shown)],
                             f"참고로 {day} 마감 기준 {SPOKEN.get(name, name)}{josa(name, '은/는')} {spoken}{_ieyo(spoken)}.",
                             "live", f"{day} 마감 기준", False, 1))
-    segs.append(Segment("", [], "다음에도 경제 용어 하나 알려 드릴게요!", "outro", "잠깐 경제 용어 끝", priority=0))
+    # 끝 — 댓글로 다음 용어를 받는다 (10/9 동화님: 댓글이 거의 없다)
+    segs.append(Segment("", [], "궁금한 경제 용어가 있으면 댓글로 남겨 주세요! 다음에 알려 드릴게요.", "outro",
+                        "잠깐 경제 용어 끝", priority=0))
     title = f"잠깐 경제 용어{f' {number}편' if number else ''}"
-    return Script("", title, "up", segs, "", hook_q)
+    return Script("", title, "term", segs, "", hook_q)        # 연노랑 바탕 (10/9 동화님)
 
 
 def meta(term: dict, script: Script) -> tuple[str, str]:
     """(유튜브 제목, 설명)."""
+    from brief.shorts.render import more_links
     title = f"{script.headline} | 잠깐! 경제 용어 '{term['term']}'"
     desc = "\n".join([f"잠깐! 경제 용어 — {term['term']}", "",
                       term["screen"], "", *term["speech"], "",
                       f"출처: {term.get('source', SOURCE)} '{term['source_word']}'",
-                      "공식 데이터를 모아 만든 정확한 정보의 영상입니다!",
+                      "공식 데이터를 모아 만든 정확한 정보의 영상입니다!", "",
+                      "💬 궁금한 경제 용어를 댓글로 남겨 주시면 다음 영상에서 알려 드릴게요!", "",
+                      *more_links("terms"),
                       f"#경제용어 #{term['term'].replace(' ', '')} #경제공부 #재테크 #Shorts"])
     return title[:100], desc

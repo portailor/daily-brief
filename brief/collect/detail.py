@@ -45,6 +45,9 @@ US_SECTORS = {
 }
 
 MOVER_MIN_TRADING_VALUE = 500 * EOK     # 급등락 종목은 거래대금 500억원 이상만 (소형주 잡음 제외)
+# '이름 있는 종목' — 시가총액 2조원 이상. 쇼츠 '오늘의 숫자'가 처음 듣는 소형주보다 먼저 고른다
+# (10/9 동화님: 샌즈랩·녹십자엠에스 같은 낯선 이름은 넘겨진다, 1,000회 넘긴 건 환율 두 편뿐)
+KNOWN_MIN_CAP = 2 * 10_000 * EOK
 
 
 def _latest_kr_date(conn) -> str | None:
@@ -110,6 +113,16 @@ def collect_kr(kr_date: str) -> dict:
         } for t, r in frame.iterrows()]
         out["gainers"], out["losers"] = pack(gain), pack(loss)
         out["mover_min_eok"] = MOVER_MIN_TRADING_VALUE / EOK
+
+        # 시가총액 2조원 이상 종목 중 가장 많이 오르고 내린 3개씩 (collect 가 kr_known 으로 옮긴다)
+        known = both[both["시가총액"] >= KNOWN_MIN_CAP]
+        kg = known.sort_values("등락률", ascending=False).head(3)
+        kl = known.sort_values("등락률").head(3)
+        names.update(_names(stock, [t for t in list(kg.index) + list(kl.index) if t not in names]))
+        with_cap = lambda frame: [{**x, "cap_jo": float(frame.loc[x["code"], "시가총액"] / EOK / 10_000)}  # noqa: E731
+                                  for x in pack(frame)]
+        out["known"] = {"gainers": with_cap(kg), "losers": with_cap(kl),
+                        "min_cap_jo": KNOWN_MIN_CAP / EOK / 10_000}
 
         # 시장 전체 오른 종목 / 내린 종목 수
         out["breadth"] = {m: {"up": int((f["등락률"] > 0).sum()),
@@ -220,6 +233,14 @@ def collect() -> dict:
             news.attach(detail)
         except Exception as exc:                        # noqa: BLE001
             detail["kr"].setdefault("errors", []).append(f"공시·뉴스: {type(exc).__name__}")
+        # 이름 있는 종목(시총 2조원↑)은 따로 — 리포트의 급등락 이슈 목록에는 섞지 않는다 (쇼츠 전용)
+        known = detail["kr"].pop("known", None) if isinstance(detail.get("kr"), dict) else None
+        if known:
+            detail["kr_known"] = {"date": kr_date, **known}
+            try:
+                news.attach(detail, key="kr_known")
+            except Exception as exc:                    # noqa: BLE001
+                detail["kr_known"].setdefault("errors", []).append(f"공시·뉴스: {type(exc).__name__}")
     # 월요일 — 지난주 한 주 동안 가장 많이 오르고 내린 종목 (+ 그 주의 기사)
     from brief.clock import today_kst                   # noqa: PLC0415
     today = today_kst()

@@ -32,7 +32,7 @@ def test_build_with_and_without_live_number():
 def test_live_placeholder_in_hook():
     idx = next(t for t in T.load() if t["id"] == "stock_index")
     sc = T.build(idx, {"dashboard": [{"id": "KOSPI", "close": "6,971.35"}], "kr_date": "2026-10-02"})
-    assert sc.headline == "코스피 6,971.35, 이 숫자는 뭘 뜻할까?"
+    assert sc.headline == "코스피 6,971.35, 무엇을 100으로 놓고 잰 숫자일까?"
     assert "{live}" not in T.build(idx, None).headline
 
 
@@ -56,3 +56,12 @@ def test_term_slots_mon_wed_fri_sun():
     assert got[10] == "2026-10-11T19:00:00+09:00"           # 토 → 일요일 것
     assert got[11] is None                                    # 일요일엔 실행이 없다
     assert run.term_slot(date(2026, 10, 6), {"term_days": list(range(7))}) == "2026-10-06T19:00:00+09:00"
+
+
+def test_term_is_light_yellow_and_asks_for_comments():
+    fx = next(t for t in T.load() if t["id"] == "fx")
+    sc = T.build(fx)
+    assert sc.mood == "term"                                          # 연노랑 바탕 (10/9 동화님)
+    assert "댓글" in sc.segments[-1].speech
+    _title, desc = T.meta(fx, sc)
+    assert "playlist?list=" in desc and "댓글" in desc

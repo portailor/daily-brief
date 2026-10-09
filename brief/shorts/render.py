@@ -6,7 +6,8 @@
   입 모양   말하는 동안 talk_open(ㅇ)과 talk_closed(ㅡ)를 번갈아 — 소리 크기와 무관.
   대기      다음 이슈로 넘어가며 쉬는 구간은 smile(기본형).
   놀람      놀랄 만한 구간은 처음 SURPRISE_SEC 동안 surprised, 그다음부터 말하기.
-  자켓      상승 빨강 / 하락 파랑 (대본의 mood).
+  반응      (10/9 동화님) 종목·지수가 크게 오르면 손 번쩍(cheer), 크게 내리면 울상(cry) — 놀람 대신.
+  자켓      상승 빨강 / 하락 파랑 (대본의 mood). 잠깐! 경제 용어는 연노랑 옷·연노랑 바탕 (10/9 동화님).
   화면      파스텔 바탕 + 스티커 같은 카드, 둥근 글꼴(주아)과 손글씨 말풍선(개구).
             웹 리포트와 다른 글꼴로 — "캡처해서 따온 것 같다"(9/22)는 말에 따라.
   길이      쇼츠 상한(3분) 안에 들도록 MAX_SEC 를 넘으면 덜 중요한 구간부터 뺀다.
@@ -56,6 +57,8 @@ CREAM = (255, 253, 247)
 THEME = {   # 바탕 위·아래, 강조색
     "up":   {"top": (255, 244, 240), "bottom": (255, 226, 219), "accent": (240, 100, 110)},
     "down": {"top": (238, 246, 255), "bottom": (218, 234, 255), "accent": (79, 142, 247)},
+    # 잠깐! 경제 용어 — 연노랑 바탕 (10/9 동화님). 흰 글씨 이름표가 읽히게 강조색은 진한 주황
+    "term": {"top": (255, 251, 228), "bottom": (255, 241, 186), "accent": (219, 120, 22)},
 }
 UP_C, DOWN_C = (232, 72, 85), (52, 120, 230)
 
@@ -205,11 +208,13 @@ def _audio(lines: list[Line], folder: Path) -> Path:
 # ── 그림 ────────────────────────────────────────────────────
 
 def _characters(mood: str) -> dict[str, Image.Image]:
-    color = "red" if mood == "up" else "blue"
+    color = {"down": "blue", "term": "yellow"}.get(mood, "red")     # 용어 쇼츠는 연노랑 옷 (10/9 동화님)
     out = {}
-    for pose in ("smile", "talk_open", "talk_closed", "surprised"):
-        im = Image.open(CHAR_DIR / f"{color}_{pose}.png").convert("RGBA")
-        out[pose] = im.resize((round(im.width * CHAR_H / im.height), CHAR_H), Image.LANCZOS)
+    for pose in ("smile", "talk_open", "talk_closed", "surprised", "cheer", "cry"):
+        f = CHAR_DIR / f"{color}_{pose}.png"
+        if f.exists():
+            im = Image.open(f).convert("RGBA")
+            out[pose] = im.resize((round(im.width * CHAR_H / im.height), CHAR_H), Image.LANCZOS)
     return out
 
 
@@ -423,7 +428,7 @@ def _pose(t: float, lines: list[Line], segs: list[Segment], frame: int) -> str:
     for ln in lines:
         if ln.start <= t < ln.end:
             if segs[ln.seg].surprise and t - first_start[ln.seg] < SURPRISE_SEC:
-                return "surprised"
+                return segs[ln.seg].react or "surprised"
             if any(a <= t - ln.start < b for a, b in ln.pauses):
                 return "talk_closed"                     # 쉼표에서 쉬는 동안은 입을 닫는다
             return "talk_open" if (frame // MOUTH_EVERY) % 2 == 0 else "talk_closed"
@@ -468,7 +473,7 @@ def render(script: Script, out: Path, voice: dict | None = None) -> tuple[Path, 
                 im, bottom = panels[lines[j].seg]
                 im = im.copy()
                 _bubble(im, lines[j].text, bottom, tail_x)
-                im.alpha_composite(chars[pose], (cx, cy))
+                im.alpha_composite(chars.get(pose) or chars["surprised"], (cx, cy))
                 cache[(j, pose)] = im.convert("RGB").tobytes()
             return cache[(j, pose)]
 
@@ -489,13 +494,32 @@ def render(script: Script, out: Path, voice: dict | None = None) -> tuple[Path, 
         # 첫 장면이 '오늘 가장 큰 뉴스'여도 썸네일은 인사 장면(오늘 이야기할 것) — 9/27 동화님
         # '오늘의 숫자'(10/2~)는 인사 장면이 없다 — 썸네일도 첫 장면(큰 숫자 + 하차니 표정)
         intro_j = next((j for j, ln in enumerate(lines) if script.segments[ln.seg].kind == "intro"), 0)
-        pose = "surprised" if script.segments[lines[intro_j].seg].surprise else "smile"
+        first = script.segments[lines[intro_j].seg]
+        pose = (first.react or "surprised") if first.surprise else "smile"
         Image.frombytes("RGB", (W, H), frame_bytes(intro_j, pose)).save(
             thumb_path(out), "JPEG", quality=90, optimize=True)
     return out, keep
 
 
 SHORTS_DIR = ROOT / "data" / "shorts"
+
+
+PLAYLIST_LABEL = {"brief": "📊 하차니의 오늘의 숫자 (월~토 아침)",
+                  "terms": "📖 잠깐! 경제 용어 (월·수·금·일 저녁)",
+                  "episodes": "🐢 하차니 에피소드 (화·목·토 오전)"}
+
+
+def more_links(skip: str) -> list[str]:
+    """설명란 끝 '다른 영상' — 같은 채널의 다른 재생목록으로 (10/9 동화님: 시청층 잇기). 끝에 빈 줄."""
+    try:
+        import yaml
+        pl = (yaml.safe_load((ROOT / "config" / "settings.yaml").read_text(encoding="utf-8"))
+              .get("shorts") or {}).get("playlists") or {}
+    except Exception:                                      # noqa: BLE001
+        return []
+    out = [f"{PLAYLIST_LABEL[k]}\nhttps://www.youtube.com/playlist?list={pl[k]}"
+           for k in PLAYLIST_LABEL if k != skip and pl.get(k)]
+    return [*out, ""] if out else []
 
 
 def thumb_path(video: Path) -> Path:
@@ -553,7 +577,7 @@ def _articles(payload: dict, names: list[str]) -> list[str]:
     """영상에 나온 종목의 기사 하나씩 — (제목 줄, 주소 줄). 쇼츠 설명란 링크는 눌리지 않아 복사해서 연다."""
     from brief.shorts.script import GENERIC_HEADLINE
     det = payload.get("detail") or {}
-    issues = {i["name"]: i for key in ("kr_week", "kr") for i in (det.get(key) or {}).get("issues") or []}
+    issues = {i["name"]: i for key in ("kr_week", "kr_known", "kr") for i in (det.get(key) or {}).get("issues") or []}
     out = []
     for name in names:
         it = issues.get(name) or {}
@@ -586,7 +610,8 @@ def _make_one(payload: dict, weekly: bool, voice: dict) -> dict | None:
                       *[f"[{s.tag}] {s.screen}" for s in used if s.tag and s.screen], "",
                       "오늘 시장 한눈에: " + " · ".join(market), "",
                       *(["관련 기사 (주소를 복사해서 열어 주세요)", *articles, ""] if articles else []),
-                      "공식 데이터를 모아 만든 정확한 정보의 영상입니다!",
+                      "공식 데이터를 모아 만든 정확한 정보의 영상입니다!", "",
+                      *more_links("brief"),
                       "#경제 #주식 #코스피 #오늘의숫자 #Shorts"])
     return {"path": str(out), "thumb": str(thumb_path(out)), "title": title[:100], "description": desc,
             "mood": script.mood, "speech": " ".join(script.segments[i].speech for i in keep)}
