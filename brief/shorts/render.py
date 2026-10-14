@@ -107,18 +107,25 @@ class Line:
         return self.start + self.dur
 
 
+# 10/14: Ava 목소리만 한동안 빈 응답(NoAudioReceived)을 낸 일이 있었다 — 그럴 땐 비슷한 다국어 여성 목소리로
+# 영상은 나가게 한다 (목소리가 조금 달라도 영상이 빠지는 것보다 낫다).
+FALLBACK_VOICE = "en-US-EmmaMultilingualNeural"
+
+
 async def _tts(jobs: list[tuple[str, Path]], voice: dict) -> None:
     import edge_tts
     for text, path in jobs:
-        for attempt in range(3):
+        for attempt in range(5):
+            name = voice["voice"] if attempt < 3 else FALLBACK_VOICE
             try:
-                await edge_tts.Communicate(text, voice["voice"], rate=voice["rate"],
-                                           pitch=voice["pitch"]).save(str(path))
+                await edge_tts.Communicate(text, name, rate=voice["rate"], pitch=voice["pitch"]).save(str(path))
+                if name != voice["voice"]:
+                    print(f"  △ 목소리 {voice['voice']} 응답 없음 — {name} 로 대신 읽음")
                 break
             except Exception:                              # noqa: BLE001
-                if attempt == 2:
+                if attempt == 4:
                     raise
-                await asyncio.sleep(3)
+                await asyncio.sleep(3 * (attempt + 1))
 
 
 def _voice_lines(script: Script, folder: Path, voice: dict) -> list[Line]:
