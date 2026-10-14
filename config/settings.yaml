@@ -189,7 +189,9 @@ shorts:
     episodes: PLUtDB445g7wc    # 하차니의 에피소드 (대기열 애니메이션)
   privacy: public
   # 목소리 — edge-tts. 9/23 동화님이 후보 A~E 중 C 선택: 영어권 다국어 목소리(Ava)가 한국어를 읽는다
+  # 10/14 동화님: 구글 Chirp 3 HD 'Puck'(남자, 후보 30종 중 21번) · 빠르기 1.1. 키 GOOGLE_TTS_API_KEY (.env·Secrets).
+  # 예전 목소리로 되돌리려면 engine 줄을 지우고 voice: en-US-AvaMultilingualNeural, rate: "+10%", pitch: "+20Hz".
   voice:
-    voice: en-US-AvaMultilingualNeural
-    rate: "+10%"
-    pitch: "+20Hz"
+    engine: google
+    name: ko-KR-Chirp3-HD-Puck
+    rate: 1.1

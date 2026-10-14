@@ -110,9 +110,40 @@ class Line:
 # 10/14: Ava 목소리만 한동안 빈 응답(NoAudioReceived)을 낸 일이 있었다 — 그럴 땐 비슷한 다국어 여성 목소리로
 # 영상은 나가게 한다 (목소리가 조금 달라도 영상이 빠지는 것보다 낫다).
 FALLBACK_VOICE = "en-US-EmmaMultilingualNeural"
+GOOGLE_FALLBACK = "ko-KR-InJoonNeural"            # 구글(남자 Puck)이 안 될 때 — 무료 한국어 남자 목소리
+
+
+def _google_tts(text: str, path: Path, voice: dict) -> None:
+    """구글 Chirp 3 HD (10/14 동화님: 목소리를 'Puck'으로). 키는 GOOGLE_TTS_API_KEY — 찍지 않는다."""
+    import base64
+    import os
+
+    import requests
+    from brief.collect.macro import _load_env
+    key = os.environ.get("GOOGLE_TTS_API_KEY") or _load_env().get("GOOGLE_TTS_API_KEY", "")
+    r = requests.post("https://texttospeech.googleapis.com/v1/text:synthesize", headers={"X-Goog-Api-Key": key}, timeout=60,   # 키는 주소에 넣지 않는다 (오류 로그에 찍히지 않게)
+                      json={"input": {"text": text},
+                            "voice": {"languageCode": "ko-KR", "name": voice["name"]},
+                            "audioConfig": {"audioEncoding": "MP3", "speakingRate": float(voice.get("rate", 1.0))}})
+    if r.status_code != 200:
+        raise RuntimeError(f"구글 TTS 실패 ({r.status_code})")
+    path.write_bytes(base64.b64decode(r.json()["audioContent"]))
 
 
 async def _tts(jobs: list[tuple[str, Path]], voice: dict) -> None:
+    if voice.get("engine") == "google":
+        for text, path in jobs:
+            for attempt in range(4):
+                try:
+                    _google_tts(text, path, voice)
+                    break
+                except Exception as exc:                   # noqa: BLE001
+                    if attempt == 3:                       # 구글이 끝내 안 되면 무료 남자 목소리로라도
+                        print(f"  △ 구글 목소리 실패({exc}) — {GOOGLE_FALLBACK} 로 대신 읽음")
+                        await _tts([(text, path)], {"voice": GOOGLE_FALLBACK, "rate": "+10%", "pitch": "+0Hz"})
+                        break
+                    await asyncio.sleep(3 * (attempt + 1))
+        return
     import edge_tts
     for text, path in jobs:
         for attempt in range(5):

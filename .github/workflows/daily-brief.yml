@@ -200,6 +200,7 @@ jobs:
         env:
           PYTHONUTF8: '1'
           TZ: Asia/Seoul
+          GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}   # 쇼츠 목소리 (구글 Chirp 3 HD Puck)
         run: python run.py --no-send --no-publish
 
       - name: 리포트와 기록 올리기
