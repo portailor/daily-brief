@@ -97,6 +97,19 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         run: pip install -r requirements.txt
 
+      # 쇼츠 애니메이션 엔진 — 비공개 저장소라 읽기 전용 토큰으로 받는다 (10/15 동화님). 없으면 예전 화면으로.
+      - name: 애니메이션 엔진 받기
+        if: steps.guard.outputs.skip != 'true'
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: portailor/hachani-anim
+          token: ${{ secrets.HACHANI_ANIM_TOKEN }}
+          path: anim
+          sparse-checkout: |
+            애니메이션
+          persist-credentials: false
+
       # 쇼츠 영상용 — 영상 인코더와 한글 글꼴 (runner 에는 한글 글꼴이 없다)
       - name: ffmpeg·한글 글꼴 설치
         if: steps.guard.outputs.skip != 'true'

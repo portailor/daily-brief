@@ -1047,7 +1047,18 @@ def _build_one_macro(payload: dict, weekly: bool = False, force: str | None = No
     ahead = _ahead(st, d)
     if ahead and past:                                  # '참고로 …' 와 '참고하시면 …' 이 겹치지 않게
         ahead.speech = ahead.speech.replace("참고로 ", "그리고 ", 1)
-    segs = [s for s in (_closed_now(st), hook, why, past, ahead, outro) if s]
+    # 10/16: 지표가 주인공인 날(코스닥 -7.65% 등)도 시장 한 줄 + 한눈에 보는 경제 — 첫 장면·평소의 ○배만으로는 짧다
+    mk_seg, board = None, None
+    if iid != "FOREIGN" or kr:
+        mk = _market_line(payload, "kr" if kr else "us", stale)
+        if mk:
+            mk_seg, extra = mk
+            if extra == iid:                                   # 첫 장면 지표를 시장 한 줄에서 또 말하지 않게
+                mk_seg = _market_line({**payload, "dashboard": [r for r in payload.get("dashboard", [])
+                                                                if r["id"] != iid]}, "kr" if kr else "us", stale)
+                mk_seg = mk_seg[0] if mk_seg else None
+        board = _board(payload, kr, us, "kr" if kr else "us", skip={iid})
+    segs = [s for s in (_closed_now(st), hook, why, mk_seg, board, past, ahead, outro) if s]
     if segs[0].kind == "closed":                        # 휴장 안내보다 숫자가 먼저 — 첫 2초가 전부다
         segs[0], segs[1] = segs[1], segs[0]
     return Script(payload["date_short"], "오늘의 숫자", mood, segs, "", title)

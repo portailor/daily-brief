@@ -576,7 +576,7 @@ def make(payload: dict, message: str = "", weekly: bool = False, link: str | Non
     if voice is None:
         voice = sc.get("voice") or {}
     if sc.get("format", "one") == "one":                   # 10/2~ '오늘의 숫자' (settings.yaml shorts.format)
-        return _make_one(payload, weekly, voice)
+        return _make_one(payload, weekly, voice, anim=bool(sc.get("anim", False)))
     script = build(payload, message, weekly=weekly, link=link or "")
     if script is None:
         return None
@@ -627,13 +627,50 @@ def _articles(payload: dict, names: list[str]) -> list[str]:
     return out
 
 
-def _make_one(payload: dict, weekly: bool, voice: dict) -> dict | None:
-    """'오늘의 숫자' 영상 + 제목·설명."""
+def _anim_dir() -> Path | None:
+    """애니메이션 엔진(비공개 저장소 portailor/hachani-anim 의 애니메이션/) 위치. 워크플로가 anim/ 에 받아 둔다."""
+    import os
+    d = Path(os.environ.get("HACHANI_ANIM_DIR") or ROOT / "anim" / "애니메이션")
+    return d if (d / "brief_anim.py").exists() else None
+
+
+def render_anim(script: Script, out: Path, voice: dict) -> tuple[Path, list[int]]:
+    """10/15 동화님: '오늘의 숫자'를 애니메이션 틀(brief_anim)로 — 장면 종류마다 정해 둔 움직임.
+    썸네일은 첫 장면 숫자가 다 자란 뒤(1.6초) 한 장."""
+    import numpy as np
+    d = _anim_dir()
+    if d is None:
+        raise RuntimeError("애니메이션 엔진 없음")
+    if str(d) not in sys.path:
+        sys.path.insert(0, str(d))
+    import brief_anim
+    import explainer
+    if voice.get("engine") == "google":
+        explainer.VOICE = dict(engine="google", name=voice["name"], rate=float(voice.get("rate", 1.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    b = brief_anim.Brief(script)
+    b.render(str(out))
+    frame = (np.clip(b.frame(b.T["s0"] + 1.6), 0, 1) * 255).astype(np.uint8)
+    Image.fromarray(frame).save(thumb_path(out), "JPEG", quality=90, optimize=True)
+    keep = [i for i, s in enumerate(script.segments) if s in b.segs]
+    return out, keep
+
+
+def _make_one(payload: dict, weekly: bool, voice: dict, anim: bool = False) -> dict | None:
+    """'오늘의 숫자' 영상 + 제목·설명. anim=True 면 애니메이션 틀, 안 되면 예전 화면으로."""
     from brief.shorts.script import ONE_NAME as NAME, build_one
     script = build_one(payload, weekly=weekly)
     if script is None:
         return None
-    out, keep = render(script, SHORTS_DIR / f"{payload['brief_date']}.mp4", voice)
+    path = SHORTS_DIR / f"{payload['brief_date']}.mp4"
+    out = keep = None
+    if anim:
+        try:
+            out, keep = render_anim(script, path, voice)
+        except Exception as exc:                           # noqa: BLE001 — 영상이 빠지는 것보다 예전 화면이 낫다
+            print(f"  △ 애니메이션 실패 ({type(exc).__name__}: {str(exc)[:120]}) — 예전 화면으로")
+    if out is None:
+        out, keep = render(script, path, voice)
     used = [script.segments[i] for i in keep]
     hook = next(s for s in used if s.kind == "hook")
     # 제목 — 숫자부터. 날짜는 뒤로 (10/2: 쇼츠는 제목 앞부분만 보인다)
