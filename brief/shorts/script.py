@@ -839,6 +839,39 @@ def _market_line(payload: dict, side: str, stale: set) -> Segment | None:
     return Segment("오늘 시장은", rows, speech, "market", "", False, 1), (big[0] if big else None)
 
 
+# ── 10/15 동화님: '오늘의 숫자'에 경제 정보를 조금 더 — 한눈에 보는 경제 (외국인 · 환율 · 미국 증시)
+def _board(payload: dict, kr: bool, us: bool, side: str, skip: set) -> Segment | None:
+    """외국인 코스피 순매수(한국장 마감일 때) · 원/달러 환율 · 미국 증시(시장 한 줄에서 미국을 말하지 않았을 때).
+    skip = 이미 다른 장면에서 말한 지표 id. 대시보드·수급 숫자 그대로 — 해석은 붙이지 않는다."""
+    dash = _dash(payload)
+    rows, said = [], []
+    if kr and "FOREIGN" not in skip:
+        f = next((s for s in payload.get("flow_stats", []) if s.market == "KOSPI" and s.investor == "외국인합계"), None)
+        if f and f.eok:
+            verb = "순매수" if f.eok > 0 else "순매도"
+            run = f"{abs(f.streak)}거래일 연속 " if abs(f.streak) >= 2 else ""
+            rows.append(("외국인 코스피", f"{'+' if f.eok > 0 else '-'}{kt._eok(f.eok)}"))
+            said.append(f"외국인은 코스피에서 {_won(f.eok)}어치를 {run}{verb}했고")
+    fx = dash.get("USDKRW")
+    if kr and fx and "USDKRW" not in skip and fx.get("close") and _num(fx.get("change")) is not None:
+        v = _num(fx["change"])
+        rows.append(("원/달러 환율", f"{fx['close']}원 {fx['change']}"))
+        level = f"약 {round(_num(fx['close'])):,}원"          # 읽을 땐 소수점 없이 (화면엔 그대로)
+        said.append(f"원 달러 환율은 {level}으로 {_pct(v)} {_move(v)}고")
+    if us and side != "us":
+        got = [i for i in ("NASDAQ", "SPX") if i in dash and _num(dash[i].get("change")) is not None and i not in skip]
+        if got:
+            i = got[0]
+            v = _num(dash[i]["change"])
+            rows.append((f"미국 {NAME[i]}", dash[i]["change"]))
+            said.append(f"미국 {NAME[i]}{josa(NAME[i], '은/는')} {_pct(v)} {_move(v)}어요")
+    if len(rows) < 2:
+        return None
+    speech = "한눈에 보면, " + ", ".join(said)
+    speech = re.sub(r"(했|렸|랐)고$", r"\1어요", speech.rstrip()) if not speech.endswith("어요") else speech
+    return Segment("한눈에 보는 경제", rows, speech + ("." if not speech.endswith(".") else ""), "board", "", False, 1)
+
+
 def _build_week_one(payload: dict) -> Script | None:
     """월요일 '지난주의 숫자' — 지난주 한 주 동안 가장 크게 움직인 종목 (10/6 동화님).
     토요일과 월요일 아침이 같은 금요일 마감 숫자를 되풀이하던 것을 막는다."""
@@ -935,6 +968,9 @@ def build_one(payload: dict, weekly: bool = False) -> Script | None:
     if mk:
         seg, big_iid = mk
         segs.append(seg)
+    board = _board(payload, kr, us, side, skip={big_iid})
+    if board:
+        segs.append(board)
     # 과거 통계 — 평소와 많이 다를 때만 (10/6 동화님)
     past = _skewed(_one_past(payload, big_iid, kr) if big_iid else None)
     d = date.fromisoformat(payload["brief_date"])
