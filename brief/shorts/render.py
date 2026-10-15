@@ -130,7 +130,13 @@ def _google_tts(text: str, path: Path, voice: dict) -> None:
     path.write_bytes(base64.b64decode(r.json()["audioContent"]))
 
 
+def spoken(text: str) -> str:
+    """읽을 글: 숫자 쉼표를 뺀다 — '1,339원'을 '1, 339원'이 아니라 '천삼백삼십구 원'으로 (10/16 동화님)."""
+    return re.sub(r"(?<=\d),(?=\d{3})", "", text)
+
+
 async def _tts(jobs: list[tuple[str, Path]], voice: dict) -> None:
+    jobs = [(spoken(text), path) for text, path in jobs]
     if voice.get("engine") == "google":
         for text, path in jobs:
             for attempt in range(4):

@@ -143,15 +143,25 @@ def test_bigger_name_first_unless_small_one_moved_twice_as_much():
                [{"name": "펩트론", "chg_pct": -29.9, "cap_jo": 2.1}]) == "펩트론"
 
 
-def test_board_adds_foreign_fx_and_us():
-    """10/15 동화님: 경제 정보 조금 더 — 외국인·환율·미국 증시 한눈에."""
-    p = _payload(gainers=[("가", 24.0)])
+def test_board_and_flows():
+    """10/15 동화님: 경제 정보 조금 더 — 환율·미국 증시 한눈에.
+    10/16 동화님: 외국인 연속 매도는 코스피 등락과 함께 '누가 팔고 누가 샀나'로 (원인이라고 단정하진 않는다)."""
+    from brief.shorts.render import spoken
+    p = _payload(gainers=[("가", 24.0)], rows=[("KOSPI", ("-7.57%", "-1.80", "5%"))])
     for r in p["dashboard"]:
         if r["id"] == "USDKRW":
-            r["close"] = "1,340.31"
-    p["flow_stats"] = [SimpleNamespace(market="KOSPI", investor="외국인합계", eok=-11201.9, streak=-7, sigma=-0.2)]
+            r["close"] = "1,341.58"
+    p["flow_stats"] = [SimpleNamespace(market="KOSPI", investor="외국인합계", eok=-36300.0, streak=-8, sigma=-1.3),
+                       SimpleNamespace(market="KOSPI", investor="기관합계", eok=5054.0, streak=3, sigma=0.5),
+                       SimpleNamespace(market="KOSPI", investor="개인", eok=24400.0, streak=1, sigma=0.8)]
     sc = build_one(p)
+    kinds = [s.kind for s in sc.segments]
+    assert kinds.index("flows") < kinds.index("board")
+    fl = next(s for s in sc.segments if s.kind == "flows")
+    assert [r[0] for r in fl.rows] == ["외국인", "기관", "개인"]
+    assert "코스피가 7.57퍼센트 내렸던 날" in fl.speech and "8거래일 연속" in fl.speech and "반대로 기관은" in fl.speech
+    assert "때문" not in fl.speech                                        # 원인 단정 금지
     board = next(s for s in sc.segments if s.kind == "board")
-    assert [r[0] for r in board.rows] == ["외국인 코스피", "원/달러 환율", "미국 나스닥"]
-    assert "7거래일 연속 순매도" in board.speech and "약 1,340원" in board.speech
-    assert board.speech.endswith("어요.")
+    assert [r[0] for r in board.rows] == ["원/달러 환율", "미국 나스닥"]
+    assert "약 1342원" in board.speech and board.speech.endswith("어요.")
+    assert spoken("약 1,342원, 5,054억") == "약 1342원, 5054억"            # 쉼표 없이 읽는다

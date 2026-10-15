@@ -845,18 +845,11 @@ def _board(payload: dict, kr: bool, us: bool, side: str, skip: set) -> Segment |
     skip = 이미 다른 장면에서 말한 지표 id. 대시보드·수급 숫자 그대로 — 해석은 붙이지 않는다."""
     dash = _dash(payload)
     rows, said = [], []
-    if kr and "FOREIGN" not in skip:
-        f = next((s for s in payload.get("flow_stats", []) if s.market == "KOSPI" and s.investor == "외국인합계"), None)
-        if f and f.eok:
-            verb = "순매수" if f.eok > 0 else "순매도"
-            run = f"{abs(f.streak)}거래일 연속 " if abs(f.streak) >= 2 else ""
-            rows.append(("외국인 코스피", f"{'+' if f.eok > 0 else '-'}{kt._eok(f.eok)}"))
-            said.append(f"외국인은 코스피에서 {_won(f.eok)}어치를 {run}{verb}했고")
     fx = dash.get("USDKRW")
     if kr and fx and "USDKRW" not in skip and fx.get("close") and _num(fx.get("change")) is not None:
         v = _num(fx["change"])
         rows.append(("원/달러 환율", f"{fx['close']}원 {fx['change']}"))
-        level = f"약 {round(_num(fx['close'])):,}원"          # 읽을 땐 소수점 없이 (화면엔 그대로)
+        level = f"약 {round(_num(fx['close']))}원"           # 읽을 땐 소수점·쉼표 없이 — '약 천삼백사십 원' (10/16 동화님)
         said.append(f"원 달러 환율은 {level}으로 {_pct(v)} {_move(v)}고")
     if us and side != "us":
         got = [i for i in ("NASDAQ", "SPX") if i in dash and _num(dash[i].get("change")) is not None and i not in skip]
@@ -870,6 +863,39 @@ def _board(payload: dict, kr: bool, us: bool, side: str, skip: set) -> Segment |
     speech = "한눈에 보면, " + ", ".join(said)
     speech = re.sub(r"(했|렸|랐)고$", r"\1어요", speech.rstrip()) if not speech.endswith("어요") else speech
     return Segment("한눈에 보는 경제", rows, speech + ("." if not speech.endswith(".") else ""), "board", "", False, 1)
+
+
+# ── 10/16 동화님: 외국인이 며칠 연속 팔면 코스피가 내린 것과 함께 설명해 달라 — '누가 팔고 누가 샀나'.
+#    원인이라고 단정하지 않고(환각 금지) 같은 날 있었던 일로 나란히: 코스피 등락 · 외국인·기관·개인 순매수 · 외국인 연속 일수.
+FLOW_WHO = (("외국인합계", "외국인"), ("기관합계", "기관"), ("개인", "개인"))
+
+
+def _one_flows(payload: dict) -> Segment | None:
+    stats = {s.investor: s for s in payload.get("flow_stats", []) if s.market == "KOSPI"}
+    got = [(label, stats[inv]) for inv, label in FLOW_WHO if inv in stats and stats[inv].eok]
+    if len(got) < 2 or got[0][0] != "외국인":
+        return None
+    k = _num((_dash(payload).get("KOSPI") or {}).get("change"))
+    f = got[0][1]
+    rows = [(label, f"{'+' if s.eok > 0 else '-'}{kt._eok(s.eok)}") for label, s in got]
+    verb = "순매수" if f.eok > 0 else "순매도"
+    said = []
+    if k is not None:
+        said.append(f"코스피가 {_pct(k)} {_move(k)}던 날, 누가 팔고 누가 샀는지 볼게요.")
+    run = f" 벌써 {abs(f.streak)}거래일 연속이에요." if abs(f.streak) >= 2 else ""
+    said.append(f"외국인은 코스피에서 {_won(f.eok)}어치를 {verb}했어요.{run}")
+    others = [(label, s) for label, s in got[1:]]
+    opp = [(label, s) for label, s in others if (s.eok > 0) != (f.eok > 0)]
+    same = [(label, s) for label, s in others if (s.eok > 0) == (f.eok > 0)]
+    if opp:
+        v2 = "순매수" if opp[0][1].eok > 0 else "순매도"
+        said.append("반대로 " + ", ".join(f"{label}{josa(label, '은/는')} {_won(s.eok)}" for label, s in opp)
+                    + f"어치를 {v2}했어요.")
+    if same:
+        said.append(", ".join(f"{label}{josa(label, '도')} {_won(s.eok)}" for label, s in same)
+                    + f"어치를 {verb}했고요.")
+    note = f"외국인 {abs(f.streak)}거래일 연속 {verb}" if abs(f.streak) >= 2 else ""
+    return Segment("누가 팔고 누가 샀나", rows, " ".join(said), "flows", note, False, 1)
 
 
 def _build_week_one(payload: dict) -> Script | None:
@@ -968,6 +994,9 @@ def build_one(payload: dict, weekly: bool = False) -> Script | None:
     if mk:
         seg, big_iid = mk
         segs.append(seg)
+    flows = _one_flows(payload) if kr else None
+    if flows:
+        segs.append(flows)
     board = _board(payload, kr, us, side, skip={big_iid})
     if board:
         segs.append(board)
@@ -1058,7 +1087,8 @@ def _build_one_macro(payload: dict, weekly: bool = False, force: str | None = No
                                                                 if r["id"] != iid]}, "kr" if kr else "us", stale)
                 mk_seg = mk_seg[0] if mk_seg else None
         board = _board(payload, kr, us, "kr" if kr else "us", skip={iid})
-    segs = [s for s in (_closed_now(st), hook, why, mk_seg, board, past, ahead, outro) if s]
+    flows = _one_flows(payload) if kr and iid != "FOREIGN" else None
+    segs = [s for s in (_closed_now(st), hook, why, mk_seg, flows, board, past, ahead, outro) if s]
     if segs[0].kind == "closed":                        # 휴장 안내보다 숫자가 먼저 — 첫 2초가 전부다
         segs[0], segs[1] = segs[1], segs[0]
     return Script(payload["date_short"], "오늘의 숫자", mood, segs, "", title)
