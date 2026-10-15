@@ -544,7 +544,7 @@ SHORTS_DIR = ROOT / "data" / "shorts"
 
 PLAYLIST_LABEL = {"brief": "📊 하차니의 오늘의 숫자 (월~토 아침)",
                   "terms": "📖 잠깐! 경제 용어 (월·수·금·일 저녁)",
-                  "episodes": "🐢 하차니 에피소드 (화·목·토 오전)"}
+                  "episodes": "🐢 하차니 에피소드 (매주 토요일 오전)"}
 
 
 def more_links(skip: str) -> list[str]:
