@@ -1,6 +1,6 @@
 {
-  "market_key": "KOSPI:2026-11-03|SPX:2026-11-03",
-  "brief_date": "2026-11-04",
+  "market_key": "KOSPI:2026-11-04|SPX:2026-11-04",
+  "brief_date": "2026-11-05",
   "sent_date": "2026-11-04",
   "results_shown": {
     "fomc:2026-09-16": "2026-09-22",
@@ -55,7 +55,8 @@
     "earn:AMZN:2026Q3": "2026-10-30",
     "earn:INTC:2026Q3": "2026-10-30",
     "earn:AAPL:2026Q4": "2026-11-04",
-    "earn:PLTR:2026Q3": "2026-11-04"
+    "earn:PLTR:2026Q3": "2026-11-04",
+    "earn:AMD:2026Q3": "2026-11-05"
   },
   "queue_done": [
     "anim-ep03-chart",
