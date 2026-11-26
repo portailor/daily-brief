@@ -175,7 +175,8 @@ watchlist:
 # 올리기는 카톡 발송 직후. 자격증명은 scripts/youtube_auth.py 로 한 번 받는다.
 # 감사 받지 않은 API 프로젝트는 public 으로 올려도 유튜브가 비공개로 잠근다.
 shorts:
-  upload: true
+  # 11/26 동화님: 유튜브 임시 중단 — 다시 켤 때 true (복구 기록: hachani-anim 애니메이션/pause_2026-11-26/)
+  upload: false
   # one = '오늘의 숫자' (그날 가장 센 숫자 하나, 20~30초 — 10/2 동화님) / full = 예전 전체 브리핑(1분 남짓)
   format: one
   # 10/15 동화님: 애니메이션 틀(비공개 저장소 hachani-anim 의 brief_anim.py — 워크플로가 anim/ 에 받아 둔다).
