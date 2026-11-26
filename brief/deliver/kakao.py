@@ -27,6 +27,7 @@ from brief.retry import with_retry  # noqa: E402
 
 SEND_URL = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
 TOKEN_URL = "https://kauth.kakao.com/oauth/token"
+TOKEN_ATTEMPTS, TOKEN_RETRY_DELAY = 4, 60.0          # 연결 실패 시 1·2·4분 뒤 다시 (최대 7분)
 TEXT_LIMIT = 200
 
 
@@ -58,7 +59,11 @@ def refresh_access_token() -> str:
     if cfg.get("client_secret"):
         payload["client_secret"] = cfg["client_secret"]
 
-    res = requests.post(TOKEN_URL, data=payload, timeout=15)
+    # 11/26 아침 kauth.kakao.com 연결이 시간 초과로 끊겨 그날 발송이 4시간 늦었다 (예비 실행이 11:27 에 보냄).
+    # 연결 자체가 안 된 경우(요청이 서버에 닿지 않음)만 1 → 2 → 4분 기다리며 다시 시도한다.
+    res = with_retry(lambda: requests.post(TOKEN_URL, data=payload, timeout=15),
+                     attempts=TOKEN_ATTEMPTS, base_delay=TOKEN_RETRY_DELAY, label="카카오 토큰 갱신",
+                     on=(requests.exceptions.ConnectionError,))
 
     if res.status_code != 200:
         raise KakaoError(

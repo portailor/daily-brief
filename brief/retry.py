@@ -30,8 +30,10 @@ def with_retry(fn: Callable[[], T], *,
                attempts: int = 3,
                base_delay: float = 2.0,
                label: str = "",
-               on_retry: Callable[[int, Exception], None] | None = None) -> T:
+               on_retry: Callable[[int, Exception], None] | None = None,
+               on: tuple[type[BaseException], ...] = TRANSIENT) -> T:
     """fn 을 최대 attempts 번 시도한다. 대기 시간은 2초 → 4초 → 8초.
+    on = 재시도할 오류 종류 (기본 TRANSIENT).
 
     마지막 시도까지 실패하면 원래 예외를 그대로 올린다 —
     호출한 쪽이 무엇이 실패했는지 알아야 하기 때문이다.
@@ -41,7 +43,7 @@ def with_retry(fn: Callable[[], T], *,
     for i in range(1, attempts + 1):
         try:
             return fn()
-        except TRANSIENT as exc:
+        except on as exc:
             last = exc
             if i == attempts:
                 break
